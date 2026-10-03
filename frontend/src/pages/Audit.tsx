@@ -24,30 +24,34 @@ export default function Audit() {
     {
       title: '时间',
       dataIndex: 'created_at',
-      width: 160,
+      width: '30%',
       render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm'),
     },
     {
       title: '操作人',
       dataIndex: 'username',
+      width: '25%',
       render: (v: string, r) => v || `#${r.user_id}`,
     },
     {
       title: '动作',
       dataIndex: 'action',
-      width: 96,
+      width: '20%',
       render: (a: string) => {
         const m = ACTION_LABEL[a];
         return <Tag color={m?.color}>{m?.text ?? a}</Tag>;
       },
     },
-    { title: '账期', dataIndex: 'period_key', width: 110 },
+    { title: '账期', dataIndex: 'period_key', width: '25%' },
   ];
 
   return (
     <div className="page">
       <div className="page-head">
-        <h2>审计日志</h2>
+        <div>
+          <div className="eyebrow">AUDIT · 封账与解封留痕</div>
+          <h2>审计日志</h2>
+        </div>
       </div>
 
       <Card size="small" className="panel">

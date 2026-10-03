@@ -95,11 +95,14 @@ export default function Settings() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>账期设置</h2>
+        <div>
+          <div className="eyebrow">PERIOD · 结算日与封账</div>
+          <h2>账期设置</h2>
+        </div>
       </div>
 
       {/* 结算日：改日提示“仅影响今日之后的流水” */}
-      <Card size="small" className="panel" title="结算日" loading={settings.isLoading}>
+      <Card size="small" className="panel panel--measure" title="结算日" loading={settings.isLoading}>
         <div className="setting-row">
           <InputNumber
             min={1}
@@ -127,7 +130,7 @@ export default function Settings() {
       </Card>
 
       {/* 封账：手动选择已结束账期，确认前展示收支结余 */}
-      <Card size="small" className="panel" title="封账管理">
+      <Card size="small" className="panel panel--measure" title="封账管理">
         <div className="setting-row">
           <DatePicker
             picker="month"

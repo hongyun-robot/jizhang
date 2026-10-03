@@ -73,13 +73,16 @@ export default function Budgets() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>预算</h2>
+        <div>
+          <div className="eyebrow">BUDGET · {month ? month.format('YYYY.MM') : '本期'}</div>
+          <h2>预算</h2>
+        </div>
         <Tag color={isAdmin ? 'teal' : 'default'}>{isAdmin ? '可配置' : '仅查看'}</Tag>
       </div>
 
       <Card
         size="small"
-        className="panel"
+        className="panel panel--measure"
         title="预算配置"
         extra={
           <DatePicker

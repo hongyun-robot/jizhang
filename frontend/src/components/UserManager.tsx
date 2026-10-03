@@ -211,7 +211,7 @@ export default function UserManager() {
     <>
       <Card
         size="small"
-        className="panel"
+        className="panel panel--measure"
         title="用户管理"
         extra={
           <Button

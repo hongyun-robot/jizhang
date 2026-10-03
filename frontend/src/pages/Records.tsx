@@ -192,7 +192,7 @@ export default function Records() {
 
   const actions = (t: Transaction) =>
     canEdit(t) ? (
-      <>
+      <span className="row-actions">
         <Button type="link" size="small" onClick={() => openEdit(t)}>
           编辑
         </Button>
@@ -201,7 +201,7 @@ export default function Records() {
             删除
           </Button>
         </Popconfirm>
-      </>
+      </span>
     ) : null;
 
   const columns = [
@@ -259,7 +259,14 @@ export default function Records() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>流水</h2>
+        <div>
+          <div className="eyebrow">
+            {list.data
+              ? `${filters.range.start.replace(/-/g, '.')} – ${filters.range.end.replace(/-/g, '.')} · ${list.data.total.toLocaleString('zh-CN')} 笔`
+              : '载入中'}
+          </div>
+          <h2>流水</h2>
+        </div>
         <div className="head-actions">
           <Button
             icon={<DownloadOutlined />}

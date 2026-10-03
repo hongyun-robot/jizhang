@@ -74,9 +74,15 @@ function snap(page) {
   });
 }
 
-const LIGHT_BODY = 'rgb(244, 244, 245)';
-const DARK_BODY = 'rgb(9, 9, 11)';
-const DARK_PANEL = 'rgb(24, 24, 27)';
+// 取值与 src/styles.css 的设计变量保持一致（:root 浅色 / [data-theme='dark'] 暗色）：
+// 改设计色板时这里要同步，否则断言的是「色值」而非「主题切换」这件事本身。
+const LIGHT_BODY = 'rgb(242, 240, 234)'; // --bg #f2f0ea
+const LIGHT_PANEL = 'rgb(255, 254, 250)'; // --panel #fffefa
+const DARK_BODY = 'rgb(11, 13, 12)'; // --bg #0b0d0c
+const DARK_PANEL = 'rgb(20, 23, 22)'; // --panel #141716
+const DARK_TAB_BG = 'rgba(20, 23, 22, 0.86)'; // --tab-bg（半透明面板底 + 毛玻璃）
+const DARK_TAB_FG = 'rgba(236, 235, 228, 0.58)'; // --tab-fg（非选中 Tab 文字）
+const LIGHT_PRIMARY_BTN = 'rgb(13, 110, 102)'; // --primary-fill #0d6e66
 
 const browser = await chromium.launch({ executablePath: EXE, headless: true });
 
@@ -109,7 +115,7 @@ const browser = await chromium.launch({ executablePath: EXE, headless: true });
 
   const light = await snap(page);
   ok(
-    light.theme === 'light' && light.bodyBg === LIGHT_BODY && light.panelBg === 'rgb(255, 255, 255)',
+    light.theme === 'light' && light.bodyBg === LIGHT_BODY && light.panelBg === LIGHT_PANEL,
     '12.1 默认（系统浅色）：页面与面板为浅色',
     `${light.theme} ${light.bodyBg} ${light.panelBg}`,
   );
@@ -216,7 +222,7 @@ const browser = await chromium.launch({ executablePath: EXE, headless: true });
   );
   const btnLight = (await snap(page)).primaryBtnBg;
   ok(
-    btnLight !== btnDark && btnLight === 'rgb(15, 118, 110)',
+    btnLight !== btnDark && btnLight === LIGHT_PRIMARY_BTN,
     '12.1 AntD 主按钮底色随主题切换（明暗两套 token）',
     `${btnLight} vs ${btnDark}`,
   );
@@ -243,7 +249,7 @@ const browser = await chromium.launch({ executablePath: EXE, headless: true });
     `${m.theme} ${m.bodyBg}`,
   );
   ok(
-    m.tabBg === DARK_PANEL && m.tabColor === 'rgba(244, 244, 245, 0.6)',
+    m.tabBg === DARK_TAB_BG && m.tabColor === DARK_TAB_FG,
     '12.1 移动端底部 Tab 栏同步暗色（面板底 + 非选中 Tab 文字色）',
     `${m.tabBg} ${m.tabColor}`,
   );

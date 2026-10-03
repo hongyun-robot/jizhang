@@ -109,29 +109,40 @@ export default function Accounts() {
   };
 
   const columns = [
-    { title: '账户', dataIndex: 'name', key: 'name' },
+    { title: '账户', dataIndex: 'name', key: 'name', width: '38%' },
     {
       title: '类型',
       dataIndex: 'type',
       key: 'type',
+      width: '9%',
       render: (t: AccountType) => (t === 'asset' ? <Tag>资产</Tag> : <Tag color="volcano">负债</Tag>),
     },
-    { title: '余额', key: 'balance', render: (_: unknown, a: Account) => renderBalance(a) },
+    {
+      title: '余额',
+      key: 'balance',
+      width: '15%',
+      align: 'right' as const,
+      render: (_: unknown, a: Account) => renderBalance(a),
+    },
     {
       title: '还款日',
       dataIndex: 'repayment_day',
       key: 'repayment_day',
+      width: '12%',
       render: (d?: number | null) => (d ? `每月 ${d} 日` : '—'),
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
+      width: '9%',
       render: (s: string) => (s === 'active' ? <Tag color="success">启用</Tag> : <Tag>停用</Tag>),
     },
     {
       title: '',
       key: 'actions',
+      width: '17%',
+      align: 'right' as const,
       render: (_: unknown, a: Account) => (
         <>
           <Button type="link" size="small" onClick={() => openEdit(a)}>
@@ -150,13 +161,16 @@ export default function Accounts() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>账户管理</h2>
+        <div>
+          <div className="eyebrow">ACCOUNTS · {(accounts.data ?? []).length} 个账户</div>
+          <h2>账户管理</h2>
+        </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           新建账户
         </Button>
       </div>
 
-      <Card size="small" className="panel">
+      <Card size="small" className="panel panel--measure">
         {isMobile ? (
           <div className="acct-list">
             {(accounts.data ?? []).map((a) => (

@@ -3,12 +3,19 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Grid, Layout, Menu } from 'antd';
 import {
   HomeOutlined,
+  MoonOutlined,
   PieChartOutlined,
+  SunOutlined,
   UnorderedListOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 
-import { useEnsureRecurring } from '../api/hooks';
+import { useBudgets, useEnsureRecurring, useStatsCompare } from '../api/hooks';
+import { ROLE_LABEL } from '../labels';
+import { useAuth } from '../stores/auth';
+import { resolve, useTheme } from '../stores/theme';
+import Brand from './Brand';
+import Money, { fmtMoney } from './Money';
 import NotifBell from './NotifBell';
 
 const { Sider } = Layout;
@@ -33,15 +40,69 @@ function activeKey(pathname: string): string {
   return navItems.find((i) => i.path !== '/' && pathname.startsWith(i.path))?.key ?? 'dash';
 }
 
-/** 桌面侧栏布局（light zinc，符合中性底 + 单主色设计决策）。 */
+/** 侧栏「本期」速览：结余 + 预算水位，把导航下方的留白变成可扫读的信息位。 */
+function SiderBrief() {
+  const compare = useStatsCompare(null);
+  const budgets = useBudgets();
+  const cur = compare.data?.current;
+  const total = budgets.data?.total;
+  const pct = Math.min(100, Number(total?.percent ?? 0));
+
+  return (
+    <div className="sider-brief">
+      <div className="brief-label">
+        <span>本期结余</span>
+        <span>{budgets.data?.period_key ?? '—'}</span>
+      </div>
+      <div className="brief-value">
+        {compare.data ? (
+          <Money
+            value={cur?.balance ?? '0'}
+            tone={Number(cur?.balance ?? 0) < 0 ? 'expense' : 'income'}
+          />
+        ) : (
+          <span className="muted">—</span>
+        )}
+      </div>
+      <div className="brief-meta">
+        {compare.data ? (
+          <>
+            收入 {fmtMoney(cur?.income)} · 支出 {fmtMoney(cur?.expense)}
+          </>
+        ) : (
+          '读取中…'
+        )}
+      </div>
+      {total?.budget && (
+        <>
+          <div className={total.over ? 'brief-bar over' : 'brief-bar'}>
+            <i style={{ width: `${pct}%` }} />
+          </div>
+          <div className="brief-meta">
+            预算已用 {total.percent}%
+            {total.over && <span className="budget-over"> · 已超支</span>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** 桌面侧栏：品牌位 + 四项导航 + 本期速览 + 用户位（含明暗切换）。 */
 export function DesktopShell({ children }: { children?: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const user = useAuth((s) => s.user);
+  const mode = useTheme((s) => s.mode);
+  const sys = useTheme((s) => s.sys);
+  const setMode = useTheme((s) => s.setMode);
+  const resolved = resolve(mode, sys);
+
   return (
     <Layout style={{ minHeight: '100dvh' }}>
-      <Sider width={200} breakpoint="lg" collapsedWidth={0} theme="light" className="app-sider">
+      <Sider width={236} breakpoint="lg" collapsedWidth={0} theme="light" className="app-sider">
         <div className="brand">
-          <span>记账</span>
+          <Brand />
           <NotifBell />
         </div>
         <Menu
@@ -50,6 +111,27 @@ export function DesktopShell({ children }: { children?: React.ReactNode }) {
           items={navItems.map((i) => ({ key: i.key, icon: i.icon, label: i.label }))}
           onClick={({ key }) => navigate(navItems.find((i) => i.key === key)!.path)}
         />
+        <SiderBrief />
+        <div className="sider-foot">
+          <span className="user-chip">
+            <span className="avatar" aria-hidden="true">
+              {(user?.username ?? '?').slice(0, 1).toUpperCase()}
+            </span>
+            <span className="who">
+              <b>{user?.username ?? '—'}</b>
+              <span>{user ? ROLE_LABEL[user.role] ?? user.role : ''}</span>
+            </span>
+          </span>
+          <button
+            type="button"
+            className="theme-toggle"
+            title={resolved === 'dark' ? '切换到浅色' : '切换到暗色'}
+            aria-label={resolved === 'dark' ? '切换到浅色' : '切换到暗色'}
+            onClick={() => setMode(resolved === 'dark' ? 'light' : 'dark')}
+          >
+            {resolved === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+          </button>
+        </div>
       </Sider>
       <Layout.Content className="app-content">{children ?? <Outlet />}</Layout.Content>
     </Layout>

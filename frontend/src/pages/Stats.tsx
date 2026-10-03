@@ -19,9 +19,9 @@ import EChart from '../components/EChart';
 import Money, { fmtMoney } from '../components/Money';
 import PeriodPicker, { presetRange } from '../components/PeriodPicker';
 
-/** 图表配色：单一青绿主色 + zinc 中性，红/绿仅作收支语义；暗色为同色相提亮版。 */
-const PALETTE_LIGHT = ['#0f766e', '#115e59', '#0d9488', '#14b8a6', '#5eead4', '#78716c', '#a8a29e', '#d6d3d1'];
-const PALETTE_DARK = ['#2dd4bf', '#14b8a6', '#0d9488', '#115e59', '#5eead4', '#a8a29e', '#d6d3d1', '#78716c'];
+/** 图表配色：单一墨绿主色 + 暖灰中性，红/绿仅作收支语义；暗色为同色相提亮版。 */
+const PALETTE_LIGHT = ['#0d6e66', '#0a524b', '#128e85', '#3aa9a0', '#79c7c0', '#8b8579', '#b7b1a3', '#dcd8cd'];
+const PALETTE_DARK = ['#2dd4bf', '#14b8a6', '#0d9488', '#5eead4', '#99f6e4', '#a8a29e', '#d6d3d1', '#78716c'];
 
 function pct(p: number | null): { text: string; cls: string } {
   if (p === null) return { text: '—', cls: 'pct-flat' };
@@ -57,12 +57,12 @@ export default function Stats() {
 
   // 主题相关用色（任务 12.1）：画布不读 CSS 变量，需按生效主题取值
   const dark = useResolvedTheme() === 'dark';
-  const TEAL = dark ? '#2dd4bf' : '#0f766e';
-  const GREEN = dark ? '#4ade80' : '#16a34a';
-  const RED = dark ? '#f87171' : '#dc2626';
+  const TEAL = dark ? '#2dd4bf' : '#0d6e66';
+  const GREEN = dark ? '#4ade80' : '#0f7a52';
+  const RED = dark ? '#f87171' : '#c0392b';
   const PALETTE = dark ? PALETTE_DARK : PALETTE_LIGHT;
-  const pieBorder = dark ? '#18181b' : '#fff';
-  const prevBar = dark ? '#78716c' : '#d6d3d1';
+  const pieBorder = dark ? '#141716' : '#fffefa';
+  const prevBar = dark ? '#78716c' : '#d8d4c9';
 
   const share = shareKind === 'expense' ? category.data?.expense : category.data?.income;
 
@@ -77,12 +77,14 @@ export default function Stats() {
           type: 'pie',
           radius: ['40%', '66%'],
           itemStyle: { borderColor: pieBorder, borderWidth: 2 },
-          label: { fontSize: 11, formatter: '{b} {d}%' },
+          // 窄屏标签会互相压住，交给图例与 tooltip
+          label: isMobile ? { show: false } : { fontSize: 11, formatter: '{b} {d}%' },
+          labelLine: { show: !isMobile },
           data: items.map((i) => ({ name: i.name, value: Number(i.amount) })),
         },
       ],
     };
-  }, [share, dark, pieBorder, PALETTE]);
+  }, [share, dark, pieBorder, PALETTE, isMobile]);
 
   const trendOption = useMemo<EChartsOption>(() => {
     const pts = trend.data?.points ?? [];
@@ -168,7 +170,12 @@ export default function Stats() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>统计</h2>
+        <div>
+          <div className="eyebrow">
+            {`${range.start.replace(/-/g, '.')} – ${range.end.replace(/-/g, '.')}`}
+          </div>
+          <h2>统计</h2>
+        </div>
       </div>
 
       {/* 共享区间选择器：与流水列表同一组件、同一区间语义 */}
@@ -295,7 +302,17 @@ export default function Stats() {
           </div>
         </Card>
 
-        {/* 5. 资产走势（负债负贡献） */}
+        {/* 5. 本期预算进度（与首页同数据源，specs/budgets；宽面板双列铺排，填满整行） */}
+        <Card size="small" className="panel stats-wide" title="预算进度">
+          <BudgetProgress
+            view={budgets.data}
+            loading={budgets.isLoading}
+            showPeriod
+            configLink={user?.role === 'admin'}
+          />
+        </Card>
+
+        {/* 6. 资产走势（负债负贡献） */}
         <Card size="small" className="panel stats-wide" title="资产走势">
           {assets.isLoading ? (
             <Spin />
@@ -309,16 +326,6 @@ export default function Stats() {
           ) : (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="区间内无数据" />
           )}
-        </Card>
-
-        {/* 6. 本期预算进度（与首页同数据源，specs/budgets） */}
-        <Card size="small" className="panel" title="预算进度">
-          <BudgetProgress
-            view={budgets.data}
-            loading={budgets.isLoading}
-            showPeriod
-            configLink={user?.role === 'admin'}
-          />
         </Card>
       </div>
     </div>

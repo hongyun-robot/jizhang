@@ -134,7 +134,10 @@ export default function Categories() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>分类管理</h2>
+        <div>
+          <div className="eyebrow">CATEGORIES · 支出与收入两棵树</div>
+          <h2>分类管理</h2>
+        </div>
       </div>
 
       {forest.isLoading ? (

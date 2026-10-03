@@ -4,55 +4,78 @@ import type { EChartsOption } from 'echarts';
 
 import { useResolvedTheme } from '../stores/theme';
 
-/** 暗色补色（任务 12.1）：echarts 画布不读 CSS 变量，深色底需显式给文字/网格/浮层用色。 */
-const DARK_TEXT = '#e4e4e7';
-const DARK_AXIS = '#a1a1aa';
-const DARK_GRID = 'rgba(244, 244, 245, 0.08)';
-const DARK_AXIS_LINE = 'rgba(244, 244, 245, 0.18)';
-const DARK_TIP_BG = 'rgba(24, 24, 27, 0.96)';
-const DARK_TIP_BORDER = 'rgba(244, 244, 245, 0.14)';
+/**
+ * 画布不读 CSS 变量：亮/暗两套文本、网格、浮层用色都显式给，
+ * 并统一字体族（与页面同一套拉丁字体，数字才对得齐）。
+ */
+const UI_FONT =
+  "'Instrument Sans Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif";
+
+const LIGHT = {
+  text: '#4b473e',
+  axis: '#7b766a',
+  grid: 'rgba(38, 35, 28, 0.08)',
+  axisLine: 'rgba(38, 35, 28, 0.16)',
+  tipBg: 'rgba(255, 254, 250, 0.97)',
+  tipBorder: 'rgba(38, 35, 28, 0.12)',
+};
+
+const DARK = {
+  text: '#e4e4e7',
+  axis: '#a1a1aa',
+  grid: 'rgba(244, 244, 245, 0.08)',
+  axisLine: 'rgba(244, 244, 245, 0.18)',
+  tipBg: 'rgba(20, 23, 22, 0.96)',
+  tipBorder: 'rgba(236, 234, 227, 0.14)',
+};
 
 type AnyOpt = Record<string, any>;
+type Palette = typeof LIGHT;
 
 /**
- * 在调用方 option 之上补暗色默认值：只改「颜色」，不动业务配置
- * （调用方显式给的颜色优先，font/formatter 等原样保留）。
+ * 在调用方 option 之上补主题默认值：只改「颜色与字体」，不动业务配置
+ * （调用方显式给的颜色优先，formatter 等原样保留）。
  */
-function applyDark(option: EChartsOption): EChartsOption {
+function applyTheme(option: EChartsOption, p: Palette): EChartsOption {
   const o = option as unknown as AnyOpt;
-  const out: AnyOpt = { ...o, textStyle: { color: DARK_TEXT, ...(o.textStyle ?? {}) } };
+  const out: AnyOpt = {
+    ...o,
+    textStyle: { fontFamily: UI_FONT, color: p.text, ...(o.textStyle ?? {}) },
+  };
 
   if (o.legend && !Array.isArray(o.legend)) {
     out.legend = {
       ...o.legend,
-      textStyle: { color: DARK_TEXT, fontSize: 11, ...((o.legend as AnyOpt).textStyle ?? {}) },
+      textStyle: { fontFamily: UI_FONT, color: p.text, fontSize: 11, ...((o.legend as AnyOpt).textStyle ?? {}) },
     };
   }
 
   if (o.tooltip && !Array.isArray(o.tooltip)) {
     const t = o.tooltip as AnyOpt;
     out.tooltip = {
-      backgroundColor: DARK_TIP_BG,
-      borderColor: DARK_TIP_BORDER,
+      backgroundColor: p.tipBg,
+      borderColor: p.tipBorder,
+      borderWidth: 1,
       ...t,
-      textStyle: { color: DARK_TEXT, ...(t.textStyle ?? {}) },
+      textStyle: { fontFamily: UI_FONT, color: p.text, ...(t.textStyle ?? {}) },
     };
   }
 
   const axis = (a: AnyOpt, isY: boolean): AnyOpt => {
     const next: AnyOpt = {
       ...a,
-      axisLabel: { color: DARK_AXIS, ...(a.axisLabel ?? {}) },
+      axisLabel: { fontFamily: UI_FONT, color: p.axis, fontSize: 11, ...(a.axisLabel ?? {}) },
       axisLine: {
         ...(a.axisLine ?? {}),
-        lineStyle: { color: DARK_AXIS_LINE, ...((a.axisLine ?? {}).lineStyle ?? {}) },
+        lineStyle: { color: p.axisLine, ...((a.axisLine ?? {}).lineStyle ?? {}) },
       },
-      nameTextStyle: { color: DARK_TEXT, ...(a.nameTextStyle ?? {}) },
+      axisTick: { ...(a.axisTick ?? {}) },
+      nameTextStyle: { fontFamily: UI_FONT, color: p.text, ...(a.nameTextStyle ?? {}) },
     };
     if (isY) {
       next.splitLine = {
         ...(a.splitLine ?? {}),
-        lineStyle: { color: DARK_GRID, ...((a.splitLine ?? {}).lineStyle ?? {}) },
+        lineStyle: { color: p.grid, ...((a.splitLine ?? {}).lineStyle ?? {}) },
       };
     }
     return next;
@@ -67,7 +90,7 @@ function applyDark(option: EChartsOption): EChartsOption {
   if (Array.isArray(o.series)) {
     out.series = (o.series as AnyOpt[]).map((s) =>
       s && typeof s === 'object' && s.label
-        ? { ...s, label: { color: DARK_TEXT, ...(s.label ?? {}) } }
+        ? { ...s, label: { fontFamily: UI_FONT, color: p.text, ...(s.label ?? {}) } }
         : s,
     );
   }
@@ -95,10 +118,7 @@ export default function EChart({ option, height = 280 }: { option: EChartsOption
     };
   }, []);
 
-  const themed = useMemo(
-    () => (mode === 'dark' ? applyDark(option) : option),
-    [option, mode],
-  );
+  const themed = useMemo(() => applyTheme(option, mode === 'dark' ? DARK : LIGHT), [option, mode]);
 
   useEffect(() => {
     instRef.current?.setOption(themed, true);

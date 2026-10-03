@@ -59,7 +59,12 @@ export default function Notifications() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>提醒</h2>
+        <div>
+          <div className="eyebrow">
+            INBOX{unread > 0 ? ` · 未读 ${unread}` : ' · 全部已读'}
+          </div>
+          <h2>提醒</h2>
+        </div>
         <Button
           icon={<CheckOutlined />}
           disabled={unread === 0}

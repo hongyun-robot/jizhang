@@ -236,7 +236,10 @@ export default function Recurring() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>周期记账</h2>
+        <div>
+          <div className="eyebrow">RECURRING · 到期自动补记</div>
+          <h2>周期记账</h2>
+        </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           新建周期
         </Button>

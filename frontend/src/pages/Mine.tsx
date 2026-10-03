@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, Button, Card, Segmented, Tag } from 'antd';
 import {
@@ -6,6 +6,7 @@ import {
   CalendarOutlined,
   FundOutlined,
   HistoryOutlined,
+  RightOutlined,
   SyncOutlined,
   TeamOutlined,
   TagsOutlined,
@@ -14,23 +15,44 @@ import {
 } from '@ant-design/icons';
 
 import { api } from '../api/client';
+import { ROLE_LABEL } from '../labels';
 import { useAuth, canRecord } from '../stores/auth';
 import { useTheme, type ThemeMode } from '../stores/theme';
 import UserManager from '../components/UserManager';
 
-const ROLE_LABEL: Record<string, string> = {
-  admin: '管理员',
-  recorder: '记账员',
-  member: '成员',
-  viewer: '只读',
+/** 角色徽标：不走 antd 预设蓝，统一到墨绿系（styles.css .role-tag）。 */
+const ROLE_TONE: Record<string, string> = {
+  admin: 'admin',
+  recorder: 'recorder',
+  member: 'member',
+  viewer: 'viewer',
 };
 
-const ROLE_COLOR: Record<string, string> = {
-  admin: 'geekblue',
-  recorder: 'cyan',
-  member: 'default',
-  viewer: 'default',
-};
+/** 「我的」里的入口磁贴：图标 + 名称 + 右箭头，桌面三列铺排。 */
+function Tile({
+  icon,
+  label,
+  onClick,
+  active,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+}) {
+  return (
+    <Button
+      type="text"
+      className={`mine-tile${active ? ' is-active' : ''}`}
+      onClick={onClick}
+      aria-label={label}
+    >
+      <span className="mine-tile-icon">{icon}</span>
+      <span className="mine-tile-label">{label}</span>
+      <RightOutlined className="mine-tile-arrow" />
+    </Button>
+  );
+}
 
 /** 我的：身份信息 + 外观主题 + 记账入口（周期记账对可记账角色可见）
  *  + 管理入口（账户/分类/用户仅管理员可见）+ 退出登录。 */
@@ -55,68 +77,50 @@ export default function Mine() {
   return (
     <div className="page">
       <div className="page-head">
-        <h2>我的</h2>
+        <div>
+          <div className="eyebrow">ACCOUNT · 身份、外观与入口</div>
+          <h2>我的</h2>
+        </div>
       </div>
 
-      <Card size="small" className="panel mine-card">
-        <Avatar size={48} icon={<UserOutlined />} style={{ background: '#0f766e' }} />
+      <Card size="small" className="panel panel--measure mine-card">
+        <Avatar size={54} icon={<UserOutlined />} className="mine-avatar" />
         <div className="mine-id">
           <div className="mine-name">{user?.username ?? '—'}</div>
-          <div>
+          <div className="mine-meta">
             {user && (
-              <Tag color={ROLE_COLOR[user.role]}>{ROLE_LABEL[user.role] ?? user.role}</Tag>
+              <Tag className={`role-tag role-${ROLE_TONE[user.role] ?? 'member'}`}>
+                {ROLE_LABEL[user.role] ?? user.role}
+              </Tag>
             )}
+            <span className="mine-hint">家人共用同一本账簿</span>
           </div>
         </div>
       </Card>
 
       {/* 记账入口：管理员/记账员/普通成员可见（specs/recurring-entries 归属隔离） */}
       {canRecord(user?.role) && (
-        <Card size="small" className="panel" title="记账">
+        <Card size="small" className="panel panel--measure" title="记账">
           <div className="mine-menu">
-            <Button block type="text" icon={<SyncOutlined />} onClick={() => navigate('/recurring')}>
-              周期记账
-            </Button>
+            <Tile icon={<SyncOutlined />} label="周期记账" onClick={() => navigate('/recurring')} />
           </div>
         </Card>
       )}
 
       {user?.role === 'admin' && (
-        <Card size="small" className="panel" title="管理">
+        <Card size="small" className="panel panel--measure" title="管理">
           <div className="mine-menu">
-            <Button
-              block
-              type={userMgmt ? 'primary' : 'text'}
+            <Tile
               icon={<TeamOutlined />}
+              label="用户管理"
+              active={userMgmt}
               onClick={() => setUserMgmt((v) => !v)}
-            >
-              用户管理
-            </Button>
-            <Button
-              block
-              type="text"
-              icon={<AppstoreOutlined />}
-              onClick={() => navigate('/accounts')}
-            >
-              账户管理
-            </Button>
-            <Button block type="text" icon={<TagsOutlined />} onClick={() => navigate('/categories')}>
-              分类管理
-            </Button>
-            <Button
-              block
-              type="text"
-              icon={<CalendarOutlined />}
-              onClick={() => navigate('/settings')}
-            >
-              账期设置
-            </Button>
-            <Button block type="text" icon={<FundOutlined />} onClick={() => navigate('/budgets')}>
-              预算管理
-            </Button>
-            <Button block type="text" icon={<HistoryOutlined />} onClick={() => navigate('/audit')}>
-              审计日志
-            </Button>
+            />
+            <Tile icon={<AppstoreOutlined />} label="账户管理" onClick={() => navigate('/accounts')} />
+            <Tile icon={<TagsOutlined />} label="分类管理" onClick={() => navigate('/categories')} />
+            <Tile icon={<CalendarOutlined />} label="账期设置" onClick={() => navigate('/settings')} />
+            <Tile icon={<FundOutlined />} label="预算管理" onClick={() => navigate('/budgets')} />
+            <Tile icon={<HistoryOutlined />} label="审计日志" onClick={() => navigate('/audit')} />
           </div>
         </Card>
       )}
@@ -124,21 +128,23 @@ export default function Mine() {
       {/* 用户管理（原地展开，不新增路由；见 components/UserManager） */}
       {user?.role === 'admin' && userMgmt && <UserManager />}
 
-      <Card size="small" className="panel" title="外观">
-        <Segmented
-          block
-          value={themeMode}
-          onChange={(v) => setThemeMode(v as ThemeMode)}
-          options={[
-            { value: 'system', label: '跟随系统' },
-            { value: 'light', label: '浅色' },
-            { value: 'dark', label: '暗色' },
-          ]}
-        />
+      <Card size="small" className="panel panel--measure" title="外观">
+        <div className="seg-wrap">
+          <Segmented
+            block
+            value={themeMode}
+            onChange={(v) => setThemeMode(v as ThemeMode)}
+            options={[
+              { value: 'system', label: '跟随系统' },
+              { value: 'light', label: '浅色' },
+              { value: 'dark', label: '暗色' },
+            ]}
+          />
+        </div>
       </Card>
 
-      <Card size="small" className="panel">
-        <Button block danger icon={<LogoutOutlined />} onClick={logout}>
+      <Card size="small" className="panel panel--measure mine-foot">
+        <Button block danger className="logout-btn" icon={<LogoutOutlined />} onClick={logout}>
           退出登录
         </Button>
       </Card>

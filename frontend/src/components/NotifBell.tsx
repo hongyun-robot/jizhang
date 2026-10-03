@@ -17,6 +17,7 @@ export default function NotifBell() {
     <button
       type="button"
       className="notif-bell"
+      data-unread={unread > 0 ? '1' : '0'}
       aria-label="提醒"
       title="提醒"
       onClick={() => navigate('/notifications')}

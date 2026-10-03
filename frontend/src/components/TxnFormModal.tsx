@@ -214,6 +214,7 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
         {/* 分类（转账无分类） */}
         {kind !== 'transfer' && roots.length > 0 && (
           <div className="cat-pick">
+            <div className="pick-label">分类</div>
             <div className="cat-roots">
               {roots.map((r) => (
                 <Tag.CheckableTag
@@ -225,6 +226,7 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
                 </Tag.CheckableTag>
               ))}
             </div>
+            {leaves.length > 0 && <div className="pick-label">子分类</div>}
             <div className="cat-leaves">
               {leaves.map((c) => (
                 <Tag.CheckableTag
