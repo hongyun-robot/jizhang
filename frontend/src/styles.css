@@ -1,0 +1,1080 @@
+/* 全局样式：AntD 之外的布局骨架（双形态壳、底部 Tab、品牌位） */
+
+/* 盒模型基线。
+   此前全站没有 box-sizing reset，而 .app-content 是 width:100% + padding:12px 且处于
+   content-box → 360px 视口下实际渲染 360+24=384px，移动端**每个页面**都横向溢出 24px。
+   通配符优先级(0,0,0)低于任何类选择器，AntD 组件自带的 border-box 声明不会被覆盖。 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+.brand {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 0 20px;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  color: var(--text, #18181b);
+  border-bottom: 1px solid var(--line, rgba(24, 24, 27, 0.08));
+}
+
+/* 侧栏选中态：浅青绿底 + 主色文字（默认 token 对比度不足；暗色由变量整组切换） */
+.app-sider {
+  background: var(--panel);
+}
+.app-sider .ant-menu {
+  background: transparent;
+}
+.app-sider .ant-menu-item-selected {
+  background: var(--sel-bg);
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.app-sider .ant-menu-item-selected .anticon {
+  color: var(--primary);
+}
+
+.app-content {
+  padding: 16px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.mobile-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.mobile-shell .app-content {
+  flex: 1;
+  padding: 12px 12px calc(72px + env(safe-area-inset-bottom));
+}
+
+.bottom-tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  /* 4 个 Tab + 右端铃铛工具位（非 Tab，specs/notifications） */
+  grid-template-columns: repeat(4, 1fr) 56px;
+  background: var(--tab-bg);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+}
+
+.bottom-tabs .tab {
+  position: relative;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 56px;
+  font-size: 11px;
+  color: var(--tab-fg);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+/* 图标是 .tab 的子级 span（旧选择器 .tab.anticon 永不命中），按设计意图定 20px */
+.bottom-tabs .tab .anticon {
+  font-size: 20px;
+}
+
+.bottom-tabs .tab span {
+  font-size: 11px;
+}
+
+.bottom-tabs .tab.active {
+  color: var(--primary, #0f766e);
+}
+
+/* 选中 Tab 顶部指示条：scaleX 展开，传达「当前所在位置」 */
+.bottom-tabs .tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 26px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--primary, #0f766e);
+  transform: translateX(-50%) scaleX(0);
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bottom-tabs .tab.active::before {
+  transform: translateX(-50%) scaleX(1);
+}
+
+/* 选中时图标回弹一次：确认操作落点 */
+.bottom-tabs .tab.active .anticon {
+  animation: tab-pop 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bottom-tabs .tab:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-tabs .tab {
+    transition: none;
+  }
+  .bottom-tabs .tab:active {
+    transform: none;
+  }
+}
+
+/* 主题变量（任务 12.1）：浅色为设计基准，暗色由 [data-theme='dark'] 整组覆盖 */
+:root {
+  color-scheme: light;
+  --primary: #0f766e;
+  --bg: #f4f4f5;
+  --panel: #ffffff;
+  --tab-bg: #ffffff;
+  --login-bg: #f6f7f9;
+  --line: rgba(24, 24, 27, 0.08);
+  --text: #18181b;
+  --muted: #71717a;
+  --income: #16a34a;
+  --expense: #dc2626;
+  /* 语义化的派生色：Tab 文字、青绿 hover/选中、行内闪烁 */
+  --tab-fg: rgba(0, 0, 0, 0.55);
+  --sel-bg: rgba(15, 118, 110, 0.1);
+  --hover-soft: rgba(15, 118, 110, 0.06);
+  --hover-tint: rgba(15, 118, 110, 0.08);
+  --flash: rgba(15, 118, 110, 0.16);
+}
+
+/* 暗色：同色相 zinc 灰阶；主色青绿仅提亮文字级用色（#2dd4bf），不引入第二主色 */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --primary: #2dd4bf;
+  --bg: #09090b;
+  --panel: #18181b;
+  --tab-bg: #18181b;
+  --login-bg: #09090b;
+  --line: rgba(244, 244, 245, 0.1);
+  --text: #f4f4f5;
+  --muted: #a1a1aa;
+  --income: #4ade80;
+  --expense: #f87171;
+  --tab-fg: rgba(244, 244, 245, 0.6);
+  --sel-bg: rgba(45, 212, 191, 0.16);
+  --hover-soft: rgba(45, 212, 191, 0.1);
+  --hover-tint: rgba(45, 212, 191, 0.14);
+  --flash: rgba(45, 212, 191, 0.18);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* ---------- 页面骨架 ---------- */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* 标题右侧操作组（流水页：导出 + 记一笔） */
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 12px;
+}
+
+/* ---------- 金额语义 ---------- */
+
+.money {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  white-space: nowrap;
+}
+.money-expense {
+  color: var(--expense);
+}
+.money-income {
+  color: var(--income);
+}
+
+/* ---------- 区间选择器 / 筛选栏 ---------- */
+
+.period-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.amount-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.amount-range .sep {
+  color: var(--muted);
+}
+
+/* ---------- 流水列表 ---------- */
+
+.txn-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.txn-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.txn-row:last-child {
+  border-bottom: 0;
+}
+
+.txn-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.txn-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.txn-cat {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.txn-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.txn-actions {
+  flex-shrink: 0;
+}
+
+.pager {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 8px;
+}
+
+/* ---------- 账户列表 ---------- */
+
+.acct-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.acct-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.acct-row:last-child {
+  border-bottom: 0;
+}
+
+.acct-main {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.acct-name {
+  font-weight: 500;
+}
+
+.acct-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.acct-right {
+  text-align: right;
+}
+.acct-balance {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 分类管理 ---------- */
+
+.cat-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cat-root-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.cat-root-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.cat-root-name {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.cat-children {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  padding-left: 2px;
+}
+.cat-children.muted {
+  font-size: 12px;
+}
+
+/* ---------- 记一笔表单 ---------- */
+
+.txn-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.amount-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 4px;
+}
+
+.amount-symbol {
+  font-size: 20px;
+  color: var(--muted);
+}
+
+.amount-input .ant-input {
+  font-size: 28px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border: 0;
+  box-shadow: none;
+  padding-left: 0;
+  background: transparent;
+}
+
+.quick-amounts {
+  display: flex;
+  gap: 8px;
+}
+
+.cat-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cat-roots,
+.cat-leaves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cat-leaves .ant-tag {
+  margin-inline-end: 0;
+  padding: 2px 10px;
+  font-size: 13px;
+}
+
+.transfer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transfer-arrow {
+  color: var(--muted);
+}
+
+/* ---------- 首页 ---------- */
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 768px) {
+  .stat-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .stat-grid.three {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.stat-card .ant-card-body {
+  padding: 12px 14px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.stat-card .money {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.dash-grid {
+  display: grid;
+  gap: 12px;
+}
+.dash-grid.two {
+  grid-template-columns: 1fr 1.4fr;
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.recent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.recent-row:last-child {
+  border-bottom: 0;
+}
+
+.recent-row.clickable {
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.recent-row.clickable:hover {
+  background: var(--hover-soft);
+}
+
+/* 首页点击最近流水 → 流水页定位高亮 */
+@keyframes row-flash {
+  0% {
+    background-color: var(--flash);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.txn-row.flash {
+  animation: row-flash 1.8s ease-out;
+}
+
+tr.flash > td {
+  animation: row-flash 1.8s ease-out;
+}
+
+.recent-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.hi {
+  text-align: center;
+}
+
+/* ---------- 统计页 ---------- */
+
+.stats-grid {
+  display: grid;
+  gap: 12px;
+}
+.stats-grid.two {
+  grid-template-columns: 1fr 1fr;
+}
+.stats-grid .stats-wide {
+  grid-column: 1 / -1;
+}
+
+.share-total {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.share-total .money {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.cmp-meta {
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.cmp-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  padding-top: 4px;
+}
+
+.pct-up {
+  color: var(--income);
+}
+.pct-down {
+  color: var(--expense);
+}
+.pct-flat {
+  color: var(--muted);
+}
+
+.cmp-values {
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+.period-table {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.period-head,
+.period-line {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr 1fr;
+  gap: 6px;
+  padding: 5px 2px;
+  align-items: center;
+  text-align: right;
+}
+.period-head {
+  color: var(--muted);
+  font-size: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.period-head span:first-child,
+.period-line span:first-child {
+  text-align: left;
+}
+.period-line {
+  border-bottom: 1px solid var(--line);
+}
+.period-line:last-child {
+  border-bottom: 0;
+}
+
+/* ---------- 我的 ---------- */
+
+.mine-card .ant-card-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mine-name {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.mine-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mine-menu .ant-btn {
+  justify-content: flex-start;
+  height: 40px;
+}
+
+/* ---------- 预算进度（specs/budgets） ---------- */
+
+.budget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.budget-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.budget-name {
+  width: 64px;
+  flex: none;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-input {
+  width: 116px;
+  flex: none;
+}
+
+.budget-bar {
+  flex: 1;
+  min-width: 0;
+}
+
+.budget-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.budget-over {
+  color: var(--expense);
+  font-weight: 500;
+}
+
+.budget-empty {
+  padding: 2px 0;
+}
+
+/* ---------- 周期记账（specs/recurring-entries，任务 9.4） ---------- */
+
+.rule-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.rule-row:last-child {
+  border-bottom: none;
+}
+
+.rule-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rule-amount {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.rule-status {
+  margin-left: auto;
+}
+
+.rule-meta {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.rule-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.rule-form-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 流水行的「自动」来源标记（周期模板生成） */
+.src-tag {
+  margin-left: 6px;
+}
+
+/* ---------- 提醒铃铛与列表（specs/notifications，任务 10.3） ---------- */
+
+/* 骨架与空态占位（流水/提醒/首页）：收敛到与列表一致的行距 */
+.txn-skeleton,
+.list-skeleton {
+  padding: 4px 0;
+}
+
+.list-empty {
+  padding: 12px 0 4px;
+}
+
+.stat-card .ant-skeleton-paragraph {
+  margin: 0;
+}
+
+.stat-card .ant-skeleton-paragraph > li {
+  height: 24px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ant-skeleton .ant-skeleton-content .ant-skeleton-paragraph > li,
+  .ant-skeleton .ant-skeleton-input {
+    animation: none !important;
+  }
+}
+
+
+.notif-bell {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--muted, #71717a);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.notif-bell:hover {
+  background: var(--hover-tint);
+  color: var(--primary, #0f766e);
+}
+
+.notif-bell .anticon {
+  font-size: 17px;
+}
+
+/* 移动端 Tab 栏右端工具位：与四个 Tab 同高，左分隔线 */
+.bottom-tabs .notif-bell {
+  height: 56px;
+  border-radius: 0;
+  border-left: 1px solid var(--line);
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notif-bell {
+    transition: none;
+  }
+}
+
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notif-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--line, rgba(24, 24, 27, 0.08));
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.notif-row.unread {
+  border-left: 3px solid var(--primary, #0f766e);
+}
+
+.notif-icon {
+  font-size: 17px;
+  margin-top: 2px;
+  flex: none;
+}
+
+.notif-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.notif-title .ant-tag {
+  margin-inline-start: auto;
+  font-weight: 400;
+}
+
+.notif-text {
+  color: var(--muted, #71717a);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.notif-row .ant-btn {
+  flex: none;
+  margin-top: 2px;
+}
+
+.notif-read {
+  flex: none;
+  margin-top: 4px;
+}
+
+/* ============================================================
+   动效层（MOTION_INTENSITY 4：路由入场 + 错峰浮现 + 微反馈）
+   全部动画只动 transform / opacity；prefers-reduced-motion 下整层关停。
+   ============================================================ */
+
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 路由切换：整页自下而上淡入（每个路由根节点都是 .page，仅挂载时播一次） */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 卡片/行错峰浮现 */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Tab 图标选中回弹 */
+@keyframes tab-pop {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+  60% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* fill-mode 用 backwards：入场期间隐藏，结束后交还普通样式
+   （不能用 both，否则 transform 被动画锁定，:active 反馈会失效） */
+.page {
+  animation: page-in 0.32s var(--ease-out) backwards;
+}
+
+.stat-grid > * {
+  animation: rise-in 0.42s var(--ease-out) backwards;
+}
+.stat-grid > *:nth-child(1) {
+  animation-delay: 40ms;
+}
+.stat-grid > *:nth-child(2) {
+  animation-delay: 90ms;
+}
+.stat-grid > *:nth-child(3) {
+  animation-delay: 140ms;
+}
+.stat-grid > *:nth-child(4) {
+  animation-delay: 190ms;
+}
+
+.recent-row,
+.notif-row {
+  animation: rise-in 0.4s var(--ease-out) backwards;
+}
+.recent-row:nth-child(1),
+.notif-row:nth-child(1) {
+  animation-delay: 80ms;
+}
+.recent-row:nth-child(2),
+.notif-row:nth-child(2) {
+  animation-delay: 130ms;
+}
+.recent-row:nth-child(3),
+.notif-row:nth-child(3) {
+  animation-delay: 180ms;
+}
+.recent-row:nth-child(4),
+.notif-row:nth-child(4) {
+  animation-delay: 230ms;
+}
+.recent-row:nth-child(5),
+.notif-row:nth-child(5) {
+  animation-delay: 280ms;
+}
+.recent-row:nth-child(6),
+.notif-row:nth-child(6) {
+  animation-delay: 330ms;
+}
+.recent-row:nth-child(n + 7),
+.notif-row:nth-child(n + 7) {
+  animation-delay: 380ms;
+}
+
+/* ---------- 微反馈：悬停/按压/键盘焦点 ---------- */
+
+.recent-row {
+  transition: background-color 0.18s ease;
+}
+
+.recent-row.clickable:active {
+  background: var(--hover-tint);
+  transform: scale(0.995);
+}
+
+.txn-row {
+  transition: background-color 0.16s ease;
+}
+
+.txn-row:active {
+  background: var(--hover-soft);
+}
+
+/* 主操作按下反馈：antd 按钮自带 transition，transform 会平滑跟随 */
+.page-head .ant-btn:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+/* 可交互自绘元素的键盘焦点环（antd 控件自带焦点样式，不在此重复） */
+.recent-row.clickable:focus-visible,
+.bottom-tabs .tab:focus-visible,
+.notif-bell:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page,
+  .stat-grid > *,
+  .recent-row,
+  .notif-row,
+  .bottom-tabs .tab.active .anticon {
+    animation: none !important;
+  }
+
+  .bottom-tabs .tab::before {
+    transition: none;
+  }
+
+  .recent-row,
+  .txn-row {
+    transition: none;
+  }
+
+  .recent-row.clickable:active,
+  .page-head .ant-btn:not(:disabled):active {
+    transform: none;
+  }
+}

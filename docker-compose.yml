@@ -1,0 +1,118 @@
+# 统一日志轮转（design D10：zap JSON 到 stdout，Docker 限制 50m×3）
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: jizhang-mysql
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-devpass}
+      MYSQL_DATABASE: ${DB_NAME:-jizhang}
+      TZ: Asia/Shanghai
+    ports:
+      # 默认只绑回环：本地 go run 直连 127.0.0.1:3307 不受影响，服务器上则不会把
+      # 数据库端口暴露到公网（曾靠安全组挡，属运气不属设计）。
+      - "${DB_BIND:-127.0.0.1}:${DB_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: jizhang-redis
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      # 同 mysql：只绑回环
+      - "${REDIS_BIND:-127.0.0.1}:${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ---- 应用栈（profile "app"，本地开发不起）----
+  # 服务器全栈：docker compose --profile app up -d --build
+  api:
+    profiles: ["app"]
+    build: ./backend
+    container_name: jizhang-api
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      TZ: Asia/Shanghai
+      SERVER_PORT: "8080"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-devpass}
+      DB_NAME: ${DB_NAME:-jizhang}
+      REDIS_ADDR: redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5600}
+      ACCESS_TTL_MIN: ${ACCESS_TTL_MIN:-30}
+      REFRESH_TTL_HOURS: ${REFRESH_TTL_HOURS:-720}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # refresh cookie 的 Path：必须与浏览器实际访问路径一致，否则刷新时不带 cookie。
+      # 子路径部署（如 /jizhang/）需改为 /jizhang/api/v1/auth，见 docker/nginx.conf。
+      COOKIE_PATH: ${COOKIE_PATH:-/api/v1/auth}
+      # 备份状态（docker/backup.sh 写入，health 暴露最近备份时间，任务 11.3）
+      BACKUP_STATUS_FILE: /backups/last-backup.json
+    volumes:
+      # 宿主 cron 的备份状态只读挂入，api 无需其他宿主目录
+      - ./backups:/backups:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    # 不映射宿主端口：外部统一走 web(nginx)；需本机直连调试时自行加
+    #   ports: ["127.0.0.1:8080:8080"]
+
+  web:
+    profiles: ["app"]
+    build: ./frontend
+    container_name: jizhang-web
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      # HTTP_BIND 默认 0.0.0.0（本地直连）；服务器上由宿主 nginx 终止 TLS 再反代，
+      # 应设 HTTP_BIND=127.0.0.1 只监听回环，避免容器端口直接暴露公网。
+      - "${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/api/v1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mysql-data:
+  redis-data:
