@@ -21,6 +21,7 @@ backups/
 # e2e 截图产物（preview 视觉回归 / shots 走查，体积大且随跑随变）
 frontend/e2e/preview/
 frontend/e2e/shots/
+frontend/e2e/downloads/
 
 # IDE / 系统
 .vscode/

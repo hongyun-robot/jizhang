@@ -3,7 +3,7 @@
 export type Role = 'admin' | 'recorder' | 'member' | 'viewer';
 export type AccountType = 'asset' | 'liability';
 export type Status = 'active' | 'disabled';
-export type TxnKind = 'expense' | 'income' | 'transfer';
+export type TxnKind = 'expense' | 'income' | 'transfer' | 'refund';
 export type CategoryKind = 'expense' | 'income';
 
 export interface Account {
@@ -50,6 +50,10 @@ export interface Transaction {
   account_id: number;
   transfer_account_id?: number | null;
   category_id?: number | null;
+  /** 退款关联的原支出流水 id（仅退款有） */
+  related_txn_id?: number | null;
+  /** 仅列表接口返回：该支出被关联退款累计的金额 */
+  refunded_amount?: string;
   entry_date: string;
   period_key: string;
   note?: string;
@@ -76,6 +80,8 @@ export interface TxnListParams {
   amount_min?: string;
   amount_max?: string;
   keyword?: string;
+  /** 定位关联到该支出的退款（refunds 跳转） */
+  related_txn_id?: number;
   page?: number;
   page_size?: number;
 }

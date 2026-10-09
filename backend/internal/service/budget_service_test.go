@@ -364,3 +364,88 @@ func TestBudgetSetValidation(t *testing.T) {
 		t.Errorf("一级支出行数 = %d, want 2（未配置也返回行供回填）", len(view.Categories))
 	}
 }
+
+// TestBudgetRefundPayback 覆盖任务 3.4 / specs/budgets「预算消耗计算」「进度与超支展示」：
+// 退款按到账月回吐分类与总消耗；净消耗为负不超支、不触发提醒；净消耗重新超预算才提醒。
+func TestBudgetRefundPayback(t *testing.T) {
+	env := newBudgetEnv(t)
+	meal, lunch, _, _, _, _ := env.seedCats(t)
+	cash, _ := env.seedAccounts(t)
+	admin := adminUser()
+
+	total, mealBudget := "8000", "3000"
+	mustOK(t, env.budget.Set("2026-10", BudgetSetInput{
+		Total: &total,
+		Items: []BudgetSetItem{{CategoryID: meal, Amount: &mealBudget}},
+	}))
+
+	// 支出 1000 → 消耗 1000
+	mustCreate(t, env.txn, admin, TxnInput{
+		Kind: model.TxnExpense, Amount: dec("1000"), AccountID: cash.ID,
+		CategoryID: lunch, EntryDate: mustDate(t, "2026-10-05"),
+	})
+	// 退款 200（到账月同月）→ 消耗回吐 800
+	mustCreate(t, env.txn, admin, TxnInput{
+		Kind: model.TxnRefund, Amount: dec("200"), AccountID: cash.ID,
+		CategoryID: lunch, EntryDate: mustDate(t, "2026-10-06"),
+	})
+
+	rowOf := func(view *BudgetView, catID int64) *BudgetCategoryRow {
+		for i := range view.Categories {
+			if view.Categories[i].CategoryID == catID {
+				return &view.Categories[i]
+			}
+		}
+		return nil
+	}
+
+	view, err := env.budget.Get("2026-10")
+	mustOK(t, err)
+	if view.Total.Consumed != "800.00" {
+		t.Errorf("总消耗 = %s, want 800.00（退款回吐）", view.Total.Consumed)
+	}
+	if r := rowOf(view, meal); r == nil || r.Consumed != "800.00" {
+		t.Errorf("餐饮消耗 = %v, want 800.00", r)
+	}
+
+	// 净消耗为负：再退 1000 → 餐饮/总 -200 → 不超支、进度 0
+	mustCreate(t, env.txn, admin, TxnInput{
+		Kind: model.TxnRefund, Amount: dec("1000"), AccountID: cash.ID,
+		CategoryID: lunch, EntryDate: mustDate(t, "2026-10-07"),
+	})
+	view, err = env.budget.Get("2026-10")
+	mustOK(t, err)
+	if view.Total.Consumed != "-200.00" {
+		t.Errorf("总消耗 = %s, want -200.00", view.Total.Consumed)
+	}
+	if view.Total.Over || view.Total.Percent != 0 {
+		t.Errorf("负消耗不应超支/应零进度: over=%v pct=%v", view.Total.Over, view.Total.Percent)
+	}
+	mRow := rowOf(view, meal)
+	if mRow == nil || mRow.Consumed != "-200.00" || mRow.Over || mRow.Percent != 0 {
+		t.Errorf("餐饮负消耗 = %+v, want -200.00/false/0", mRow)
+	}
+
+	// 负消耗不触发超支提醒
+	notifs, err := env.notifs.List(model.NotifBudgetOverdue)
+	mustOK(t, err)
+	if len(notifs) != 0 {
+		t.Errorf("负消耗不应提醒, got %d 条", len(notifs))
+	}
+
+	// 净消耗重新超过预算才提醒（餐饮 -200 + 4000 = 3800 > 3000）
+	mustCreate(t, env.txn, admin, TxnInput{
+		Kind: model.TxnExpense, Amount: dec("4000"), AccountID: cash.ID,
+		CategoryID: lunch, EntryDate: mustDate(t, "2026-10-08"),
+	})
+	notifs, err = env.notifs.List(model.NotifBudgetOverdue)
+	mustOK(t, err)
+	if len(notifs) != 1 {
+		t.Errorf("净消耗超预算应提醒 1 条, got %d", len(notifs))
+	}
+	view, err = env.budget.Get("2026-10")
+	mustOK(t, err)
+	if r := rowOf(view, meal); r == nil || r.Consumed != "3800.00" || !r.Over || r.OverAmount != "800.00" {
+		t.Errorf("餐饮超支行 = %+v, want 3800.00/true/800.00", r)
+	}
+}

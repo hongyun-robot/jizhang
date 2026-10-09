@@ -136,6 +136,43 @@ func TestDeleteRollsBackBalance(t *testing.T) {
 	}
 }
 
+// TestRefundIncreasesBalance 覆盖任务 3.1 / specs/refunds「退款流水类型」+ accounts「流水关联账户」：
+// 退款使账户余额增加（+amount），不经过 income。
+func TestRefundIncreasesBalance(t *testing.T) {
+	db := newTestDB(t)
+	accRepo := repository.NewAccountRepo(db)
+	txnRepo := repository.NewTransactionRepo(db)
+
+	acc := model.Account{Name: "支付宝", Type: model.AccountAsset,
+		OpeningBalance: dec("1000"), Status: model.StatusActive}
+	must(t, accRepo.Create(&acc))
+
+	entry := mustDate(t, "2026-10-03")
+	txns := []model.Transaction{
+		{Kind: model.TxnExpense, Amount: dec("200"), AccountID: acc.ID,
+			EntryDate: entry, PeriodKey: "2026-10", CreatedBy: 1, Source: model.SourceManual},
+		{Kind: model.TxnRefund, Amount: dec("50"), AccountID: acc.ID,
+			EntryDate: entry, PeriodKey: "2026-10", CreatedBy: 1, Source: model.SourceManual},
+	}
+	for i := range txns {
+		must(t, txnRepo.Create(&txns[i]))
+	}
+
+	accounts, err := accRepo.List()
+	must(t, err)
+	for _, a := range accounts {
+		if a.ID != acc.ID {
+			continue
+		}
+		// 1000 - 200 + 50 = 850
+		if !a.Balance.Equal(dec("850")) {
+			t.Errorf("退款后余额 = %s, want 850", a.Balance)
+		}
+		return
+	}
+	t.Fatal("account missing")
+}
+
 // TestCategoryDeleteConstraints 覆盖 3.3：有子分类/被流水引用时不可删。
 func TestCategoryDeleteConstraints(t *testing.T) {
 	db := newTestDB(t)

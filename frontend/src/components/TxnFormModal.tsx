@@ -1,34 +1,51 @@
 import { useEffect, useMemo, useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
-import { App, Button, DatePicker, Grid, Input, Modal, Segmented, Select, Tag } from 'antd';
+import { Alert, App, Button, DatePicker, Grid, Input, Modal, Segmented, Select, Tag } from 'antd';
 
 import { useAccounts, useCategoryForest, useCreateTxn, useUpdateTxn } from '../api/hooks';
 import { rootsOfKind } from '../api/category';
 import type { TxnKind, Transaction } from '../api/types';
 import { errMsg } from '../api/client';
+import { useAuth } from '../stores/auth';
 
 const KIND_OPTIONS = [
   { value: 'expense', label: '支出' },
   { value: 'income', label: '收入' },
   { value: 'transfer', label: '转账' },
+  { value: 'refund', label: '退款' },
 ];
 
 const QUICK_AMOUNTS = [10, 20, 50, 100];
+
+/** 行内「退款」入口的预填（specs/refunds 分类与账户继承 + 超额提示所需上下文）。 */
+export interface TxnRefill {
+  kind: TxnKind;
+  related_txn_id?: number;
+  account_id?: number;
+  category_id?: number;
+  /** 原支出金额（超额黄条计算） */
+  related_amount?: string;
+  /** 原支出已退累计 */
+  refunded?: number;
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
   /** 传入流水则为编辑模式，否则为记一笔 */
   editing?: Transaction | null;
+  /** 行内「退款」等入口的预填（仅新建模式生效） */
+  refill?: TxnRefill | null;
 }
 
 /**
- * 记一笔表单（specs/transactions 记账三态 + ui-shell 数字键盘与常用金额快捷键）：
- * - 支出/收入/转账三态；金额用系统数字键盘（inputMode=decimal）
- * - 支出/收入选两级分类（先选一级再选子分类，无子分类的一级可直选）
+ * 记一笔表单（specs/transactions 记账四态 + ui-shell 数字键盘与常用金额快捷键）：
+ * - 支出/收入/转账/退款四态；金额用系统数字键盘（inputMode=decimal）
+ * - 支出/收入选两级分类（先选一级再选子分类，无子分类的一级可直选）；退款分类可留空
  * - 转账双账户且无分类；日期默认今天
+ * - 退款可关联原支出（related_txn_id），累计超原支出时黄条提示、二次确认提交
  */
-export default function TxnFormModal({ open, onClose, editing }: Props) {
+export default function TxnFormModal({ open, onClose, editing, refill }: Props) {
   const { message } = App.useApp();
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
@@ -37,6 +54,10 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
   const forest = useCategoryForest();
   const createTxn = useCreateTxn();
   const updateTxn = useUpdateTxn();
+  const user = useAuth((s) => s.user);
+  // 退款是入账动作，只读角色（viewer）不显示该选项（specs/refunds 权限约束）
+  const kindOptions =
+    user?.role === 'viewer' ? KIND_OPTIONS.filter((o) => o.value !== 'refund') : KIND_OPTIONS;
 
   const [kind, setKind] = useState<TxnKind>('expense');
   const [amount, setAmount] = useState('');
@@ -46,10 +67,16 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
   const [activeRootId, setActiveRootId] = useState<number | undefined>();
   const [date, setDate] = useState<Dayjs>(() => dayjs());
   const [note, setNote] = useState('');
+  // 退款关联上下文：关联 id / 原支出金额 / 已退累计 / 超额二次确认
+  const [relatedId, setRelatedId] = useState<number | undefined>();
+  const [relatedAmount, setRelatedAmount] = useState<string | undefined>();
+  const [refundedBase, setRefundedBase] = useState(0);
+  const [overAck, setOverAck] = useState(false);
 
-  // 打开时初始化（编辑回填 / 新建默认今天）
+  // 打开时初始化（编辑回填 / 行内退款预填 / 新建默认今天）
   useEffect(() => {
     if (!open) return;
+    setOverAck(false);
     if (editing) {
       setKind(editing.kind);
       setAmount(editing.amount);
@@ -58,6 +85,21 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
       setCategoryId(editing.category_id ?? undefined);
       setDate(dayjs(editing.entry_date));
       setNote(editing.note ?? '');
+      setRelatedId(editing.related_txn_id ?? undefined);
+      setRelatedAmount(undefined);
+      setRefundedBase(0);
+    } else if (refill) {
+      setKind(refill.kind);
+      setAmount('');
+      setAccountId(refill.account_id);
+      setTransferId(undefined);
+      setCategoryId(refill.category_id);
+      setActiveRootId(undefined);
+      setDate(dayjs());
+      setNote('');
+      setRelatedId(refill.related_txn_id);
+      setRelatedAmount(refill.related_amount);
+      setRefundedBase(refill.refunded ?? 0);
     } else {
       setKind('expense');
       setAmount('');
@@ -66,8 +108,11 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
       setCategoryId(undefined);
       setDate(dayjs());
       setNote('');
+      setRelatedId(undefined);
+      setRelatedAmount(undefined);
+      setRefundedBase(0);
     }
-  }, [open, editing]);
+  }, [open, editing, refill]);
 
   const activeAccounts = useMemo(
     () => (accounts.data ?? []).filter((a) => a.status === 'active'),
@@ -115,16 +160,30 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
     if (kind === 'transfer') {
       if (!transferId) return '请选择转入账户';
       if (transferId === accountId) return '转出与转入账户不能相同';
-    } else if (!categoryId) {
+    } else if (kind !== 'refund' && !categoryId) {
       return '请选择分类';
     }
     return null;
   };
 
+  // 超额黄条：累计退款（已退 + 本次）超过原支出（specs/refunds 超额仅提示不拦截）
+  const overTotal =
+    relatedId && relatedAmount && Number(amount) > 0
+      ? refundedBase + Number(amount)
+      : null;
+  const isOver = overTotal !== null && relatedAmount !== undefined && overTotal > Number(relatedAmount);
+
   const submit = async () => {
     const err = validate();
     if (err) {
       message.warning(err);
+      return;
+    }
+    if (isOver && !overAck) {
+      setOverAck(true);
+      message.warning(
+        `累计退款 ¥${overTotal} 已超过原支出 ¥${relatedAmount}，如确认请再次点击提交`,
+      );
       return;
     }
     const input = {
@@ -134,6 +193,7 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
       ...(kind === 'transfer'
         ? { transfer_account_id: transferId }
         : { category_id: categoryId }),
+      ...(kind === 'refund' && relatedId ? { related_txn_id: relatedId } : {}),
       entry_date: date.format('YYYY-MM-DD'),
       note: note || undefined,
     };
@@ -177,11 +237,17 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
         <Segmented
           block
           value={kind}
-          options={KIND_OPTIONS}
+          options={kindOptions}
           onChange={(v) => {
             setKind(v as TxnKind);
             setCategoryId(undefined);
             setActiveRootId(undefined);
+            setOverAck(false);
+            if (v !== 'refund') {
+              setRelatedId(undefined);
+              setRelatedAmount(undefined);
+              setRefundedBase(0);
+            }
           }}
         />
 
@@ -211,10 +277,10 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
           </Button>
         </div>
 
-        {/* 分类（转账无分类） */}
+        {/* 分类（转账无分类；退款分类可留空） */}
         {kind !== 'transfer' && roots.length > 0 && (
           <div className="cat-pick">
-            <div className="pick-label">分类</div>
+            <div className="pick-label">分类{kind === 'refund' ? '（可留空）' : ''}</div>
             <div className="cat-roots">
               {roots.map((r) => (
                 <Tag.CheckableTag
@@ -237,6 +303,17 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
                   {c.name}
                 </Tag.CheckableTag>
               ))}
+              {kind === 'refund' && (
+                <Tag.CheckableTag
+                  checked={!categoryId}
+                  onChange={() => {
+                    setCategoryId(undefined);
+                    setActiveRootId(undefined);
+                  }}
+                >
+                  未分类
+                </Tag.CheckableTag>
+              )}
             </div>
           </div>
         )}
@@ -267,6 +344,22 @@ export default function TxnFormModal({ open, onClose, editing }: Props) {
             value={accountId}
             onChange={setAccountId}
             style={{ width: '100%' }}
+          />
+        )}
+
+        {/* 退款关联信息 + 超额黄条（累计可超原支出，仅提示需二次确认） */}
+        {kind === 'refund' && relatedId && (
+          <div className="refund-related">
+            已关联原支出 #{relatedId}
+            {relatedAmount ? `（原 ¥${relatedAmount}，已退 ¥${refundedBase}）` : ''}
+          </div>
+        )}
+        {kind === 'refund' && isOver && relatedAmount !== undefined && overTotal !== null && (
+          <Alert
+            type="warning"
+            showIcon
+            className="refund-over"
+            message={`累计退款 ¥${overTotal} 超过原支出 ¥${relatedAmount}（本次 ¥${amount}），如确认请再次点击「${editing ? '保存' : '记账'}」`}
           />
         )}
 

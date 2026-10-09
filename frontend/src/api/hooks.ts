@@ -55,6 +55,7 @@ export function txnQueryUrl(p: TxnListParams): string {
     amount_min: p.amount_min,
     amount_max: p.amount_max,
     keyword: p.keyword,
+    related_txn_id: p.related_txn_id,
     page: p.page,
     page_size: p.page_size,
   })}`;
@@ -133,11 +134,13 @@ export function useStatsAssets(range: DateRange) {
 // ---------- 流水写操作（成功后失效流水/余额/统计缓存） ----------
 
 export interface TxnInput {
-  kind: 'expense' | 'income' | 'transfer';
+  kind: 'expense' | 'income' | 'transfer' | 'refund';
   amount: string;
   account_id: number;
   transfer_account_id?: number;
   category_id?: number;
+  /** 退款关联的原支出流水 id */
+  related_txn_id?: number;
   entry_date: string;
   note?: string;
 }

@@ -186,8 +186,16 @@ export default function Dashboard() {
                       : t.note || acctName.get(t.account_id) || '—'}
                   </span>
                   <Money
-                    value={t.kind === 'income' ? t.amount : `-${t.amount}`}
-                    tone={t.kind === 'income' ? 'income' : t.kind === 'expense' ? 'expense' : 'plain'}
+                    value={
+                      t.kind === 'income' || t.kind === 'refund' ? t.amount : `-${t.amount}`
+                    }
+                    tone={
+                      t.kind === 'income' || t.kind === 'refund'
+                        ? 'income'
+                        : t.kind === 'expense'
+                          ? 'expense'
+                          : 'plain'
+                    }
                   />
                 </div>
               ))

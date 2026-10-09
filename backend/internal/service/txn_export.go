@@ -44,6 +44,8 @@ func kindLabel(k model.TxnKind) string {
 		return "收入"
 	case model.TxnTransfer:
 		return "转账"
+	case model.TxnRefund:
+		return "退款"
 	}
 	return string(k)
 }
@@ -98,9 +100,9 @@ func buildTxnCSV(rows []model.Transaction, acctNames map[int64]string, catPaths 
 		if t.TransferAccountID != nil {
 			transferTo = acct(*t.TransferAccountID)
 		}
-		// 金额带方向（与列表展示一致）：收入为正，支出/转账为负
+		// 金额带方向（与列表展示一致）：收入/退款为正，支出/转账为负
 		amt := t.Amount.StringFixed(2)
-		if t.Kind != model.TxnIncome {
+		if t.Kind != model.TxnIncome && t.Kind != model.TxnRefund {
 			amt = "-" + amt
 		}
 		cells := []string{

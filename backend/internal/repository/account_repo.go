@@ -22,18 +22,19 @@ type netRow struct {
 	Net decimal.Decimal
 }
 
-// List 返回全部账户并附余额：opening + 收入 − 支出 − 转出 + 转入。
+// List 返回全部账户并附余额：opening + 收入 + 退款 − 支出 − 转出 + 转入。
 func (r *AccountRepo) List() ([]model.Account, error) {
 	var accounts []model.Account
 	if err := r.db.Order("sort, id").Find(&accounts).Error; err != nil {
 		return nil, err
 	}
 
-	// 流水净额：资产/负债共用同一口径（信用卡支出=余额变负，还款=转入回正）
+	// 流水净额：资产/负债共用同一口径（信用卡支出=余额变负，还款=转入回正，退款=资金回流）
 	const netSQL = `
 		SELECT aid, SUM(v) AS net FROM (
 			SELECT account_id AS aid,
 			       CASE kind WHEN 'income' THEN amount
+			                 WHEN 'refund' THEN amount
 			                 WHEN 'expense' THEN -amount
 			                 WHEN 'transfer' THEN -amount END AS v
 			FROM transactions

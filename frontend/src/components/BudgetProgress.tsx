@@ -59,9 +59,21 @@ export default function BudgetProgress({
           <span className="budget-name">{r.name}</span>
           {inputFor?.(r.scope)}
           <div className="budget-bar">
-            {r.p.budget ? (
+            {Number(r.p.consumed) < 0 ? (
+              // 净消耗为负（退款回吐超过支出）：以退回文案替代进度条，不出现负宽度
+              <div className="budget-refund">
+                本月已退回 ¥
+                {Math.abs(Number(r.p.consumed)).toLocaleString('zh-CN', {
+                  minimumFractionDigits: 2,
+                })}
+              </div>
+            ) : r.p.budget ? (
               <>
-                <Progress percent={r.p.percent} size="small" status={r.p.over ? 'exception' : undefined} />
+                <Progress
+                  percent={Math.max(0, r.p.percent)}
+                  size="small"
+                  status={r.p.over ? 'exception' : undefined}
+                />
                 <div className="budget-meta">
                   <span>
                     ¥{r.p.consumed} / {r.p.budget}

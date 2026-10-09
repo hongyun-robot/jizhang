@@ -43,14 +43,17 @@ type rootConsumeRow struct {
 }
 
 // ConsumptionByRoot 某账期支出按一级分类上卷汇总（子分类并入父级）。
-// 只计 kind='expense'：收入与转账天然排除（specs/budgets「预算消耗计算」）。
+// 消耗 = 同账期支出 − 同账期退款（退款按到账日落账期、按归属分类回吐，specs/budgets
+// 「预算消耗计算」）；收入与转账天然排除，净额可为负（前端按「本月已退回」展示）。
+// 无分类退款（root 为 NULL）不冲减任何分类预算。
 func (r *BudgetRepo) ConsumptionByRoot(periodKey string) (map[int64]decimal.Decimal, error) {
 	const sql = `
-		SELECT COALESCE(p.id, c.id) AS root_id, SUM(t.amount) AS total
+		SELECT COALESCE(p.id, c.id) AS root_id,
+		       SUM(CASE WHEN t.kind = 'refund' THEN -t.amount ELSE t.amount END) AS total
 		FROM transactions t
 		LEFT JOIN categories c ON c.id = t.category_id
 		LEFT JOIN categories p ON p.id = c.parent_id
-		WHERE t.kind = 'expense' AND t.period_key = ?
+		WHERE t.kind IN ('expense', 'refund') AND t.period_key = ?
 		  AND COALESCE(p.id, c.id) IS NOT NULL
 		GROUP BY COALESCE(p.id, c.id)`
 	var rows []rootConsumeRow

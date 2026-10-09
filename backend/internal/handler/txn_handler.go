@@ -28,9 +28,10 @@ func NewTxn(svc *service.TransactionService) *txnHandler {
 type txnReq struct {
 	Kind              model.TxnKind `json:"kind" binding:"required"`
 	Amount            string        `json:"amount" binding:"required"`
-	AccountID         int64         `json:"account_id" binding:"required"`
+	AccountID         int64         `json:"account_id"` // 必填语义由服务层校验；退款带关联时可省略（按原支出预填）
 	TransferAccountID int64         `json:"transfer_account_id"`
 	CategoryID        int64         `json:"category_id"`
+	RelatedTxnID      int64         `json:"related_txn_id"` // 退款关联原支出，0=无
 	EntryDate         string        `json:"entry_date" binding:"required"`
 	Note              string        `json:"note" binding:"max=255"`
 }
@@ -50,6 +51,7 @@ func (r *txnReq) parse() (service.TxnInput, bool) {
 		AccountID:         r.AccountID,
 		TransferAccountID: r.TransferAccountID,
 		CategoryID:        r.CategoryID,
+		RelatedTxnID:      r.RelatedTxnID,
 		EntryDate:         d,
 		Note:              r.Note,
 	}, true
@@ -68,8 +70,11 @@ func mapTxnErr(c *gin.Context, err error) {
 		errors.Is(err, service.ErrTxnCategoryInvalid),
 		errors.Is(err, service.ErrTxnTransferSame),
 		errors.Is(err, service.ErrTxnKindInvalid),
-		errors.Is(err, service.ErrTxnDateInvalid):
+		errors.Is(err, service.ErrTxnDateInvalid),
+		errors.Is(err, service.ErrTxnRelatedInvalid):
 		response.Invalid(c, err.Error())
+	case errors.Is(err, service.ErrTxnRefundsExist):
+		response.Conflict(c, err.Error())
 	default:
 		response.Internal(c, "操作失败")
 	}
@@ -79,7 +84,7 @@ func mapTxnErr(c *gin.Context, err error) {
 func (h *txnHandler) Create(c *gin.Context) {
 	var req txnReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Invalid(c, "类型、金额、账户、发生日期必填")
+		response.Invalid(c, "类型、金额、发生日期必填")
 		return
 	}
 	in, ok := req.parse()
@@ -103,7 +108,7 @@ func (h *txnHandler) Update(c *gin.Context) {
 	}
 	var req txnReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Invalid(c, "类型、金额、账户、发生日期必填")
+		response.Invalid(c, "类型、金额、发生日期必填")
 		return
 	}
 	in, ok := req.parse()
@@ -133,29 +138,31 @@ func (h *txnHandler) Delete(c *gin.Context) {
 }
 
 type txnListQuery struct {
-	PeriodKey  string `form:"period_key"`
-	StartDate  string `form:"start_date"`
-	EndDate    string `form:"end_date"`
-	Kind       string `form:"kind"`
-	AccountID  int64  `form:"account_id"`
-	CategoryID int64  `form:"category_id"`
-	AmountMin  string `form:"amount_min"`
-	AmountMax  string `form:"amount_max"`
-	Keyword    string `form:"keyword"`
-	Page       int    `form:"page"`
-	PageSize   int    `form:"page_size"`
+	PeriodKey    string `form:"period_key"`
+	StartDate    string `form:"start_date"`
+	EndDate      string `form:"end_date"`
+	Kind         string `form:"kind"`
+	AccountID    int64  `form:"account_id"`
+	CategoryID   int64  `form:"category_id"`
+	AmountMin    string `form:"amount_min"`
+	AmountMax    string `form:"amount_max"`
+	Keyword      string `form:"keyword"`
+	RelatedTxnID int64  `form:"related_txn_id"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // buildFilter 查询参数 → 过滤条件（List 与 Export 共用，保证导出与列表同一套筛选语义）。
 func buildFilter(q txnListQuery) repository.TxnFilter {
 	f := repository.TxnFilter{
-		PeriodKey:  q.PeriodKey,
-		Kind:       model.TxnKind(q.Kind),
-		AccountID:  q.AccountID,
-		CategoryID: q.CategoryID,
-		Keyword:    q.Keyword,
-		Page:       q.Page,
-		PageSize:   q.PageSize,
+		PeriodKey:    q.PeriodKey,
+		Kind:         model.TxnKind(q.Kind),
+		AccountID:    q.AccountID,
+		CategoryID:   q.CategoryID,
+		Keyword:      q.Keyword,
+		RelatedTxnID: q.RelatedTxnID,
+		Page:         q.Page,
+		PageSize:     q.PageSize,
 	}
 	if q.AmountMin != "" {
 		f.AmountMin = &q.AmountMin

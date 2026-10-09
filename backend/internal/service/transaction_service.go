@@ -21,6 +21,8 @@ var (
 	ErrTxnKindInvalid     = errors.New("无效的流水类型")
 	ErrTxnDateInvalid     = errors.New("发生日期无效")
 	ErrTxnForbidden       = errors.New("无权操作这条流水")
+	ErrTxnRelatedInvalid  = errors.New("关联流水不存在或不是支出流水")
+	ErrTxnRefundsExist    = errors.New("该支出存在关联退款，请先处理退款")
 )
 
 var maxAmount = decimal.RequireFromString("9999999999.99")
@@ -33,6 +35,10 @@ type TxnStore interface {
 	GetByID(id int64) (*model.Transaction, error)
 	List(f repository.TxnFilter) ([]model.Transaction, int64, error)
 	ListAll(f repository.TxnFilter) ([]model.Transaction, error)
+	// HasRefunds 关联退款存在性（支出删除约束，specs/refunds）。
+	HasRefunds(txnID int64) (bool, error)
+	// RefundedTotals 按原支出 id 聚合关联退款累计（列表「已退」标记）。
+	RefundedTotals(ids []int64) (map[int64]decimal.Decimal, error)
 }
 
 // TxnDeps 流水服务的外部依赖。
@@ -78,12 +84,13 @@ type TxnInput struct {
 	CategoryID        int64
 	EntryDate         time.Time
 	Note              string
+	RelatedTxnID      int64 // 关联原支出流水（退款用，0=无）
 }
 
 // validate 校验并规整入参；返回错误供 handler 映射。
 func (s *TransactionService) validate(in *TxnInput) error {
 	switch in.Kind {
-	case model.TxnExpense, model.TxnIncome, model.TxnTransfer:
+	case model.TxnExpense, model.TxnIncome, model.TxnTransfer, model.TxnRefund:
 	default:
 		return ErrTxnKindInvalid
 	}
@@ -96,6 +103,23 @@ func (s *TransactionService) validate(in *TxnInput) error {
 	}
 	if in.EntryDate.IsZero() || in.EntryDate.Year() < 2000 || in.EntryDate.Year() > 2100 {
 		return ErrTxnDateInvalid
+	}
+
+	// 退款可关联原支出：目标必须存在且为支出；未显式给出的账户/分类按原支出预填（design D3）
+	if in.Kind == model.TxnRefund && in.RelatedTxnID > 0 {
+		orig, err := s.deps.Txns.GetByID(in.RelatedTxnID)
+		if err != nil {
+			return err
+		}
+		if orig == nil || orig.Kind != model.TxnExpense {
+			return ErrTxnRelatedInvalid
+		}
+		if in.AccountID == 0 {
+			in.AccountID = orig.AccountID
+		}
+		if in.CategoryID == 0 && orig.CategoryID != nil {
+			in.CategoryID = *orig.CategoryID
+		}
 	}
 
 	acc, err := s.deps.Accounts.GetByID(in.AccountID)
@@ -121,7 +145,10 @@ func (s *TransactionService) validate(in *TxnInput) error {
 		return nil
 	}
 
-	// 支出/收入必须挂末级分类且类型匹配
+	// 支出/收入必须挂末级分类且类型匹配；退款分类可留空，给了则须为支出类末级
+	if in.Kind == model.TxnRefund && in.CategoryID == 0 {
+		return nil
+	}
 	cat, err := s.deps.Cats.GetByID(in.CategoryID)
 	if err != nil {
 		return err
@@ -181,9 +208,13 @@ func (s *TransactionService) Create(actor *model.User, in TxnInput) (*model.Tran
 	if in.Kind == model.TxnTransfer {
 		tid := in.TransferAccountID
 		t.TransferAccountID = &tid
-	} else {
+	} else if in.CategoryID > 0 {
 		cid := in.CategoryID
 		t.CategoryID = &cid
+	}
+	if in.Kind == model.TxnRefund && in.RelatedTxnID > 0 {
+		rid := in.RelatedTxnID
+		t.RelatedTxnID = &rid
 	}
 	if err := s.deps.Txns.Create(t); err != nil {
 		return nil, err
@@ -279,9 +310,19 @@ func (s *TransactionService) Update(actor *model.User, id int64, in TxnInput) (*
 		t.TransferAccountID = &tid
 		t.CategoryID = nil
 	} else {
-		cid := in.CategoryID
-		t.CategoryID = &cid
 		t.TransferAccountID = nil
+		if in.CategoryID > 0 {
+			cid := in.CategoryID
+			t.CategoryID = &cid
+		} else {
+			t.CategoryID = nil
+		}
+	}
+	if in.Kind == model.TxnRefund && in.RelatedTxnID > 0 {
+		rid := in.RelatedTxnID
+		t.RelatedTxnID = &rid
+	} else {
+		t.RelatedTxnID = nil
 	}
 	if err := s.deps.Txns.Update(t); err != nil {
 		return nil, err
@@ -306,6 +347,16 @@ func (s *TransactionService) Delete(actor *model.User, id int64) error {
 	if err := s.guardOpen(t.PeriodKey); err != nil {
 		return err
 	}
+	// 关联退款未清空前不可删原支出（specs/refunds 删除约束）
+	if t.Kind == model.TxnExpense {
+		has, err := s.deps.Txns.HasRefunds(id)
+		if err != nil {
+			return err
+		}
+		if has {
+			return ErrTxnRefundsExist
+		}
+	}
 	if err := s.deps.Txns.Delete(id); err != nil {
 		return err
 	}
@@ -314,12 +365,39 @@ func (s *TransactionService) Delete(actor *model.User, id int64) error {
 	return nil
 }
 
-// List 查询（四档角色均可读）。
+// List 查询（四档角色均可读），并聚合各支出的累计已退金额。
 func (s *TransactionService) List(actor *model.User, f repository.TxnFilter) ([]model.Transaction, int64, error) {
 	if !CanView(actor) {
 		return nil, 0, ErrTxnForbidden
 	}
-	return s.deps.Txns.List(f)
+	list, total, err := s.deps.Txns.List(f)
+	if err != nil {
+		return nil, 0, err
+	}
+	s.fillRefunded(list)
+	return list, total, nil
+}
+
+// fillRefunded 填充支出行的已退累计金额（仅支出会被退款关联）。
+func (s *TransactionService) fillRefunded(list []model.Transaction) {
+	ids := make([]int64, 0, len(list))
+	for _, t := range list {
+		if t.Kind == model.TxnExpense {
+			ids = append(ids, t.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	totals, err := s.deps.Txns.RefundedTotals(ids)
+	if err != nil {
+		return // 聚合失败不阻塞列表，已退标记降级为 0
+	}
+	for i := range list {
+		if v, ok := totals[list[i].ID]; ok {
+			list[i].RefundedAmount = v
+		}
+	}
 }
 
 // GetByID 读单条（校验用）。

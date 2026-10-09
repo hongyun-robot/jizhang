@@ -153,3 +153,28 @@ func TestExportCSVFilterMatchesList(t *testing.T) {
 		t.Fatalf("区间筛选导出行数 = %d, 命中 = %d", got, dTotal)
 	}
 }
+
+// TestExportCSVRefundRow 覆盖任务 4.3 / specs/transactions「CSV 导出」：
+// 退款行类型标记为「退款」、金额为正数。
+func TestExportCSVRefundRow(t *testing.T) {
+	e, a1, _, lunch, _ := exportEnv(t)
+	admin := adminUser()
+
+	exp := mustCreate(t, e.txn, admin, e.expense(t, a1.ID, lunch, "100.00", "2026-10-01"))
+	mustCreate(t, e.txn, admin, TxnInput{
+		Kind: model.TxnRefund, Amount: dec("40.00"), AccountID: a1.ID,
+		CategoryID: lunch, RelatedTxnID: exp.ID, EntryDate: mustDate(t, "2026-10-02"),
+	})
+
+	csv, err := e.txn.ExportCSV(admin, repository.TxnFilter{})
+	mustOK(t, err)
+	all := strings.Join(csvDataLines(t, csv), "\n")
+
+	// 退款标记 + 金额为正（无 - 前缀）
+	if !strings.Contains(all, "2026-10-02,退款,餐饮/午餐,现金,,40.00") {
+		t.Errorf("退款行缺少标记或金额非正:\n%s", all)
+	}
+	if strings.Contains(all, ",退款,餐饮/午餐,现金,,-40.00") {
+		t.Errorf("退款金额 MUST 为正数:\n%s", all)
+	}
+}

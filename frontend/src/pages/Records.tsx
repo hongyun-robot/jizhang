@@ -31,7 +31,7 @@ import type { CategoryTreeNode, DateRange, TxnKind, Transaction } from '../api/t
 import { useAuth } from '../stores/auth';
 import Money from '../components/Money';
 import PeriodPicker, { presetRange } from '../components/PeriodPicker';
-import TxnFormModal from '../components/TxnFormModal';
+import TxnFormModal, { type TxnRefill } from '../components/TxnFormModal';
 
 const PAGE_SIZE = 20;
 
@@ -43,6 +43,8 @@ interface FilterState {
   amount_min?: string;
   amount_max?: string;
   keyword: string;
+  /** 定位关联到某支出的退款（>0 时忽略日期区间，跨期也可跳转） */
+  related_txn_id?: number;
 }
 
 /** 扁平化分类树 → id 显示信息（含一级名，用于「餐饮/午餐」展示与 Cascader 选项）。 */
@@ -96,6 +98,7 @@ export default function Records() {
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [refill, setRefill] = useState<TxnRefill | null>(null);
 
   const { info: catInfo, options: catOptions } = useMemo(
     () => flattenForest(forest.data),
@@ -109,14 +112,16 @@ export default function Records() {
 
   const params = useMemo(
     () => ({
-      start_date: filters.range.start,
-      end_date: filters.range.end,
+      // 定位关联退款时不限日期（退款可落在原支出之后的账期）
+      start_date: filters.related_txn_id ? undefined : filters.range.start,
+      end_date: filters.related_txn_id ? undefined : filters.range.end,
       kind: filters.kind || undefined,
       account_id: filters.account_id,
       category_id: filters.category_id,
       amount_min: filters.amount_min,
       amount_max: filters.amount_max,
       keyword: filters.keyword || undefined,
+      related_txn_id: filters.related_txn_id,
       page,
       page_size: PAGE_SIZE,
     }),
@@ -155,11 +160,30 @@ export default function Records() {
 
   const openCreate = () => {
     setEditing(null);
+    setRefill(null);
     setFormOpen(true);
   };
   const openEdit = (t: Transaction) => {
     setEditing(t);
+    setRefill(null);
     setFormOpen(true);
+  };
+  /** 行内「退款」入口：预填关联原支出及其分类/账户（specs/refunds 两个入口之一）。 */
+  const openRefund = (t: Transaction) => {
+    setEditing(null);
+    setRefill({
+      kind: 'refund',
+      related_txn_id: t.id,
+      account_id: t.account_id,
+      category_id: t.category_id ?? undefined,
+      related_amount: t.amount,
+      refunded: Number(t.refunded_amount ?? 0),
+    });
+    setFormOpen(true);
+  };
+  /** 点击「已退 ¥x」→ 定位该支出的关联退款（specs/refunds 可跳转）。 */
+  const locateRefunds = (t: Transaction) => {
+    patch({ related_txn_id: t.id, kind: '', account_id: undefined, category_id: undefined });
   };
   const doDelete = async (t: Transaction) => {
     try {
@@ -184,11 +208,13 @@ export default function Records() {
   };
 
   const kindTag = (k: TxnKind) =>
-    k === 'expense' ? '支出' : k === 'income' ? '收入' : '转账';
-  const tone = (k: TxnKind) => (k === 'expense' ? 'expense' : k === 'income' ? 'income' : 'plain');
+    k === 'expense' ? '支出' : k === 'income' ? '收入' : k === 'refund' ? '退款' : '转账';
+  const tone = (k: TxnKind) =>
+    k === 'expense' ? 'expense' : k === 'income' || k === 'refund' ? 'income' : 'plain';
 
+  // 金额带方向：收入/退款为正，支出/转账为负（退款恒正，specs/refunds 金额恒正）
   const amountOf = (t: Transaction) =>
-    t.kind === 'income' ? t.amount : `-${t.amount}`;
+    t.kind === 'income' || t.kind === 'refund' ? t.amount : `-${t.amount}`;
 
   const actions = (t: Transaction) =>
     canEdit(t) ? (
@@ -196,6 +222,11 @@ export default function Records() {
         <Button type="link" size="small" onClick={() => openEdit(t)}>
           编辑
         </Button>
+        {t.kind === 'expense' && (
+          <Button type="link" size="small" onClick={() => openRefund(t)}>
+            退款
+          </Button>
+        )}
         <Popconfirm title="删除这笔流水？" onConfirm={() => doDelete(t)}>
           <Button type="link" size="small" danger>
             删除
@@ -221,6 +252,16 @@ export default function Records() {
         <>
           {kindTag(k)}
           {t.source === 'recurring' && <Tag className="src-tag">自动</Tag>}
+          {k === 'expense' && Number(t.refunded_amount ?? 0) > 0 && (
+            <Tag
+              className="refunded-tag"
+              color="green"
+              title="点击查看关联退款"
+              onClick={() => locateRefunds(t)}
+            >
+              已退 ¥{Number(t.refunded_amount).toLocaleString('zh-CN')}
+            </Tag>
+          )}
         </>
       ),
     },
@@ -293,9 +334,19 @@ export default function Records() {
             { value: 'expense', label: '支出' },
             { value: 'income', label: '收入' },
             { value: 'transfer', label: '转账' },
+            { value: 'refund', label: '退款' },
           ]}
           onChange={(v) => patch({ kind: v as TxnKind | '' })}
         />
+        {filters.related_txn_id ? (
+          <Tag
+            closable
+            color="green"
+            onClose={() => patch({ related_txn_id: undefined })}
+          >
+            关联退款 #{filters.related_txn_id}
+          </Tag>
+        ) : null}
         <Select
           size="small"
           allowClear
@@ -355,6 +406,15 @@ export default function Records() {
                         ? '转账'
                         : (t.category_id ? catInfo.get(t.category_id)?.full : undefined) ?? '未分类'}
                       {t.source === 'recurring' && <Tag className="src-tag">自动</Tag>}
+                      {t.kind === 'expense' && Number(t.refunded_amount ?? 0) > 0 && (
+                        <Tag
+                          className="refunded-tag"
+                          color="green"
+                          onClick={() => locateRefunds(t)}
+                        >
+                          已退 ¥{Number(t.refunded_amount).toLocaleString('zh-CN')}
+                        </Tag>
+                      )}
                     </span>
                     <Money value={amountOf(t)} tone={tone(t.kind)} />
                   </div>
@@ -405,7 +465,12 @@ export default function Records() {
         />
       </div>
 
-      <TxnFormModal open={formOpen} onClose={() => setFormOpen(false)} editing={editing} />
+      <TxnFormModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        editing={editing}
+        refill={refill}
+      />
     </div>
   );
 }

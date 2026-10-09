@@ -24,14 +24,15 @@ type DailyRow struct {
 	Expense decimal.Decimal
 }
 
-// DailyTotals 区间内逐日收入/支出（转账不计入，对照 statistics spec 口径）。
+// DailyTotals 区间内逐日收入/支出（转账不计入，支出为退款冲减后净额，对照 statistics spec 口径）。
 func (r *StatsRepo) DailyTotals(start, end time.Time) ([]DailyRow, error) {
 	const sql = `
 		SELECT entry_date AS d,
 		       SUM(CASE WHEN kind = 'income'  THEN amount ELSE 0 END) AS income,
-		       SUM(CASE WHEN kind = 'expense' THEN amount ELSE 0 END) AS expense
+		       SUM(CASE WHEN kind = 'expense' THEN amount
+		                WHEN kind = 'refund'  THEN -amount ELSE 0 END) AS expense
 		FROM transactions
-		WHERE kind IN ('income', 'expense')
+		WHERE kind IN ('income', 'expense', 'refund')
 		  AND entry_date >= ? AND entry_date <= ?
 		GROUP BY entry_date
 		ORDER BY entry_date`
@@ -48,15 +49,19 @@ type CategoryRow struct {
 }
 
 // CategoryTotals 区间内按一级分类聚合收入/支出（子分类上卷到一级）。
+// 退款并入 expense 口径按负值累计：净额可为负且 MUST 原样返回（specs/statistics 分类占比，
+// 口径过滤由图表层执行）；无分类退款归入 root_id=0（未分类）。
 func (r *StatsRepo) CategoryTotals(start, end time.Time) ([]CategoryRow, error) {
 	const sql = `
-		SELECT COALESCE(p.id, c.id) AS root_id, t.kind AS kind, SUM(t.amount) AS total
+		SELECT COALESCE(p.id, c.id) AS root_id,
+		       CASE WHEN t.kind = 'refund' THEN 'expense' ELSE t.kind END AS kind,
+		       SUM(CASE WHEN t.kind = 'refund' THEN -t.amount ELSE t.amount END) AS total
 		FROM transactions t
 		LEFT JOIN categories c ON c.id = t.category_id
 		LEFT JOIN categories p ON p.id = c.parent_id
-		WHERE t.kind IN ('income', 'expense')
+		WHERE t.kind IN ('income', 'expense', 'refund')
 		  AND t.entry_date >= ? AND t.entry_date <= ?
-		GROUP BY COALESCE(p.id, c.id), t.kind`
+		GROUP BY COALESCE(p.id, c.id), CASE WHEN t.kind = 'refund' THEN 'expense' ELSE t.kind END`
 	var rows []CategoryRow
 	err := r.db.Raw(sql, start, end).Scan(&rows).Error
 	return rows, err
@@ -69,28 +74,30 @@ type PeriodRow struct {
 	Expense   decimal.Decimal
 }
 
-// PeriodTotals 指定年份各账期的收入/支出（period_key 前缀走索引）。
+// PeriodTotals 指定年份各账期的收入/支出（period_key 前缀走索引，支出含退款冲减）。
 func (r *StatsRepo) PeriodTotals(year int) ([]PeriodRow, error) {
 	const sql = `
 		SELECT period_key,
 		       SUM(CASE WHEN kind = 'income'  THEN amount ELSE 0 END) AS income,
-		       SUM(CASE WHEN kind = 'expense' THEN amount ELSE 0 END) AS expense
+		       SUM(CASE WHEN kind = 'expense' THEN amount
+		                WHEN kind = 'refund'  THEN -amount ELSE 0 END) AS expense
 		FROM transactions
-		WHERE kind IN ('income', 'expense') AND period_key LIKE ?
+		WHERE kind IN ('income', 'expense', 'refund') AND period_key LIKE ?
 		GROUP BY period_key`
 	var rows []PeriodRow
 	err := r.db.Raw(sql, fmt.Sprintf("%04d-%%", year)).Scan(&rows).Error
 	return rows, err
 }
 
-// SumByPeriod 按物化 period_key 汇总收入/支出（转账不计）。
+// SumByPeriod 按物化 period_key 汇总收入/支出（转账不计，支出含退款冲减）。
 // 封账预览用：与 guardOpen 的锁口径（同 period_key）严格一致，改结算日不影响历史合计。
 func (r *StatsRepo) SumByPeriod(periodKey string) (PeriodRow, error) {
 	const sql = `
 		SELECT COALESCE(SUM(CASE WHEN kind = 'income'  THEN amount END), 0) AS income,
-		       COALESCE(SUM(CASE WHEN kind = 'expense' THEN amount END), 0) AS expense
+		       COALESCE(SUM(CASE WHEN kind = 'expense' THEN amount
+		                         WHEN kind = 'refund'  THEN -amount END), 0) AS expense
 		FROM transactions
-		WHERE kind IN ('income', 'expense') AND period_key = ?`
+		WHERE kind IN ('income', 'expense', 'refund') AND period_key = ?`
 	var row PeriodRow
 	err := r.db.Raw(sql, periodKey).Scan(&row).Error
 	row.PeriodKey = periodKey
@@ -110,6 +117,7 @@ func (r *StatsRepo) DailyAccountNets(end time.Time) ([]AssetNetRow, error) {
 		SELECT aid, d, SUM(v) AS net FROM (
 			SELECT account_id AS aid, entry_date AS d,
 			       CASE kind WHEN 'income' THEN amount
+			                 WHEN 'refund' THEN amount
 			                 WHEN 'expense' THEN -amount END AS v
 			FROM transactions
 			WHERE kind <> 'transfer' AND entry_date <= ?

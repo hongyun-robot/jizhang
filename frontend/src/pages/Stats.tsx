@@ -68,9 +68,27 @@ export default function Stats() {
 
   const pieOption = useMemo<EChartsOption>(() => {
     const items = share?.items ?? [];
+    // 金额排行（specs/statistics 分类占比）：按金额降序；净额 ≤ 0 的分类只进图例不进饼图
+    const ranked = [...items].sort((a, b) => Number(b.amount) - Number(a.amount));
+    const amountOf = (name: string) => {
+      const it = ranked.find((i) => i.name === name);
+      if (!it) return '';
+      const v = Number(it.amount);
+      const body = Math.abs(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+      return v < 0 ? ` −¥${body}` : ` ¥${body}`;
+    };
     return {
       tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
-      legend: { type: 'scroll', bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 } },
+      legend: {
+        type: 'scroll',
+        bottom: 0,
+        itemWidth: 10,
+        itemHeight: 10,
+        textStyle: { fontSize: 11 },
+        // 图例含净额为负的分类，且带金额（负值如实显示，如「数码 −¥200」）
+        data: ranked.map((i) => i.name),
+        formatter: (name: string) => `${name}${amountOf(name)}`,
+      },
       color: PALETTE,
       series: [
         {
@@ -80,7 +98,10 @@ export default function Stats() {
           // 窄屏标签会互相压住，交给图例与 tooltip
           label: isMobile ? { show: false } : { fontSize: 11, formatter: '{b} {d}%' },
           labelLine: { show: !isMobile },
-          data: items.map((i) => ({ name: i.name, value: Number(i.amount) })),
+          // 饼图只绘制净额 > 0 的分类；净额 ≤ 0（如仅退款的分类）不参与绘制
+          data: ranked
+            .filter((i) => Number(i.amount) > 0)
+            .map((i) => ({ name: i.name, value: Number(i.amount) })),
         },
       ],
     };

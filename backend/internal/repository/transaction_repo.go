@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
 	"jizhang/internal/model"
@@ -18,17 +19,18 @@ func NewTransactionRepo(db *gorm.DB) *TransactionRepo { return &TransactionRepo{
 
 // TxnFilter 列表过滤条件（specs/transactions 查询场景）。
 type TxnFilter struct {
-	PeriodKey  string        // 精确归期
-	StartDate  *string       // YYYY-MM-DD 起（含）
-	EndDate    *string       // YYYY-MM-DD 止（含）
-	Kind       model.TxnKind // 限定类型
-	AccountID  int64
-	CategoryID int64
-	AmountMin  *string // 金额区间下界（含）
-	AmountMax  *string // 金额区间上界（含）
-	Keyword    string  // 备注模糊
-	Page       int     // 从 1 开始
-	PageSize   int
+	PeriodKey    string        // 精确归期
+	StartDate    *string       // YYYY-MM-DD 起（含）
+	EndDate      *string       // YYYY-MM-DD 止（含）
+	Kind         model.TxnKind // 限定类型
+	AccountID    int64
+	CategoryID   int64
+	AmountMin    *string // 金额区间下界（含）
+	AmountMax    *string // 金额区间上界（含）
+	Keyword      string  // 备注模糊
+	RelatedTxnID int64   // 定位关联到该流水的退款（>0 时过滤）
+	Page         int     // 从 1 开始
+	PageSize     int
 }
 
 // applyFilter 组装筛选条件（List / ListAll 共用，导出与列表同一套筛选语义）。
@@ -62,6 +64,10 @@ func applyFilter(q *gorm.DB, f TxnFilter) *gorm.DB {
 	if f.Keyword != "" {
 		like := "%" + f.Keyword + "%"
 		q = q.Where("note LIKE ?", like)
+	}
+	if f.RelatedTxnID > 0 {
+		// 关联退款定位（specs/refunds 原支出「已退」跳转）
+		q = q.Where("related_txn_id = ?", f.RelatedTxnID)
 	}
 	return q
 }
@@ -138,4 +144,38 @@ func (r *TransactionRepo) ListByPeriod(periodKey string) ([]model.Transaction, e
 	var list []model.Transaction
 	err := r.db.Where("period_key = ?", periodKey).Order("entry_date, id").Find(&list).Error
 	return list, err
+}
+
+// HasRefunds 该流水是否已被退款关联（原支出删除约束）。
+func (r *TransactionRepo) HasRefunds(txnID int64) (bool, error) {
+	var n int64
+	err := r.db.Model(&model.Transaction{}).
+		Where("kind = ? AND related_txn_id = ?", model.TxnRefund, txnID).
+		Count(&n).Error
+	return n > 0, err
+}
+
+// RefundedTotals 按原支出 id 聚合关联退款累计金额（列表「已退 ¥x」标记）。
+func (r *TransactionRepo) RefundedTotals(ids []int64) (map[int64]decimal.Decimal, error) {
+	out := make(map[int64]decimal.Decimal, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	type row struct {
+		RelatedTxnID int64
+		Total        decimal.Decimal
+	}
+	var rows []row
+	err := r.db.Model(&model.Transaction{}).
+		Select("related_txn_id, SUM(amount) AS total").
+		Where("kind = ? AND related_txn_id IN ?", model.TxnRefund, ids).
+		Group("related_txn_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, x := range rows {
+		out[x.RelatedTxnID] = x.Total
+	}
+	return out, nil
 }
