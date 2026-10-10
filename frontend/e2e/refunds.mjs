@@ -98,12 +98,22 @@ async function expectMsg(page, re, timeout = 6000) {
   }
 }
 
-/** dev 环境 SQL（与 budgets.mjs 同一通道）。 */
+/** dev 环境 SQL（与 budgets.mjs 同一通道）。
+ * 优先 WSL docker（历史环境）；WSL/容器不可用时回退本机 MySQL 8.4（3307）。 */
+const LOCAL_MYSQL = 'C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin\\mysql.exe';
 function sql(q) {
-  return execSync(
-    `wsl -d Ubuntu-20.04 -u root -- docker exec jizhang-mysql mysql -uroot -pdevpass --default-character-set=utf8mb4 jizhang -N -e "${q}"`,
-    { encoding: 'utf8' },
-  ).trim();
+  const cols = `--default-character-set=utf8mb4 jizhang --skip-column-names -e "${q}"`;
+  try {
+    return execSync(
+      `wsl -d Ubuntu-20.04 -u root -- docker exec jizhang-mysql mysql -uroot -pdevpass ${cols}`,
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 8000 },
+    ).trim();
+  } catch {
+    return execSync(
+      `"${LOCAL_MYSQL}" --host=127.0.0.1 --port=3307 --user=root --password=devpass ${cols}`,
+      { encoding: 'utf8' },
+    ).trim();
+  }
 }
 
 async function gotoRecords(page) {
@@ -114,9 +124,12 @@ async function gotoRecords(page) {
 
 const rowOf = (page, note) => page.locator('tr.ant-table-row', { hasText: note });
 
+/** VoucherFormModal forceRender 会常驻一个隐藏容器，用 :visible 限定到打开的弹窗。 */
+const txnModal = (page) => page.locator('.ant-modal-container:visible');
+
 async function openModal(page) {
   await page.locator('.page-head').getByRole('button', { name: '记一笔' }).first().click();
-  const modal = page.locator('.ant-modal-container');
+  const modal = txnModal(page);
   await modal.waitFor({ state: 'visible', timeout: 10000 });
   return modal;
 }
@@ -132,12 +145,11 @@ async function pickAccount(modal, page, acctName) {
 }
 
 async function submitModal(page) {
-  await page.locator('.ant-modal-footer .ant-btn-primary').first().click();
+  await txnModal(page).locator('.ant-modal-footer .ant-btn-primary').first().click();
 }
 
 async function waitModalClosed(page) {
-  await page
-    .locator('.ant-modal-container')
+  await txnModal(page)
     .waitFor({ state: 'hidden', timeout: 10000 })
     .catch(() => {});
 }
@@ -147,7 +159,7 @@ async function openRowRefund(page, note) {
   const row = rowOf(page, note);
   await row.waitFor({ state: 'visible', timeout: 10000 });
   await row.getByRole('button', { name: /^退\s*款$/ }).first().click();
-  const modal = page.locator('.ant-modal-container');
+  const modal = txnModal(page);
   await modal.waitFor({ state: 'visible', timeout: 10000 });
   return modal;
 }
@@ -583,7 +595,7 @@ async function main() {
   const augRefRow = rowOf(page, `${AUG}-16`);
   ok((await augRefRow.count()) > 0, '关联退款定位到 8 月退款行');
   await augRefRow.getByRole('button', { name: /编\s*辑/ }).click();
-  const eModal = page.locator('.ant-modal-container');
+  const eModal = txnModal(page);
   await eModal.waitFor({ state: 'visible', timeout: 8000 });
   await eModal.locator('input.amount-input').fill('65');
   await submitModal(page);
@@ -711,7 +723,12 @@ async function main() {
     refundLines.some((l) => l.includes('150.00')) && refundLines.some((l) => l.includes('40.00')),
     'CSV 含退款金额 150.00 与 40.00',
   );
-  ok(!refundLines.some((l) => /,-\d/.test(l)), 'CSV 退款金额恒正（无负号）');
+  // 只校验「金额」列恒正：「消费影响」列对退款是负数（后加列），整行匹配会误报
+  const amountCellNeg = refundLines.some((l) => {
+    const cells = l.split(',');
+    return (cells[5] ?? '').trim().startsWith('-');
+  });
+  ok(!amountCellNeg, 'CSV 退款金额恒正（无负号）');
 
   // viewer：无退款入口 + API 403
   const vtok = await apiLogin('dazhi', 'member123456');
@@ -732,7 +749,7 @@ async function main() {
   const vAdd = p2.locator('.page-head').getByRole('button', { name: '记一笔' }).first();
   if ((await vAdd.count()) > 0) {
     await vAdd.click();
-    const vModal = p2.locator('.ant-modal-container');
+    const vModal = txnModal(p2);
     await vModal.waitFor({ state: 'visible', timeout: 8000 });
     const vKinds = await vModal.locator('.ant-segmented-item').count();
     const hasRefund = (await vModal.locator('.ant-segmented-item', { hasText: '退款' }).count()) > 0;

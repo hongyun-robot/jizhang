@@ -87,12 +87,22 @@ async function expectMsg(page, re, timeout = 6000) {
   }
 }
 
-/** dev 环境 SQL（查询文本只用 ASCII，中文在 JS 侧过滤）。 */
+/** dev 环境 SQL（查询文本只用 ASCII，中文在 JS 侧过滤）。
+ * 优先 WSL docker（历史环境）；WSL/容器不可用时回退本机 MySQL 8.4（3307）。 */
+const LOCAL_MYSQL = 'C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin\\mysql.exe';
 function sql(q) {
-  return execSync(
-    `wsl -d Ubuntu-20.04 -u root -- docker exec jizhang-mysql mysql -uroot -pdevpass --default-character-set=utf8mb4 jizhang -N -e "${q}"`,
-    { encoding: 'utf8' },
-  ).trim();
+  const cols = `--default-character-set=utf8mb4 jizhang --skip-column-names -e "${q}"`;
+  try {
+    return execSync(
+      `wsl -d Ubuntu-20.04 -u root -- docker exec jizhang-mysql mysql -uroot -pdevpass ${cols}`,
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 8000 },
+    ).trim();
+  } catch {
+    return execSync(
+      `"${LOCAL_MYSQL}" --host=127.0.0.1 --port=3307 --user=root --password=devpass ${cols}`,
+      { encoding: 'utf8' },
+    ).trim();
+  }
 }
 function sqlRows(q) {
   return sql(q)

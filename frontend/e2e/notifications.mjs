@@ -68,12 +68,22 @@ async function apiLogin(username, password) {
   return j.data.access_token;
 }
 
-/** dev 环境 SQL：走 stdin 传入（CJK/JSON 经 stdin 往返已验证）。 */
+/** dev 环境 SQL：走 stdin 传入（CJK/JSON 经 stdin 往返已验证）。
+ * 优先 WSL docker（历史环境）；WSL/容器不可用时回退本机 MySQL 8.4（3307）。 */
+const LOCAL_MYSQL = 'C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin\\mysql.exe';
 function sqlIn(q) {
-  return execSync(
-    `wsl -d Ubuntu-20.04 -u root -- docker exec -i jizhang-mysql mysql -uroot -pdevpass --default-character-set=utf8mb4 jizhang -N`,
-    { input: q, encoding: 'utf8' },
-  ).trim();
+  const args = `--default-character-set=utf8mb4 jizhang --skip-column-names`;
+  try {
+    return execSync(
+      `wsl -d Ubuntu-20.04 -u root -- docker exec -i jizhang-mysql mysql -uroot -pdevpass ${args}`,
+      { input: q, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 8000 },
+    ).trim();
+  } catch {
+    return execSync(
+      `"${LOCAL_MYSQL}" --host=127.0.0.1 --port=3307 --user=root --password=devpass ${args}`,
+      { input: q, encoding: 'utf8' },
+    ).trim();
+  }
 }
 const sqlN = (q) => Number(sqlIn(q) || '0');
 
@@ -203,8 +213,8 @@ async function main() {
   // ============ 5. 还款提醒渲染（SQL 种入真实 payload） ============
   console.log('— 5. 还款提醒正文渲染 —');
   sqlIn(`
-INSERT INTO notifications (kind, payload, read_at, created_at) VALUES
-('repayment_due', '{"dedup_key":"repayment_due:5:2026-10","account_id":5,"account_name":"信用卡","debt":"100.00","repayment_date":"2026-10-10","days":8,"overdue":false}', NULL, NOW());
+INSERT INTO notifications (kind, payload, read_at, created_at, owner_id) VALUES
+('repayment_due', '{"dedup_key":"repayment_due:5:2026-10","account_id":5,"account_name":"信用卡","debt":"100.00","repayment_date":"2026-10-10","days":8,"overdue":false}', NULL, NOW(), 1);
 `);
   ok(sqlN(`SELECT COUNT(*) FROM notifications WHERE kind='repayment_due'`) === 1, '种入 1 条还款提醒');
   await page.reload();
@@ -227,11 +237,15 @@ INSERT INTO notifications (kind, payload, read_at, created_at) VALUES
     amount: '88.88',
     freq: 'monthly',
     account_id: 1,
-    category_id: 3,
+    category_id: 17, // 午餐（末级分类；根分类不可直接记账）
     start_date: '2026-10-01',
   });
   ok(mk.status === 200 && mk.body.code === 0, '创建周期模板（月/88.88/午餐/2026-10-01）');
-  await page.reload(); // AppShell 挂载触发懒补齐 EnsureDueLazy
+  // 直接调懒补齐接口：页面 reload 时 AppShell 会并发触发 liabilities/ensure，
+  // 其 BeforeEnsure 走的是非懒路径（不落提醒），与懒补齐竞态导致生成被抢跑。
+  const ens = await api('POST', '/recurring/ensure', tok);
+  ok(ens.status === 200 && ens.body.data?.generated === 1, '懒补齐生成 1 笔', JSON.stringify(ens.body));
+  await page.reload(); // 拉取提醒列表（补齐已由接口完成，reload 只为刷新展示）
   await page.waitForLoadState('networkidle').catch(() => {});
   ok(await waitBell(page, DESKTOP_BELL, '2'), '懒补齐生成 → 红点 2（还款+补记）', await bellText(page, DESKTOP_BELL));
   ok(sqlN(`SELECT COUNT(*) FROM notifications WHERE kind='recurring_patched'`) === 1, 'DB 生成 1 条补齐提醒');
@@ -269,15 +283,15 @@ INSERT INTO notifications (kind, payload, read_at, created_at) VALUES
   await p2.goto(BASE + '/notifications');
   await p2.waitForLoadState('networkidle').catch(() => {});
   await p2.locator('.notif-list').waitFor({ timeout: 15000 });
-  ok((await p2.locator('.notif-row').count()) === 4, 'viewer 可读全部 4 条提醒');
-  ok((await p2.locator('.notif-row.unread').count()) === 2, 'viewer 看到 2 条未读');
-  ok(await waitBell(p2, DESKTOP_BELL, '2'), 'viewer 铃铛红点 2', await bellText(p2, DESKTOP_BELL));
+  ok((await p2.locator('.notif-row').count()) === 3, 'viewer 可读 3 条提醒（还款提醒按 owner 隔离，看不到 admin 的）');
+  ok((await p2.locator('.notif-row.unread').count()) === 1, 'viewer 看到 1 条未读（补齐提醒）');
+  ok(await waitBell(p2, DESKTOP_BELL, '1'), 'viewer 铃铛红点 1', await bellText(p2, DESKTOP_BELL));
   await p2
     .locator('.notif-row.unread')
     .first()
     .getByRole('button', { name: /标\s*为\s*已\s*读/ })
     .click();
-  ok(await waitBell(p2, DESKTOP_BELL, '1'), 'viewer 标已读生效 → 未读 1', await bellText(p2, DESKTOP_BELL));
+  ok(await waitBell(p2, DESKTOP_BELL, ''), 'viewer 标已读生效 → 未读归零', await bellText(p2, DESKTOP_BELL));
   await shot(p2, 'notif-10-viewer');
   await ctx2.close();
 

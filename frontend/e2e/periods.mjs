@@ -140,7 +140,7 @@ async function main() {
     kind: 'expense',
     amount: '88.00',
     account_id: 1,
-    category_id: 3,
+    category_id: 24, // 购物/日用（末级分类；根分类不可直接记账）
     entry_date: '2026-09-15',
     note: NOTE,
   });
@@ -267,7 +267,7 @@ async function main() {
   await sleep(700);
   const row2 = page.locator('.ant-table-tbody tr.ant-table-row', { hasText: NOTE }).first();
   await row2.getByRole('button', { name: /编\s*辑/ }).click();
-  const editModal = page.locator('.ant-modal-container');
+  const editModal = page.locator('.ant-modal-container:visible');
   await editModal.waitFor({ state: 'visible', timeout: 10000 });
   await editModal.locator('input[inputmode="decimal"]').fill('99');
   await editModal.locator('.ant-modal-footer .ant-btn-primary').click();
