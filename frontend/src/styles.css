@@ -62,7 +62,8 @@ html {
   --text: #16181a;
   --text-2: #4a4d52;
   --muted: #6b6f75;
-  --tab-fg: rgba(22, 24, 26, 0.55);
+  /* 底部 Tab 文字：0.55 对比度约 4.0:1 不达 AA，提到 0.72 约 7:1 */
+  --tab-fg: rgba(22, 24, 26, 0.72);
 
   /* 收支语义 */
   --income: #0f7a52;
@@ -109,7 +110,7 @@ html {
   --text: #ecebe4;
   --text-2: #c3c1b8;
   --muted: #918e85;
-  --tab-fg: rgba(236, 235, 228, 0.58);
+  --tab-fg: rgba(236, 235, 228, 0.72);
 
   --income: #4ade80;
   --expense: #f87171;
@@ -889,21 +890,31 @@ p {
   flex-shrink: 0;
 }
 
-/* 行内操作：默认压到次要权重，悬停/聚焦才提亮，避免每行都喊「编辑/删除」 */
+/* 行内操作：默认压到次要权重，悬停/聚焦才提亮，避免每行都喊「编辑/删除」。
+   压暗只在有 hover 的精确指针设备生效 —— 触屏永远等不到 hover，
+   否则红色「删除」恒为 0.6 不透明度、读作近禁用态（specs/ui-shell 触屏可见性）。 */
 .row-actions,
 .txn-actions {
-  opacity: 0.6;
   transition: opacity 0.18s ease;
 }
-.row-actions:focus-within,
-.txn-actions:focus-within {
-  opacity: 1;
-}
 @media (hover: hover) and (pointer: fine) {
+  .row-actions,
+  .txn-actions {
+    opacity: 0.6;
+  }
+  .row-actions:focus-within,
+  .txn-actions:focus-within {
+    opacity: 1;
+  }
   .ant-table-tbody tr:hover .row-actions,
   .txn-row:hover .txn-actions {
     opacity: 1;
   }
+}
+/* 触屏按压等价反馈（hover 的替代） */
+.row-actions .ant-btn:active,
+.txn-actions .ant-btn:active {
+  opacity: 1;
 }
 
 .pager {
@@ -958,7 +969,8 @@ p {
 
 .cat-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+  /* min(480px,100%)：窄视口轨道退化为容器宽，不再溢出被 .panel{overflow:hidden} 裁掉右侧操作 */
+  grid-template-columns: repeat(auto-fit, minmax(min(480px, 100%), 1fr));
   gap: 10px;
 }
 
@@ -1346,7 +1358,8 @@ p {
 
 .rule-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(470px, 1fr));
+  /* 同 .cat-section：窄视口单列且不被面板裁切 */
+  grid-template-columns: repeat(auto-fit, minmax(min(470px, 100%), 1fr));
   gap: 10px;
 }
 
@@ -1676,7 +1689,7 @@ p {
   justify-content: center;
   gap: 3px;
   height: 58px;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--tab-fg);
   cursor: pointer;
   transition: color 0.2s ease;
@@ -1688,8 +1701,8 @@ p {
   transition: transform 0.3s var(--ease-spring);
 }
 .bottom-tabs .tab span {
-  font-size: 10.5px;
-  letter-spacing: 0.02em;
+  font-size: 11px;
+  letter-spacing: 0.01em;
 }
 .bottom-tabs .tab.active {
   color: var(--primary);
@@ -2411,6 +2424,79 @@ tr.flash > td {
   }
 }
 
+/* ---------- 28b. 移动端触控热区（specs/ui-shell 触控热区下限） ----------
+   ≤767px 下可交互控件命中区 ≥40px、主操作 ≥44px；
+   规则全部锁在移动媒体查询内，≥768px 桌面密度零变化。 */
+@media (max-width: 767px) {
+  .ant-btn {
+    min-height: 40px;
+  }
+  /* 主操作（记账/保存/提交类）≥44px */
+  .ant-btn-primary,
+  .ant-btn-danger,
+  .ant-btn-dangerous {
+    min-height: 44px;
+  }
+  /* 行内 link 操作（编辑/退款/删除/账单…）：小尺寸按钮撑到 40px 命中区 */
+  .ant-btn-link.ant-btn-sm,
+  .ant-btn-sm {
+    min-height: 40px;
+    padding-inline: 8px;
+  }
+  .ant-select,
+  .ant-picker,
+  .ant-input-number {
+    min-height: 40px;
+  }
+  .ant-select-selector,
+  .ant-input-number-input {
+    min-height: 40px;
+  }
+  .ant-segmented,
+  .ant-segmented-item {
+    min-height: 40px;
+  }
+  .ant-segmented-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-inline: 14px;
+  }
+  /* 分页：命中区 ≥40px */
+  .ant-pagination .ant-pagination-item,
+  .ant-pagination .ant-pagination-prev,
+  .ant-pagination .ant-pagination-next {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .ant-pagination .ant-pagination-item-link {
+    min-height: 40px;
+    min-width: 40px;
+  }
+  .ant-pagination .ant-pagination-item a {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* 记账分类磁贴：单击即中，相邻不误触（≥40px、间距由 margin 保证） */
+  .ant-tag.ant-tag-checkable,
+  .cat-leaves .ant-tag {
+    min-height: 40px;
+    padding: 8px 14px;
+    display: inline-flex;
+    align-items: center;
+    margin-inline-end: 4px;
+  }
+  /* 可点标签（已退标记等）补齐命中区 */
+  .refunded-tag {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    padding-inline: 8px;
+  }
+}
+
 /* ---------- 29. 无障碍：减弱动效 ---------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -2424,6 +2510,13 @@ tr.flash > td {
   .recent-row,
   .notif-row,
   .txn-row,
+  /* 登录页入场（rise-in）与流水定位闪烁（row-flash）也要关停 */
+  .art-title,
+  .art-sub,
+  .art-ledger,
+  .login-card,
+  .txn-row.flash,
+  tr.flash,
   .bottom-tabs .tab.active .anticon,
   .notif-row.unread .notif-icon,
   .notif-bell[data-unread='1']::after {
@@ -2435,7 +2528,9 @@ tr.flash > td {
   .stat-card,
   .stat-card::before,
   .txn-row::before,
-  .recent-row.clickable::after {
+  .recent-row.clickable::after,
+  .row-actions,
+  .txn-actions {
     transition: none !important;
   }
   .bottom-tabs .tab:active,

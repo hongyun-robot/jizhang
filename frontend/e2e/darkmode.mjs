@@ -81,7 +81,7 @@ const LIGHT_PANEL = 'rgb(255, 255, 255)'; // --panel #ffffff
 const DARK_BODY = 'rgb(11, 13, 12)'; // --bg #0b0d0c
 const DARK_PANEL = 'rgb(20, 23, 22)'; // --panel #141716
 const DARK_TAB_BG = 'rgba(20, 23, 22, 0.86)'; // --tab-bg（半透明面板底 + 毛玻璃）
-const DARK_TAB_FG = 'rgba(236, 235, 228, 0.58)'; // --tab-fg（非选中 Tab 文字）
+const DARK_TAB_FG = 'rgba(236, 235, 228, 0.72)'; // --tab-fg（非选中 Tab 文字；阶段1 提到 0.72 以满足对比度 ≥4.5:1）
 const LIGHT_PRIMARY_BTN = 'rgb(10, 117, 104)'; // --primary-fill #0a7568
 
 const browser = await chromium.launch({ executablePath: EXE, headless: true });

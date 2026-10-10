@@ -117,11 +117,11 @@ async function main() {
     ok((await quickBtn.count()) > 0, '5.4 快捷记账入口存在');
 
     await quickBtn.click();
-    await page.locator('.ant-modal').waitFor({ state: 'visible', timeout: 10000 });
+    await page.locator('.ant-modal:visible').waitFor({ state: 'visible', timeout: 10000 });
     const today = localToday();
-    const dateShown = await page.locator('.ant-modal .ant-picker input').inputValue();
+    const dateShown = await page.locator('.ant-modal:visible .ant-picker input').inputValue();
     ok(dateShown === today, '5.4 快捷记账日期默认今天', `${dateShown} vs ${today}`);
-    await page.locator('.ant-modal-footer .ant-btn:not(.ant-btn-primary)').first().click();
+    await page.locator('.ant-modal:visible .ant-modal-footer .ant-btn:not(.ant-btn-primary)').first().click();
     await ctx.close();
   }
 
@@ -138,13 +138,14 @@ async function main() {
     // 记一笔（默认支出）
     const NOTE = `e2e-${Date.now()}`;
     await page.locator('.page-head').getByRole('button', { name: '记一笔' }).click();
-    const modal = page.locator('.ant-modal-container');
+    const modal = page.locator('.ant-modal-container:visible');
     await modal.waitFor({ state: 'visible' });
     await modal.locator('input[inputmode="decimal"]').fill('12.34');
     const leaves = modal.locator('.cat-leaves .ant-tag');
     if ((await leaves.count()) > 0) await leaves.first().click();
-    await modal.locator('.ant-select').first().click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+    // 第 0 个 .ant-select 是平台/商家 AutoComplete，账户选择器在第 1 位
+    await modal.locator('.ant-select').nth(1).click();
+    await page.locator('.ant-select-dropdown:visible').last().locator('.ant-select-item-option').first().click();
     await modal.locator('textarea').fill(NOTE);
     await modal.locator('.ant-modal-footer .ant-btn-primary').click();
     await page.getByText('已记一笔').waitFor({ timeout: 10000 });
@@ -155,13 +156,13 @@ async function main() {
     await shot(page, 'desktop-05-records');
 
     // 关键字筛选
-    await page.locator('input[placeholder="备注关键字"]').fill(NOTE);
+    await page.locator('input[placeholder="备注 / 平台 / 商家"]').fill(NOTE);
     await sleep(800);
     const kwRows = await page.locator('.ant-table-tbody tr.ant-table-row').count();
     ok(kwRows === 1, '4.5 备注关键字筛选命中 1 行', `${kwRows} 行`);
 
     // 金额区间
-    await page.locator('input[placeholder="备注关键字"]').fill('');
+    await page.locator('input[placeholder="备注 / 平台 / 商家"]').fill('');
     await page.locator('input[placeholder="金额≥"]').fill('999999');
     await sleep(800);
     const amtRows = await page.locator('.ant-table-tbody tr.ant-table-row').count();
@@ -179,11 +180,11 @@ async function main() {
     await sleep(600);
 
     // 编辑
-    await page.locator('input[placeholder="备注关键字"]').fill(NOTE);
+    await page.locator('input[placeholder="备注 / 平台 / 商家"]').fill(NOTE);
     await sleep(800);
     const row = page.locator('.ant-table-tbody tr.ant-table-row', { hasText: NOTE }).first();
     await row.getByRole('button', { name: /编\s*辑/ }).click();
-    const emodal = page.locator('.ant-modal-container');
+    const emodal = page.locator('.ant-modal-container:visible');
     await emodal.waitFor({ state: 'visible' });
     const editAmount = await emodal.locator('input[inputmode="decimal"]').inputValue();
     ok(editAmount === '12.34', '4.5 编辑回填金额', editAmount);
@@ -227,7 +228,7 @@ async function main() {
     // 新建 → 删除账户（空账户）
     const ANAME = `e2e户${Date.now()}`;
     await page.getByRole('button', { name: '新建账户' }).click();
-    const amodal = page.locator('.ant-modal-container');
+    const amodal = page.locator('.ant-modal-container:visible');
     await amodal.waitFor({ state: 'visible' });
     await amodal.locator('input#name').fill(ANAME);
     await amodal.locator('.ant-modal-footer .ant-btn-primary').click();
@@ -255,7 +256,7 @@ async function main() {
       .locator('.ant-card', { hasText: '支出分类' })
       .getByRole('button', { name: '新建一级' })
       .click();
-    const cmodal = page.locator('.ant-modal-container');
+    const cmodal = page.locator('.ant-modal-container:visible');
     await cmodal.waitFor({ state: 'visible' });
     await cmodal.locator('input').fill(CNAME);
     await cmodal.locator('.ant-modal-footer .ant-btn-primary').click();
@@ -347,13 +348,13 @@ async function main() {
     await shot(page, 'mobile-02-records');
 
     await page.locator('.page-head').getByRole('button', { name: '记一笔' }).click();
-    const m = page.locator('.ant-modal-container');
+    const m = page.locator('.ant-modal-container:visible');
     await m.waitFor({ state: 'visible' });
     ok((await m.locator('input[inputmode="decimal"]').count()) === 1, 'ui-shell 金额 inputMode=decimal（数字键盘）');
     ok((await m.getByRole('button', { name: '+50' }).count()) === 1, 'ui-shell 常用金额快捷键 +50 存在');
     await m.getByRole('button', { name: '+50' }).click();
     const v = await m.locator('input[inputmode="decimal"]').inputValue();
-    ok(v === '50', 'ui-shell 快捷金额写入', v);
+    ok(v === '50' || v === '50.00', 'ui-shell 快捷金额写入', v);
     await shot(page, 'mobile-03-txn-form');
     await m.locator('.ant-modal-footer .ant-btn:not(.ant-btn-primary)').first().click();
     await page.goto(BASE + '/stats');

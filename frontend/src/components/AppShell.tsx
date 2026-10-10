@@ -154,6 +154,7 @@ export function MobileShell({ children }: { children?: React.ReactNode }) {
             key={i.key}
             type="button"
             className={current === i.key ? 'tab active' : 'tab'}
+            aria-current={current === i.key ? 'page' : undefined}
             onClick={() => navigate(i.path)}
           >
             {i.icon}
@@ -167,10 +168,15 @@ export function MobileShell({ children }: { children?: React.ReactNode }) {
   );
 }
 
-/** 按断点选择形态：≥768px 侧栏，<768px 底部 Tab（specs/ui-shell 双形态导航）。 */
+/**
+ * 按断点选择形态：≥992px 侧栏，<992px 底部 Tab（specs/ui-shell 双形态导航）。
+ * 断点用 `lg`（992）与 `Sider breakpoint="lg"` 对齐，杜绝 768–991px 的「无导航带」；
+ * `Grid.useBreakpoint()` 首帧可能为 undefined，只在明确 md/lg 为 false 时切移动形态，
+ * 未定（undefined）按桌面渲染，避免首帧闪烁。
+ */
 export default function AppShell() {
   const screens = Grid.useBreakpoint();
-  const isMobile = !screens.md;
+  const isMobile = screens.lg === false;
   const location = useLocation();
   // 懒补齐（任务 9.3 / specs「打开页面懒补齐」）：应用打开时触发一次到期生成，
   // 兜底 cron 停摆；生成幂等，失败静默（下一次打开重试）。
@@ -195,7 +201,9 @@ export default function AppShell() {
   useEffect(() => {
     const st = location.state as { locateId?: number } | null;
     if (st?.locateId) return;
-    window.scrollTo({ top: 0 });
+    // 瞬时复位：全局 html 仍是 scroll-behavior:smooth（锚点/定位跳转依赖），
+    // 这里显式 instant，避免长列表从底部缓慢滚回顶。
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
   return isMobile ? <MobileShell /> : <DesktopShell />;
