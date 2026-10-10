@@ -1017,6 +1017,14 @@ p {
   gap: 14px;
 }
 
+/* 弹层挂载到触发器父级（lib/popup.popupInParent）后，父级必须是定位上下文，
+   面板坐标才以容器为原点贴合触发器；否则会按祖先偏移错位 */
+.txn-form,
+.transfer-row,
+.ant-form-item-control-input-content {
+  position: relative;
+}
+
 .txn-platform-field .pick-label {
   display: block;
 }
@@ -1031,6 +1039,10 @@ p {
 }
 .amount-row:focus-within {
   border-color: var(--primary);
+}
+/* 内联校验：金额非法时底边线转语义红（.ant-input 的 status 样式被下方无边框规则覆盖） */
+.amount-row.amount-error {
+  border-bottom-color: var(--expense);
 }
 
 .amount-symbol {
@@ -1081,6 +1093,12 @@ p {
 .pick-label + .cat-leaves,
 .cat-roots + .pick-label {
   margin-top: 10px;
+}
+/* 内联校验：未选分类时整块描红（提交后出现，选中即消失） */
+.cat-pick.pick-error {
+  border-radius: 8px;
+  outline: 2px solid var(--expense);
+  outline-offset: 4px;
 }
 
 /* 退款：关联原支出信息行与超额黄条 */
@@ -1956,6 +1974,13 @@ tr.flash > td {
 .bottom-tabs .tab:focus-visible,
 .notif-bell:focus-visible,
 .theme-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+/* 通配兜底：新出现的 role=button / 自绘可聚焦元素（账户行、已退标签、子分类标签等）
+   键盘聚焦时同样有可见焦点环，无需逐个登记 */
+[role='button']:focus-visible,
+[tabindex]:not([class*='ant-']):focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: -2px;
 }

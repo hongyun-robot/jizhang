@@ -21,6 +21,7 @@ import { rootsOfKind } from '../api/category';
 import { useAccounts, useCategoryForest, useRuleMutations, useRules } from '../api/hooks';
 import type { CategoryForest, CategoryKind, RecurringRule, RuleFreq } from '../api/types';
 import { useAuth } from '../stores/auth';
+import { popupInParent } from '../lib/popup';
 import Money from '../components/Money';
 
 const FREQ_OPTIONS = [
@@ -391,6 +392,7 @@ export default function Recurring() {
             value={form.accountId}
             onChange={(v) => patch({ accountId: v })}
             style={{ width: '100%' }}
+            getPopupContainer={popupInParent}
           />
 
           {/* 首次生成日期 */}
@@ -401,6 +403,7 @@ export default function Recurring() {
             allowClear={false}
             placeholder="首次生成日期"
             disabledDate={(d) => d.year() < 2000 || d.year() > 2100}
+            getPopupContainer={popupInParent}
           />
 
           <Input

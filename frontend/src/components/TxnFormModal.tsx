@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLiabilityDetail } from '../api/liability';
 import { plannedBills } from '../lib/liability';
 import { cents, money } from '../lib/money';
+import { popupInParent } from '../lib/popup';
 
 const KIND_OPTIONS = [
   { value: 'expense', label: '支出' },
@@ -85,6 +86,8 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   const [refundedBase, setRefundedBase] = useState(0);
   const [overAck, setOverAck] = useState(false);
   const [voucherOpen, setVoucherOpen] = useState(false);
+  // 内联校验：提交失败后才提示（specs/ui-shell 记账表单内联校验），Alert 与字段错误态同步展示
+  const [showErrors, setShowErrors] = useState(false);
   const creditAccount = (accounts.data ?? []).find((a) => a.id === (kind === 'transfer' ? transferId : accountId) && a.type === 'liability');
   const liability = useLiabilityDetail(creditAccount?.id ?? 0);
   const managed = !!editing && !!(editing.installment_plan_id || editing.liability_term_id || editing.liability_operation_id);
@@ -94,6 +97,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   useEffect(() => {
     if (!open) return;
     setOverAck(false);
+    setShowErrors(false);
     if (editing) {
       setKind(editing.kind);
       setAmount(editing.amount);
@@ -187,6 +191,10 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
     return null;
   };
 
+  // 提交后才展示的内联错误：Alert 文案 + 逐字段错误态（status="error"）
+  const fieldErr = showErrors ? validate() : null;
+  const amountInvalid = !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0;
+
   // 超额黄条：累计退款（已退 + 本次）超过原支出（specs/refunds 超额仅提示不拦截）
   const overTotal =
     relatedId && relatedAmount && cents(amount) > 0n
@@ -199,7 +207,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
     if (managed) return;
     const err = validate();
     if (err) {
-      message.warning(err);
+      setShowErrors(true); // 内联提示出错项，表单不关闭
       return;
     }
     if (isOver && !overAck) {
@@ -246,7 +254,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   }));
   const startPlan = () => {
     const error = validate();
-    if (error) { message.warning(error); return; }
+    if (error) { setShowErrors(true); return; }
     onClose();
     navigate(`/liabilities/${creditAccount!.id}`, { state: { liabilityDraft: { amount, entry_date: date.format('YYYY-MM-DD'), category_id: categoryId, note, platform:platform.trim(), source_txn_id: editing?.id } } });
   };
@@ -270,6 +278,8 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
       ]}
     >
       <div className="txn-form">
+        {/* body 顶部受控错误 Alert：提交未通过 validate() 时出现，修好后自动消失，Modal 不关闭 */}
+        {fieldErr && <Alert type="error" showIcon message={fieldErr} className="txn-form-error" />}
         {managed && <Alert type="info" title="此流水由负债计划管理" description={<Button type="link" onClick={() => { onClose(); navigate(`/liabilities/${editing!.liability_account_id ?? editing!.account_id}`); }}>查看计划、费用与修正入口</Button>} />}
         {!editing && user?.role !== 'viewer' && <Button onClick={() => { setVoucherOpen(true); onClose(); }}>购券：先付款，使用时计消费</Button>}
         <Segmented
@@ -290,7 +300,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
         />
 
         {/* 金额：大字 + 系统数字键盘 + 常用金额快捷键 */}
-        <div className="amount-row">
+        <div className={`amount-row${showErrors && amountInvalid ? ' amount-error' : ''}`}>
           <span className="amount-symbol">¥</span>
           <Input
             value={amount}
@@ -299,6 +309,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
             placeholder="0.00"
             size="large"
             className="amount-input"
+            status={showErrors && amountInvalid ? 'error' : undefined}
             autoFocus
             // 金额框回车即记账：桌面端免去一次「再找按钮」的视线跳跃
             onPressEnter={submit}
@@ -317,7 +328,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
 
         {/* 分类（转账无分类；退款分类可留空） */}
         {kind !== 'transfer' && roots.length > 0 && (
-          <div className="cat-pick">
+          <div className={`cat-pick${showErrors && kind !== 'refund' && !categoryId ? ' pick-error' : ''}`}>
             <div className="pick-label">分类{kind === 'refund' ? '（可留空）' : ''}</div>
             <div className="cat-roots">
               {roots.map((r) => (
@@ -381,6 +392,8 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
               value={accountId}
               onChange={setAccountId}
               style={{ flex: 1 }}
+              status={showErrors && !accountId ? 'error' : undefined}
+              getPopupContainer={popupInParent}
             />
             <span className="transfer-arrow">→</span>
             <Select
@@ -390,6 +403,8 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
               value={transferId}
               onChange={setTransferId}
               style={{ flex: 1 }}
+              status={showErrors && !transferId ? 'error' : undefined}
+              getPopupContainer={popupInParent}
             />
           </div>
         ) : (
@@ -400,6 +415,8 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
             value={accountId}
             onChange={setAccountId}
             style={{ width: '100%' }}
+            status={showErrors && !accountId ? 'error' : undefined}
+            getPopupContainer={popupInParent}
           />
         )}
 
@@ -424,6 +441,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
           onChange={(v) => v && setDate(v)}
           style={{ width: '100%' }}
           allowClear={false}
+          getPopupContainer={popupInParent}
         />
 
         <Input.TextArea

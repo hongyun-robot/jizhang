@@ -1,22 +1,37 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, Empty, Grid, Skeleton } from 'antd';
+import { Button, Card, Grid, Skeleton } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 
 import { useAccounts, useBudgets, useStatsCompare, useTxnList, useVouchers } from '../api/hooks';
 import type { Transaction } from '../api/types';
 import { ROLE_LABEL, VOUCHER_PURPOSE_LABEL } from '../labels';
 import { useAuth } from '../stores/auth';
-import Money from '../components/Money';
+import Money, { fmtMoney } from '../components/Money';
 import BudgetProgress from '../components/BudgetProgress';
+import QueryState from '../components/QueryState';
 import TxnFormModal from '../components/TxnFormModal';
 
 /** 指针柔光：把坐标写进 CSS 变量，只在精确指针设备上出现。 */
 function trackPointer(e: React.PointerEvent<HTMLElement>) {
+  // 仅鼠标生效：触摸移动不写 CSS 变量、不产生每帧计算（specs/home-dashboard 指针装饰仅对鼠标生效）
+  if (e.pointerType !== 'mouse') return;
   const el = e.currentTarget;
   const r = el.getBoundingClientRect();
   el.style.setProperty('--mx', `${e.clientX - r.left}px`);
   el.style.setProperty('--my', `${e.clientY - r.top}px`);
+}
+
+/**
+ * 窄屏 hero 金额按位数缩放（specs/home-dashboard 首屏结余金额完整展示）：
+ * 可用宽 ≈ 视口 − 页面内边距(28) − hero 内边距(36) − 余量(4)，
+ * tabular 数字连 ¥ 约 0.6em/字符，估算字号保证整串不被 .hero{overflow:hidden} 裁切。
+ */
+function heroFontSize(text: string, vw: number): number | undefined {
+  if (vw >= 768) return undefined;
+  const chars = text.length + 1; // +1 = ¥
+  const avail = vw - 68;
+  return Math.max(26, Math.min(58, Math.floor(avail / (chars * 0.6))));
 }
 
 /** 首页概览（specs/home-dashboard）：本期收支结余 hero + 预算进度 + 最近10笔 + 快捷记账。 */
@@ -27,6 +42,13 @@ export default function Dashboard() {
   const user = useAuth((s) => s.user);
 
   const [formOpen, setFormOpen] = useState(false);
+  // 视口宽度（hero 金额按位数缩放依赖；监听 resize 保持估算与实际宽度同步）
+  const [vw, setVw] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setVw(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // 默认区间 = 当前账期，与统计页同口径（specs/home-dashboard 数值一致）
   const compare = useStatsCompare(null);
@@ -63,6 +85,9 @@ export default function Dashboard() {
     ? `${compare.data.start.replace(/-/g, '.')} – ${compare.data.end.replace(/-/g, '.')}`
     : '账期载入中';
 
+  const heroText = fmtMoney(Number(cur?.balance ?? 0));
+  const heroSize = heroFontSize(heroText, vw);
+
   return (
     <div className="page">
       <div className="page-head">
@@ -84,7 +109,12 @@ export default function Dashboard() {
             本期结余
             {budgets.data && <span className="hero-range">账期 {budgets.data.period_key}</span>}
           </div>
-          <div className="hero-value">
+          {/* 窄屏按位数缩放字号 + title 兜底，金额完整可读不被静默裁切 */}
+          <div
+            className="hero-value"
+            style={heroSize ? { fontSize: `${heroSize}px` } : undefined}
+            title={heroSize ? `本期结余 ¥${heroText}` : undefined}
+          >
             {!compare.data && !compare.isError ? (
               <Skeleton.Input active size="large" style={{ width: 220 }} />
             ) : (
@@ -168,10 +198,16 @@ export default function Dashboard() {
           }
         >
           <div className="recent-list">
-            {!recent.data && !recent.isError ? (
-              <Skeleton active paragraph={{ rows: 5 }} title={false} />
-            ) : (recent.data?.items ?? []).length > 0 ? (
-              (recent.data?.items ?? []).map((t: Transaction) => (
+            <QueryState
+              loading={!recent.data && !recent.isError}
+              error={recent.isError}
+              isEmpty={!!recent.data && recent.data.items.length === 0}
+              onRetry={() => void recent.refetch()}
+              emptyDescription="还没有流水，记一笔吧"
+              skeleton={<Skeleton active paragraph={{ rows: 5 }} title={false} />}
+            >
+              <>
+                {(recent.data?.items ?? []).map((t: Transaction) => (
                 <div
                   className="recent-row clickable"
                   key={t.id}
@@ -203,15 +239,9 @@ export default function Dashboard() {
                     }
                   />
                 </div>
-              ))
-            ) : (
-              <div className="hi">
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="还没有流水，记一笔吧"
-                />
-              </div>
-            )}
+                ))}
+              </>
+            </QueryState>
           </div>
         </Card>
       </div>

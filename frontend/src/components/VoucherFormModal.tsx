@@ -22,6 +22,7 @@ import {
 import { rootsOfKind } from '../api/category';
 import { errMsg } from '../api/client';
 import type { Voucher, VoucherInput } from '../api/types';
+import { popupInParent } from '../lib/popup';
 import CategoryPicker from './CategoryPicker';
 import VoucherPlatformInput from './VoucherPlatformInput';
 
@@ -270,6 +271,7 @@ export default function VoucherFormModal({
               allowClear={false}
               style={{ width: '100%' }}
               disabled={financialLocked}
+              getPopupContainer={popupInParent}
             />
           </Form.Item>
           <Form.Item
@@ -281,6 +283,7 @@ export default function VoucherFormModal({
               options={accountOptions}
               placeholder="选择账户"
               disabled={financialLocked}
+              getPopupContainer={popupInParent}
             />
           </Form.Item>
         </div>
@@ -306,7 +309,7 @@ export default function VoucherFormModal({
           ]}
           extra="有效期当天仍可使用，按北京时间次日零点后处理。"
         >
-          <DatePicker style={{ width: '100%' }} />
+          <DatePicker style={{ width: '100%' }} getPopupContainer={popupInParent} />
         </Form.Item>
         <Form.Item label="到期自动退款" className="voucher-switch">
           <Form.Item name="auto_refund_enabled" valuePropName="checked" noStyle>

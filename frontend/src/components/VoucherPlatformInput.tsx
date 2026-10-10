@@ -3,6 +3,7 @@ import { App, AutoComplete, Button, Input } from 'antd';
 import { DownOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useCreateVoucherPlatform, useVoucherPlatforms } from '../api/hooks';
 import { errMsg } from '../api/client';
+import { popupInParent } from '../lib/popup';
 
 interface Props {
   id?: string;
@@ -139,6 +140,7 @@ export default function VoucherPlatformInput({
         defaultActiveFirstOption={false}
         disabled={disabled}
         style={{ width: '100%' }}
+        getPopupContainer={popupInParent}
         classNames={{ popup: { root: 'voucher-platform-dropdown' } }}
       >
         <Input

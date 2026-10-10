@@ -26,6 +26,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLiabilityDetail, useLiabilityTypes } from '../api/liability';
 import dayjs from 'dayjs';
 import { plannedBills, ruleError } from '../lib/liability';
+import { popupInParent } from '../lib/popup';
 
 interface FormValues {
   name: string;
@@ -121,6 +122,7 @@ export default function Accounts() {
   };
 
   const doDelete = async (a: Account) => {
+    if (remove.isPending) return; // 防重：确认进行中忽略重复触发
     try {
       await remove.mutateAsync(a.id);
       message.success(`已删除「${a.name}」`);
@@ -183,7 +185,11 @@ export default function Accounts() {
           <Button type="link" size="small" onClick={() => openEdit(a)}>
             编辑
           </Button>
-          <Popconfirm title={`删除「${a.name}」？`} onConfirm={() => doDelete(a)}>
+          <Popconfirm
+            title={`删除「${a.name}」？`}
+            onConfirm={() => doDelete(a)}
+            okButtonProps={{ loading: remove.isPending, disabled: remove.isPending }}
+          >
             <Button type="link" size="small" danger>
               删除
             </Button>
@@ -210,7 +216,19 @@ export default function Accounts() {
           <div className="acct-list">
             {(accounts.data ?? []).map((a) => (
               <div className="acct-row" key={a.id}>
-                <div className="acct-main" onClick={() => openEdit(a)}>
+                {/* 行级点击语义化：与 CategoryPicker 同样的 role/键盘处理，焦点环由通配 :focus-visible 兜底 */}
+                <div
+                  className="acct-main"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openEdit(a)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openEdit(a);
+                    }
+                  }}
+                >
                   <div className="acct-name">
                     {a.name}
                     <Tag color={a.type === 'liability' ? 'volcano' : undefined} style={{ marginLeft: 8 }}>
@@ -222,7 +240,11 @@ export default function Accounts() {
                 </div>
                 <div className="acct-right">
                   <div className="acct-balance">{renderBalance(a)}</div>
-                  <Popconfirm title={`删除「${a.name}」？`} onConfirm={() => doDelete(a)}>
+                  <Popconfirm
+                    title={`删除「${a.name}」？`}
+                    onConfirm={() => doDelete(a)}
+                    okButtonProps={{ loading: remove.isPending, disabled: remove.isPending }}
+                  >
                     <Button type="link" size="small" danger>
                       删除
                     </Button>
@@ -273,11 +295,11 @@ export default function Accounts() {
               getFieldValue('type') === 'liability' ? (
                 <>
                 <Alert type="info" title="各平台规则由你填写" description="消费计支出、还款记转账。日期支持 1–31 日，短月份取月底；已有账单保留，修改规则从下一周期生效。" />
-                <Form.Item name="liability_type" label="消费信用类型" rules={[{required:true}]}><Select loading={types.isLoading} options={(types.data??[]).map((t)=>({value:t.code,label:t.name}))}/></Form.Item>
+                <Form.Item name="liability_type" label="消费信用类型" rules={[{required:true}]}><Select getPopupContainer={popupInParent} loading={types.isLoading} options={(types.data??[]).map((t)=>({value:t.code,label:t.name}))}/></Form.Item>
                 {types.isError && <Alert type="error" title="消费信用类型查询失败" description={<Button onClick={()=>void types.refetch()}>重新查询</Button>}/>}
                 {types.data?.length===0 && <Alert type="warning" title="尚未配置消费信用类型"/>}
                 <Form.Item name="statement_day" label="账单日（1–31）" rules={[{required:true}]}><InputNumber min={1} max={31} style={{width:'100%'}}/></Form.Item>
-                <Form.Item name="repayment_month_offset" label="还款月份" rules={[{required:true}]}><Select options={[{value:0,label:'出账当月'},{value:1,label:'出账次月'}]}/></Form.Item>
+                <Form.Item name="repayment_month_offset" label="还款月份" rules={[{required:true}]}><Select getPopupContainer={popupInParent} options={[{value:0,label:'出账当月'},{value:1,label:'出账次月'}]}/></Form.Item>
                 <Form.Item name="repayment_day" label="还款日（1–31）" rules={[{required:true}]}>
                   <InputNumber min={1} max={31} style={{ width: '100%' }} placeholder="如：10" />
                 </Form.Item>

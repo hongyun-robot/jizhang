@@ -62,6 +62,7 @@ export default function Categories() {
   };
 
   const doDelete = async (c: CategoryTreeNode) => {
+    if (remove.isPending) return; // 防重：删除进行中忽略重复触发
     try {
       await remove.mutateAsync(c.id);
       message.success(`已删除「${c.name}」`);
@@ -95,7 +96,11 @@ export default function Categories() {
                 <Button type="link" size="small" onClick={() => openRename(root)}>
                   重命名
                 </Button>
-                <Popconfirm title={`删除「${root.name}」？`} onConfirm={() => doDelete(root)}>
+                <Popconfirm
+                  title={`删除「${root.name}」？`}
+                  onConfirm={() => doDelete(root)}
+                  okButtonProps={{ loading: remove.isPending, disabled: remove.isPending }}
+                >
                   <Button type="link" size="small" danger>
                     删除
                   </Button>
@@ -107,6 +112,8 @@ export default function Categories() {
                     <Tag
                       key={c.id}
                       closable
+                      role="button"
+                      tabIndex={0}
                       onClose={(e) => {
                         e.preventDefault();
                         void doDelete(c);
@@ -114,6 +121,12 @@ export default function Categories() {
                       onClick={(e) => {
                         if ((e.target as HTMLElement).closest('.ant-tag-close-icon')) return;
                         openRename(c);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          openRename(c);
+                        }
                       }}
                       style={{ cursor: 'pointer' }}
                     >

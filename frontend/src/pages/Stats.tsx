@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Card, Empty, Grid, InputNumber, Segmented, Spin } from 'antd';
+import { Card, Grid, InputNumber, Segmented, Spin } from 'antd';
 import type { EChartsOption, SeriesOption } from 'echarts';
 import dayjs from 'dayjs';
 
@@ -16,6 +16,7 @@ import { useAuth } from '../stores/auth';
 import { useResolvedTheme } from '../stores/theme';
 import BudgetProgress from '../components/BudgetProgress';
 import EChart from '../components/EChart';
+import QueryState from '../components/QueryState';
 import Money, { fmtMoney } from '../components/Money';
 import PeriodPicker, { presetRange } from '../components/PeriodPicker';
 
@@ -220,18 +221,22 @@ export default function Stats() {
             />
           }
         >
-          {category.isLoading ? (
-            <Spin />
-          ) : share && share.items.length ? (
+          {/* 三态统一走 QueryState：请求失败显示错误态 + 重试，不落入「区间内无数据」空态 */}
+          <QueryState
+            loading={category.isLoading}
+            error={category.isError}
+            isEmpty={!share?.items.length}
+            onRetry={() => void category.refetch()}
+            emptyDescription="区间内无数据"
+            skeleton={<Spin />}
+          >
             <>
               <div className="share-total">
-                合计 <Money value={share.total} tone={shareKind} />
+                合计 <Money value={share?.total} tone={shareKind} />
               </div>
               <EChart option={pieOption} height={260} />
             </>
-          ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="区间内无数据" />
-          )}
+          </QueryState>
         </Card>
 
         {/* 2. 收支趋势 */}
@@ -252,14 +257,24 @@ export default function Stats() {
             />
           }
         >
-          {trend.isLoading ? <Spin /> : <EChart option={trendOption} height={260} />}
+          <QueryState
+            loading={trend.isLoading}
+            error={trend.isError}
+            onRetry={() => void trend.refetch()}
+            skeleton={<Spin />}
+          >
+            <EChart option={trendOption} height={260} />
+          </QueryState>
         </Card>
 
         {/* 3. 本期环比（上一同比窗口） */}
         <Card size="small" className="panel" title="本期环比">
-          {compare.isLoading ? (
-            <Spin />
-          ) : (
+          <QueryState
+            loading={compare.isLoading}
+            error={compare.isError}
+            onRetry={() => void compare.refetch()}
+            skeleton={<Spin />}
+          >
             <>
               <div className="cmp-meta muted small">
                 {compare.data?.start} ~ {compare.data?.end} vs {compare.data?.previous_start} ~{' '}
@@ -282,7 +297,7 @@ export default function Stats() {
                 {fmtMoney(prev?.expense)}
               </div>
             </>
-          )}
+          </QueryState>
         </Card>
 
         {/* 4. 账期月度汇总 */}
@@ -301,26 +316,34 @@ export default function Stats() {
             />
           }
         >
-          <div className="period-table">
-            <div className="period-head">
-              <span>账期</span>
-              <span>收入</span>
-              <span>支出</span>
-              <span>结余</span>
-            </div>
-            {(periods.data?.periods ?? []).map((p) => (
-              <div className="period-line" key={p.period_key}>
-                <span>{p.period_key}</span>
-                <Money value={p.income} tone="income" currency={false} />
-                <Money value={p.expense} tone="expense" currency={false} />
-                <Money
-                  value={p.balance}
-                  tone={Number(p.balance) < 0 ? 'expense' : 'plain'}
-                  currency={false}
-                />
+          <QueryState
+            loading={periods.isLoading}
+            error={periods.isError}
+            isEmpty={(periods.data?.periods ?? []).length === 0}
+            onRetry={() => void periods.refetch()}
+            emptyDescription="该年度暂无账期汇总"
+          >
+            <div className="period-table">
+              <div className="period-head">
+                <span>账期</span>
+                <span>收入</span>
+                <span>支出</span>
+                <span>结余</span>
               </div>
-            ))}
-          </div>
+              {(periods.data?.periods ?? []).map((p) => (
+                <div className="period-line" key={p.period_key}>
+                  <span>{p.period_key}</span>
+                  <Money value={p.income} tone="income" currency={false} />
+                  <Money value={p.expense} tone="expense" currency={false} />
+                  <Money
+                    value={p.balance}
+                    tone={Number(p.balance) < 0 ? 'expense' : 'plain'}
+                    currency={false}
+                  />
+                </div>
+              ))}
+            </div>
+          </QueryState>
         </Card>
 
         {/* 5. 本期预算进度（与首页同数据源，specs/budgets；宽面板双列铺排，填满整行） */}
@@ -335,18 +358,21 @@ export default function Stats() {
 
         {/* 6. 资产走势（负债负贡献） */}
         <Card size="small" className="panel stats-wide" title="资产走势">
-          {assets.isLoading ? (
-            <Spin />
-          ) : (assets.data?.points.length ?? 0) > 0 ? (
+          <QueryState
+            loading={assets.isLoading}
+            error={assets.isError}
+            isEmpty={(assets.data?.points.length ?? 0) === 0}
+            onRetry={() => void assets.refetch()}
+            emptyDescription="区间内无数据"
+            skeleton={<Spin />}
+          >
             <>
               <EChart option={assetOption} height={280} />
               <div className="muted small">
                 期末总资产 <Money value={assets.data?.ending_total ?? '0'} />
               </div>
             </>
-          ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="区间内无数据" />
-          )}
+          </QueryState>
         </Card>
       </div>
     </div>

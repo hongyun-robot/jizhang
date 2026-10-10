@@ -28,3 +28,6 @@ frontend/e2e/downloads/
 .idea/
 .DS_Store
 Thumbs.db
+
+# e2e 截图产物（interaction_* 脚本写到 frontend/shots/）
+frontend/shots/

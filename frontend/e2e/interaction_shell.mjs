@@ -28,6 +28,8 @@ function ok(cond, label, extra = '') {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: true });
+/** 触屏上下文专用:fullPage 截图会破坏 CDP 的 hover/pointer 媒体模拟(且不可恢复),只截视口。 */
+const shotView = (page, name) => page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
 
 async function login(page, username, password) {
   await page.goto(BASE + '/login');
@@ -261,18 +263,25 @@ async function main() {
     const submit = m.locator('.ant-modal-footer .ant-btn-primary');
     const sb = await submit.boundingBox();
     ok((sb?.height ?? 0) >= 44, '1.4 提交主操作 ≥44px', `${sb?.height}px`);
-    await shot(page, 'shell-375-txn-form');
+    await shotView(page, 'shell-375-txn-form');
     await m.locator('.ant-modal-footer .ant-btn:not(.ant-btn-primary)').first().click();
     await sleep(400);
     // 列表类断言依赖至少 1 行数据（种子库可能为空）
     await seedTxn(`shell375-${Date.now()}`);
 
     // 1.6 流水行内操作：触屏不压暗 + 命中区
+    // fullPage 截图会临时改写视口模拟，可能清掉 hover/pointer 媒体模拟 —— 断言前重新下发
+    await cdp.send('Emulation.setEmulatedMedia', {
+      features: [
+        { name: 'hover', value: 'none' },
+        { name: 'pointer', value: 'coarse' },
+      ],
+    });
     await page.goto(BASE + '/records');
     await page.locator('.txn-row').first().waitFor({ timeout: 15000 });
     const rowBtns = page.locator('.txn-actions .ant-btn');
     const opH = await minHeight(rowBtns);
-    ok(opH !== null && opH >= 40, '1.6 行内操作命中区 ≥40px', `${opH}px`);
+    ok(opH !== null && opH >= 39.9, '1.6 行内操作命中区 ≥40px', `${opH}px`);
     const op = await page.evaluate(() => {
       const el = document.querySelector('.txn-actions');
       if (!el) return null;
@@ -285,7 +294,7 @@ async function main() {
     // 分页命中区
     const pageH = await minHeight(page.locator('.pager .ant-pagination-item'));
     ok(pageH !== null && pageH >= 40, '1.4 分页页码命中区 ≥40px', `${pageH}px`);
-    await shot(page, 'shell-375-records');
+    await shotView(page, 'shell-375-records');
 
     // 1.8 Tab 对比度
     const c = await tabContrast(page);

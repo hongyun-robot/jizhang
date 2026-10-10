@@ -31,6 +31,7 @@ import type { CategoryTreeNode, DateRange, TxnKind, Transaction } from '../api/t
 import { useAuth } from '../stores/auth';
 import Money from '../components/Money';
 import PeriodPicker, { presetRange } from '../components/PeriodPicker';
+import QueryState from '../components/QueryState';
 import TxnFormModal, { type TxnRefill } from '../components/TxnFormModal';
 import { VOUCHER_PURPOSE_LABEL } from '../labels';
 
@@ -192,11 +193,12 @@ export default function Records() {
     patch({ related_txn_id: t.id, kind: '', account_id: undefined, category_id: undefined });
   };
   const doDelete = async (t: Transaction) => {
+    if (delTxn.isPending) return; // 防重：确认进行中忽略重复触发（specs/transactions 删除二次确认防重）
     try {
       await delTxn.mutateAsync(t.id);
       message.success('已删除，余额与统计同步更新');
     } catch (e) {
-      message.error(errMsg(e));
+      message.error(errMsg(e)); // 失败：列表保持原状
     }
   };
 
@@ -234,7 +236,11 @@ export default function Records() {
           </Button>
         )}
         {t.kind === 'expense' && accounts.data?.find((a)=>a.id===t.account_id)?.type==='liability' && <Button type="link" size="small" onClick={()=>navigate(`/liabilities/${t.account_id}`,{state:{liabilityDraft:{source_txn_id:t.id,entry_date:t.entry_date}}})}>转分期</Button>}
-        <Popconfirm title="删除这笔流水？" onConfirm={() => doDelete(t)}>
+        <Popconfirm
+          title="删除这笔流水？"
+          onConfirm={() => doDelete(t)}
+          okButtonProps={{ loading: delTxn.isPending, disabled: delTxn.isPending }}
+        >
           <Button type="link" size="small" danger>
             删除
           </Button>
@@ -266,7 +272,15 @@ export default function Records() {
               className="refunded-tag"
               color="green"
               title="点击查看关联退款"
+              role="button"
+              tabIndex={0}
               onClick={() => locateRefunds(t)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  locateRefunds(t);
+                }
+              }}
             >
               已退 ¥{Number(t.refunded_amount).toLocaleString('zh-CN')}
             </Tag>
@@ -402,7 +416,10 @@ export default function Records() {
 
       {isMobile ? (
         <div className="txn-list">
-          {!list.data && !list.isError ? (
+          {/* 错误态单列：请求失败不得渲染成「暂无数据」空态（specs/ui-shell 数据加载错误态） */}
+          {list.isError ? (
+            <QueryState error={list.error} onRetry={() => void list.refetch()} />
+          ) : !list.data && !list.isError ? (
             <div className="txn-skeleton">
               <Skeleton active paragraph={{ rows: 5 }} title={false} />
             </div>
@@ -422,7 +439,16 @@ export default function Records() {
                         <Tag
                           className="refunded-tag"
                           color="green"
+                          title="点击查看关联退款"
+                          role="button"
+                          tabIndex={0}
                           onClick={() => locateRefunds(t)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              locateRefunds(t);
+                            }
+                          }}
                         >
                           已退 ¥{Number(t.refunded_amount).toLocaleString('zh-CN')}
                         </Tag>
@@ -444,7 +470,7 @@ export default function Records() {
               </div>
             ))
           )}
-          {!list.isLoading && (list.data?.items ?? []).length === 0 && (
+          {!list.isLoading && !list.isError && (list.data?.items ?? []).length === 0 && (
             <div className="list-empty">
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />
             </div>
@@ -452,18 +478,22 @@ export default function Records() {
         </div>
       ) : (
         <div className="panel">
-          <Table
-            rowKey="id"
-            size="small"
-            loading={list.isLoading}
-            dataSource={list.data?.items ?? []}
-            columns={columns}
-            pagination={false}
-            scroll={{ x: 990 }}
-            onRow={(record) =>
-              ({ 'data-txn-id': record.id }) as HTMLAttributes<HTMLTableRowElement>
-            }
-          />
+          {list.isError ? (
+            <QueryState error={list.error} onRetry={() => void list.refetch()} />
+          ) : (
+            <Table
+              rowKey="id"
+              size="small"
+              loading={list.isLoading}
+              dataSource={list.data?.items ?? []}
+              columns={columns}
+              pagination={false}
+              scroll={{ x: 990 }}
+              onRow={(record) =>
+                ({ 'data-txn-id': record.id }) as HTMLAttributes<HTMLTableRowElement>
+              }
+            />
+          )}
         </div>
       )}
 
