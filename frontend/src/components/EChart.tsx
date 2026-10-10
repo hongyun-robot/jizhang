@@ -12,12 +12,12 @@ const UI_FONT =
   "'Instrument Sans Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif";
 
 const LIGHT = {
-  text: '#4b473e',
-  axis: '#7b766a',
-  grid: 'rgba(38, 35, 28, 0.08)',
-  axisLine: 'rgba(38, 35, 28, 0.16)',
-  tipBg: 'rgba(255, 254, 250, 0.97)',
-  tipBorder: 'rgba(38, 35, 28, 0.12)',
+  text: '#4a4d52',
+  axis: '#6b6f75',
+  grid: 'rgba(20, 22, 24, 0.07)',
+  axisLine: 'rgba(20, 22, 24, 0.15)',
+  tipBg: 'rgba(255, 255, 255, 0.97)',
+  tipBorder: 'rgba(20, 22, 24, 0.12)',
 };
 
 const DARK = {

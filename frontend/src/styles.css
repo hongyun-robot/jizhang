@@ -1,8 +1,8 @@
 /* ============================================================
    记账 · 设计系统
-   方向：纸面账簿（ledger）—— 暖白纸底 + 单一墨绿主色 + 发丝线分栏
-   + 表格数字对齐 + 编辑式标题层级。全部动画只动 transform / opacity，
-   prefers-reduced-motion 下整层关停。
+   方向：纸面账簿（ledger）—— 中性浅灰底 + 纯白面板（层次靠底/面明度差拉开）
+   + 单一墨绿主色 + 发丝线分栏 + 表格数字对齐 + 编辑式标题层级。
+   全部动画只动 transform / opacity，prefers-reduced-motion 下整层关停。
    ============================================================ */
 
 /* ---------- 1. 盒模型与基线 reset ---------- */
@@ -38,40 +38,40 @@ html {
   --font-num: 'Instrument Sans Variable', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
   /* 主色：墨绿（ink teal），全站唯一彩色；红绿仅作收支语义 */
-  --primary: #0d6e66;
-  --primary-hover: #0b5f58;
-  --primary-active: #095049;
+  --primary: #0a7568;
+  --primary-hover: #086356;
+  --primary-active: #065448;
   /* 实心填充色：与文字级主色分开，保证填充按钮的字底对比度 */
-  --primary-fill: #0d6e66;
-  --primary-fill-hover: #0b5f58;
+  --primary-fill: #0a7568;
+  --primary-fill-hover: #086356;
   --primary-fg: #ffffff;
-  --sel-bg: rgba(13, 110, 102, 0.1);
-  --hover-soft: rgba(13, 110, 102, 0.06);
-  --hover-tint: rgba(13, 110, 102, 0.1);
-  --flash: rgba(13, 110, 102, 0.18);
+  --sel-bg: rgba(10, 117, 104, 0.1);
+  --hover-soft: rgba(10, 117, 104, 0.06);
+  --hover-tint: rgba(10, 117, 104, 0.1);
+  --flash: rgba(10, 117, 104, 0.18);
 
-  /* 纸面灰阶（暖调，统一色温，不混用冷灰） */
-  --bg: #f2f0ea;
-  --panel: #fffefa;
-  --panel-sunken: #f7f5ef;
-  --sider-bg: #fbfaf5;
-  --tab-bg: rgba(255, 254, 250, 0.88);
-  --login-bg: #f2f0ea;
-  --line: rgba(38, 35, 28, 0.1);
-  --line-strong: rgba(38, 35, 28, 0.18);
-  --text: #201e19;
-  --text-2: #4b473e;
-  --muted: #7b766a;
-  --tab-fg: rgba(32, 30, 25, 0.55);
+  /* 中性灰阶：浅灰底 + 纯白面板拉开层次；统一色温，不混暖灰 */
+  --bg: #f3f4f5;
+  --panel: #ffffff;
+  --panel-sunken: #f7f8f9;
+  --sider-bg: #fbfbfc;
+  --tab-bg: rgba(255, 255, 255, 0.88);
+  --login-bg: #f3f4f5;
+  --line: rgba(20, 22, 24, 0.09);
+  --line-strong: rgba(20, 22, 24, 0.17);
+  --text: #16181a;
+  --text-2: #4a4d52;
+  --muted: #6b6f75;
+  --tab-fg: rgba(22, 24, 26, 0.55);
 
   /* 收支语义 */
   --income: #0f7a52;
   --expense: #c0392b;
 
-  /* 层次：带色温的柔和投影，不用纯黑 */
-  --shadow-1: 0 1px 2px rgba(38, 35, 28, 0.04);
-  --shadow-2: 0 2px 6px -2px rgba(38, 35, 28, 0.1), 0 12px 28px -20px rgba(38, 35, 28, 0.35);
-  --shadow-pop: 0 10px 30px -12px rgba(38, 35, 28, 0.28), 0 2px 6px -2px rgba(38, 35, 28, 0.1);
+  /* 层次：中性色温的柔和投影，不用纯黑 */
+  --shadow-1: 0 1px 2px rgba(16, 18, 20, 0.05);
+  --shadow-2: 0 2px 6px -2px rgba(16, 18, 20, 0.08), 0 12px 28px -20px rgba(16, 18, 20, 0.28);
+  --shadow-pop: 0 10px 30px -12px rgba(16, 18, 20, 0.22), 0 2px 6px -2px rgba(16, 18, 20, 0.08);
 
   --radius-panel: 14px;
   --radius-row: 10px;

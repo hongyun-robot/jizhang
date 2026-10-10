@@ -13,7 +13,7 @@ import './styles.css';
 
 /**
  * 设计基调（纸面账簿）：
- * - 暖白纸底 + 单一墨绿主色（#0d6e66），红/绿只作收支语义，不作品牌色；
+ * - 中性浅灰底 + 纯白面板 + 单一墨绿主色（#0a7568），红/绿只作收支语义，不作品牌色；
  * - Instrument Sans 走拉丁与数字（tabular-nums 对齐），中文回退系统黑体；
  *   Instrument Serif 只用于展示型数字（首页结余、金额输入）；
  * - 亮/暗双主题由 ThemeProvider 统一提供（specs/ui-shell 暗色模式）。

@@ -24,10 +24,10 @@ const icoPath = join(root, 'frontend', 'public', 'favicon.ico');
 const htmlPath = join(root, 'frontend', 'index.html');
 
 // ---- 调色板 (BGRA, 51 色: 0-47 占位色, 48=背景, 49=卡片, 50=墨色) ----
-const FILLER = [0x6e, 0x76, 0x2f, 0x00]; // #2f766e
-const BG = [0x6e, 0x76, 0x0f, 0x00]; // #0f766e
-const CARD = [0xc3, 0xbf, 0x7e, 0x00]; // #7ebfc3
-const INK = [0x45, 0x4a, 0x10, 0x00]; // #104a45
+const FILLER = [0x68, 0x75, 0x2f, 0x00]; // #2f7568
+const BG = [0x68, 0x75, 0x0a, 0x00]; // #0a7568
+const CARD = [0xff, 0xff, 0xff, 0x00]; // #ffffff
+const INK = [0x56, 0x63, 0x08, 0x00]; // #086356
 const IDX_BG = 48;
 const IDX_CARD = 49;
 const IDX_INK = 50;

@@ -19,8 +19,8 @@ import EChart from '../components/EChart';
 import Money, { fmtMoney } from '../components/Money';
 import PeriodPicker, { presetRange } from '../components/PeriodPicker';
 
-/** 图表配色：单一墨绿主色 + 暖灰中性，红/绿仅作收支语义；暗色为同色相提亮版。 */
-const PALETTE_LIGHT = ['#0d6e66', '#0a524b', '#128e85', '#3aa9a0', '#79c7c0', '#8b8579', '#b7b1a3', '#dcd8cd'];
+/** 图表配色：单一墨绿主色 + 中性灰，红/绿仅作收支语义；暗色为同色相提亮版。 */
+const PALETTE_LIGHT = ['#0a7568', '#065448', '#12958a', '#45b3a8', '#8ed0c9', '#8a9096', '#b5babf', '#dcdfe2'];
 const PALETTE_DARK = ['#2dd4bf', '#14b8a6', '#0d9488', '#5eead4', '#99f6e4', '#a8a29e', '#d6d3d1', '#78716c'];
 
 function pct(p: number | null): { text: string; cls: string } {
@@ -57,12 +57,12 @@ export default function Stats() {
 
   // 主题相关用色（任务 12.1）：画布不读 CSS 变量，需按生效主题取值
   const dark = useResolvedTheme() === 'dark';
-  const TEAL = dark ? '#2dd4bf' : '#0d6e66';
+  const TEAL = dark ? '#2dd4bf' : '#0a7568';
   const GREEN = dark ? '#4ade80' : '#0f7a52';
   const RED = dark ? '#f87171' : '#c0392b';
   const PALETTE = dark ? PALETTE_DARK : PALETTE_LIGHT;
-  const pieBorder = dark ? '#141716' : '#fffefa';
-  const prevBar = dark ? '#78716c' : '#d8d4c9';
+  const pieBorder = dark ? '#141716' : '#ffffff';
+  const prevBar = dark ? '#78716c' : '#d3d6d9';
 
   const share = shareKind === 'expense' ? category.data?.expense : category.data?.income;
 
