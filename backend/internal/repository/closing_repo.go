@@ -15,6 +15,8 @@ type ClosingRepo struct {
 
 func NewClosingRepo(db *gorm.DB) *ClosingRepo { return &ClosingRepo{db: db} }
 
+func (r *ClosingRepo) DB() *gorm.DB { return r.db }
+
 // IsClosed 某归期是否已封账。
 func (r *ClosingRepo) IsClosed(periodKey string) (bool, error) {
 	var n int64

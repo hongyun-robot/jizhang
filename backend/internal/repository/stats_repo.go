@@ -26,11 +26,10 @@ type DailyRow struct {
 
 // DailyTotals 区间内逐日收入/支出（转账不计入，支出为退款冲减后净额，对照 statistics spec 口径）。
 func (r *StatsRepo) DailyTotals(start, end time.Time) ([]DailyRow, error) {
-	const sql = `
+	sql := `
 		SELECT entry_date AS d,
 		       SUM(CASE WHEN kind = 'income'  THEN amount ELSE 0 END) AS income,
-		       SUM(CASE WHEN kind = 'expense' THEN amount
-		                WHEN kind = 'refund'  THEN -amount ELSE 0 END) AS expense
+		       SUM(` + expenseEffectSQL("") + `) AS expense
 		FROM transactions
 		WHERE kind IN ('income', 'expense', 'refund')
 		  AND entry_date >= ? AND entry_date <= ?
@@ -52,10 +51,10 @@ type CategoryRow struct {
 // 退款并入 expense 口径按负值累计：净额可为负且 MUST 原样返回（specs/statistics 分类占比，
 // 口径过滤由图表层执行）；无分类退款归入 root_id=0（未分类）。
 func (r *StatsRepo) CategoryTotals(start, end time.Time) ([]CategoryRow, error) {
-	const sql = `
+	sql := `
 		SELECT COALESCE(p.id, c.id) AS root_id,
 		       CASE WHEN t.kind = 'refund' THEN 'expense' ELSE t.kind END AS kind,
-		       SUM(CASE WHEN t.kind = 'refund' THEN -t.amount ELSE t.amount END) AS total
+		       SUM(CASE WHEN t.kind = 'income' THEN t.amount ELSE ` + expenseEffectSQL("t") + ` END) AS total
 		FROM transactions t
 		LEFT JOIN categories c ON c.id = t.category_id
 		LEFT JOIN categories p ON p.id = c.parent_id
@@ -76,11 +75,10 @@ type PeriodRow struct {
 
 // PeriodTotals 指定年份各账期的收入/支出（period_key 前缀走索引，支出含退款冲减）。
 func (r *StatsRepo) PeriodTotals(year int) ([]PeriodRow, error) {
-	const sql = `
+	sql := `
 		SELECT period_key,
 		       SUM(CASE WHEN kind = 'income'  THEN amount ELSE 0 END) AS income,
-		       SUM(CASE WHEN kind = 'expense' THEN amount
-		                WHEN kind = 'refund'  THEN -amount ELSE 0 END) AS expense
+		       SUM(` + expenseEffectSQL("") + `) AS expense
 		FROM transactions
 		WHERE kind IN ('income', 'expense', 'refund') AND period_key LIKE ?
 		GROUP BY period_key`
@@ -92,10 +90,9 @@ func (r *StatsRepo) PeriodTotals(year int) ([]PeriodRow, error) {
 // SumByPeriod 按物化 period_key 汇总收入/支出（转账不计，支出含退款冲减）。
 // 封账预览用：与 guardOpen 的锁口径（同 period_key）严格一致，改结算日不影响历史合计。
 func (r *StatsRepo) SumByPeriod(periodKey string) (PeriodRow, error) {
-	const sql = `
+	sql := `
 		SELECT COALESCE(SUM(CASE WHEN kind = 'income'  THEN amount END), 0) AS income,
-		       COALESCE(SUM(CASE WHEN kind = 'expense' THEN amount
-		                         WHEN kind = 'refund'  THEN -amount END), 0) AS expense
+		       COALESCE(SUM(` + expenseEffectSQL("") + `), 0) AS expense
 		FROM transactions
 		WHERE kind IN ('income', 'expense', 'refund') AND period_key = ?`
 	var row PeriodRow
@@ -113,12 +110,10 @@ type AssetNetRow struct {
 
 // DailyAccountNets 截至 end 的逐账户逐日净额（含转账双边），按日排序。
 func (r *StatsRepo) DailyAccountNets(end time.Time) ([]AssetNetRow, error) {
-	const sql = `
+	sql := `
 		SELECT aid, d, SUM(v) AS net FROM (
 			SELECT account_id AS aid, entry_date AS d,
-			       CASE kind WHEN 'income' THEN amount
-			                 WHEN 'refund' THEN amount
-			                 WHEN 'expense' THEN -amount END AS v
+			       ` + balanceEffectSQL("") + ` AS v
 			FROM transactions
 			WHERE kind <> 'transfer' AND entry_date <= ?
 			UNION ALL

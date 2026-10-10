@@ -17,6 +17,8 @@ type TransactionRepo struct {
 
 func NewTransactionRepo(db *gorm.DB) *TransactionRepo { return &TransactionRepo{db: db} }
 
+func (r *TransactionRepo) DB() *gorm.DB { return r.db }
+
 // TxnFilter 列表过滤条件（specs/transactions 查询场景）。
 type TxnFilter struct {
 	PeriodKey    string        // 精确归期
@@ -27,7 +29,7 @@ type TxnFilter struct {
 	CategoryID   int64
 	AmountMin    *string // 金额区间下界（含）
 	AmountMax    *string // 金额区间上界（含）
-	Keyword      string  // 备注模糊
+	Keyword      string  // 备注或平台 / 商家模糊
 	RelatedTxnID int64   // 定位关联到该流水的退款（>0 时过滤）
 	Page         int     // 从 1 开始
 	PageSize     int
@@ -63,7 +65,7 @@ func applyFilter(q *gorm.DB, f TxnFilter) *gorm.DB {
 	}
 	if f.Keyword != "" {
 		like := "%" + f.Keyword + "%"
-		q = q.Where("note LIKE ?", like)
+		q = q.Where("(note LIKE ? OR platform LIKE ?)", like, like)
 	}
 	if f.RelatedTxnID > 0 {
 		// 关联退款定位（specs/refunds 原支出「已退」跳转）

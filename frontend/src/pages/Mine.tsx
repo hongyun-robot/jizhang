@@ -12,6 +12,7 @@ import {
   TagsOutlined,
   LogoutOutlined,
   UserOutlined,
+  GiftOutlined,
 } from '@ant-design/icons';
 
 import { api } from '../api/client';
@@ -99,6 +100,9 @@ export default function Mine() {
       </Card>
 
       {/* 记账入口：管理员/记账员/普通成员可见（specs/recurring-entries 归属隔离） */}
+      <Card size="small" className="panel panel--measure" title="券">
+        <div className="mine-menu"><Tile icon={<GiftOutlined />} label="我的券" onClick={() => navigate('/vouchers')} /></div>
+      </Card>
       {canRecord(user?.role) && (
         <Card size="small" className="panel panel--measure" title="记账">
           <div className="mine-menu">

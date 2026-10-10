@@ -45,7 +45,7 @@ func TestExportCSVBOMHeaderAndRowCount(t *testing.T) {
 	csv, err := e.txn.ExportCSV(adminUser(), repository.TxnFilter{})
 	mustOK(t, err)
 	head := strings.Split(string(csv[3:]), "\r\n")[0]
-	want := "日期,类型,分类,账户,转入账户,金额,备注,来源"
+	want := "日期,类型,分类,账户,转入账户,金额,备注,来源,用途,券编号,余额影响,消费影响,平台 / 商家"
 	if head != want {
 		t.Fatalf("表头 = %q, want %q", head, want)
 	}

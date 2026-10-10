@@ -83,7 +83,10 @@ func (s *ClosingService) Preview(periodKey string) (*ClosingPreview, error) {
 }
 
 // Close 封账（仅管理员，路由再加中间件门禁）：仅已结束账期；写封账记录 + 审计留痕。
-func (s *ClosingService) Close(actor *model.User, periodKey string) (*model.PeriodClosing, error) {
+func (s *ClosingService) close(actor *model.User, periodKey string) (*model.PeriodClosing, error) {
+	if !CanManageSettings(actor) {
+		return nil, ErrTxnForbidden
+	}
 	_, end, ok := s.deps.Periods.Range(periodKey)
 	if !ok {
 		return nil, ErrClosingInvalidPeriod
@@ -108,14 +111,16 @@ func (s *ClosingService) Close(actor *model.User, periodKey string) (*model.Peri
 		return nil, err
 	}
 	if err := s.audit(actor, AuditActionClose, periodKey); err != nil {
-		_ = s.deps.Closings.Reopen(periodKey) // 审计失败补偿：回滚封账，保证留痕
 		return nil, err
 	}
 	return rec, nil
 }
 
 // Reopen 解封（仅管理员）：删除封账记录 + 审计留痕。
-func (s *ClosingService) Reopen(actor *model.User, periodKey string) error {
+func (s *ClosingService) reopen(actor *model.User, periodKey string) error {
+	if !CanManageSettings(actor) {
+		return ErrTxnForbidden
+	}
 	if _, _, ok := s.deps.Periods.Range(periodKey); !ok {
 		return ErrClosingInvalidPeriod
 	}
@@ -130,9 +135,6 @@ func (s *ClosingService) Reopen(actor *model.User, periodKey string) error {
 		return err
 	}
 	if err := s.audit(actor, AuditActionReopen, periodKey); err != nil {
-		_ = s.deps.Closings.Close(&model.PeriodClosing{
-			PeriodKey: periodKey, Status: model.ClosingClosed, ClosedBy: actor.ID, ClosedAt: s.now(),
-		})
 		return err
 	}
 	return nil

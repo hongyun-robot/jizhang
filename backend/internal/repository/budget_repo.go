@@ -47,9 +47,9 @@ type rootConsumeRow struct {
 // 「预算消耗计算」）；收入与转账天然排除，净额可为负（前端按「本月已退回」展示）。
 // 无分类退款（root 为 NULL）不冲减任何分类预算。
 func (r *BudgetRepo) ConsumptionByRoot(periodKey string) (map[int64]decimal.Decimal, error) {
-	const sql = `
+	sql := `
 		SELECT COALESCE(p.id, c.id) AS root_id,
-		       SUM(CASE WHEN t.kind = 'refund' THEN -t.amount ELSE t.amount END) AS total
+		       SUM(` + expenseEffectSQL("t") + `) AS total
 		FROM transactions t
 		LEFT JOIN categories c ON c.id = t.category_id
 		LEFT JOIN categories p ON p.id = c.parent_id

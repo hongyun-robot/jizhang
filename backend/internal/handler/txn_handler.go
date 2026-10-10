@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -26,17 +27,25 @@ func NewTxn(svc *service.TransactionService) *txnHandler {
 }
 
 type txnReq struct {
-	Kind              model.TxnKind `json:"kind" binding:"required"`
-	Amount            string        `json:"amount" binding:"required"`
-	AccountID         int64         `json:"account_id"` // 必填语义由服务层校验；退款带关联时可省略（按原支出预填）
-	TransferAccountID int64         `json:"transfer_account_id"`
-	CategoryID        int64         `json:"category_id"`
-	RelatedTxnID      int64         `json:"related_txn_id"` // 退款关联原支出，0=无
-	EntryDate         string        `json:"entry_date" binding:"required"`
-	Note              string        `json:"note" binding:"max=255"`
+	Purpose           json.RawMessage `json:"purpose"`
+	VoucherEventID    json.RawMessage `json:"voucher_event_id"`
+	VoucherID         json.RawMessage `json:"voucher_id"`
+	Source            json.RawMessage `json:"source"`
+	Kind              model.TxnKind   `json:"kind" binding:"required"`
+	Amount            string          `json:"amount" binding:"required"`
+	AccountID         int64           `json:"account_id"` // 必填语义由服务层校验；退款带关联时可省略（按原支出预填）
+	TransferAccountID int64           `json:"transfer_account_id"`
+	CategoryID        int64           `json:"category_id"`
+	RelatedTxnID      int64           `json:"related_txn_id"` // 退款关联原支出，0=无
+	EntryDate         string          `json:"entry_date" binding:"required"`
+	Note              string          `json:"note" binding:"max=255"`
+	Platform          string          `json:"platform"`
 }
 
 func (r *txnReq) parse() (service.TxnInput, bool) {
+	if len(r.Purpose)+len(r.VoucherEventID)+len(r.VoucherID)+len(r.Source) > 0 {
+		return service.TxnInput{}, false
+	}
 	amt, err := decimal.NewFromString(r.Amount)
 	if err != nil {
 		return service.TxnInput{}, false
@@ -54,7 +63,12 @@ func (r *txnReq) parse() (service.TxnInput, bool) {
 		RelatedTxnID:      r.RelatedTxnID,
 		EntryDate:         d,
 		Note:              r.Note,
+		Platform:          r.Platform,
 	}, true
+}
+
+func (r *txnReq) hasReservedFields() bool {
+	return len(r.Purpose)+len(r.VoucherEventID)+len(r.VoucherID)+len(r.Source) > 0
 }
 
 func mapTxnErr(c *gin.Context, err error) {
@@ -71,9 +85,12 @@ func mapTxnErr(c *gin.Context, err error) {
 		errors.Is(err, service.ErrTxnTransferSame),
 		errors.Is(err, service.ErrTxnKindInvalid),
 		errors.Is(err, service.ErrTxnDateInvalid),
-		errors.Is(err, service.ErrTxnRelatedInvalid):
+		errors.Is(err, service.ErrTxnRelatedInvalid),
+		errors.Is(err, service.ErrTxnPlatformInvalid):
 		response.Invalid(c, err.Error())
 	case errors.Is(err, service.ErrTxnRefundsExist):
+		response.Conflict(c, err.Error())
+	case errors.Is(err, service.ErrTxnVoucherManaged):
 		response.Conflict(c, err.Error())
 	default:
 		response.Internal(c, "操作失败")
@@ -88,6 +105,10 @@ func (h *txnHandler) Create(c *gin.Context) {
 		return
 	}
 	in, ok := req.parse()
+	if req.hasReservedFields() {
+		response.Invalid(c, "券生成的记录请到券详情处理")
+		return
+	}
 	if !ok {
 		response.Invalid(c, response.MsgInvalidAmount)
 		return
@@ -112,6 +133,10 @@ func (h *txnHandler) Update(c *gin.Context) {
 		return
 	}
 	in, ok := req.parse()
+	if req.hasReservedFields() {
+		response.Invalid(c, "券生成的记录请到券详情处理")
+		return
+	}
 	if !ok {
 		response.Invalid(c, response.MsgInvalidAmount)
 		return

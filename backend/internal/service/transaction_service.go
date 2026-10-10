@@ -23,6 +23,8 @@ var (
 	ErrTxnForbidden       = errors.New("无权操作这条流水")
 	ErrTxnRelatedInvalid  = errors.New("关联流水不存在或不是支出流水")
 	ErrTxnRefundsExist    = errors.New("该支出存在关联退款，请先处理退款")
+	ErrTxnVoucherManaged  = errors.New("券生成的记录请到券详情处理")
+	ErrTxnPlatformInvalid = errors.New("平台 / 商家名称最多 128 字")
 )
 
 var maxAmount = decimal.RequireFromString("9999999999.99")
@@ -84,11 +86,17 @@ type TxnInput struct {
 	CategoryID        int64
 	EntryDate         time.Time
 	Note              string
+	Platform          string
 	RelatedTxnID      int64 // 关联原支出流水（退款用，0=无）
 }
 
 // validate 校验并规整入参；返回错误供 handler 映射。
 func (s *TransactionService) validate(in *TxnInput) error {
+	platform, err := normalizeVoucherPlatform(in.Platform, false)
+	if err != nil {
+		return ErrTxnPlatformInvalid
+	}
+	in.Platform = platform
 	switch in.Kind {
 	case model.TxnExpense, model.TxnIncome, model.TxnTransfer, model.TxnRefund:
 	default:
@@ -113,6 +121,9 @@ func (s *TransactionService) validate(in *TxnInput) error {
 		}
 		if orig == nil || orig.Kind != model.TxnExpense {
 			return ErrTxnRelatedInvalid
+		}
+		if orig.IsVoucher() {
+			return ErrTxnVoucherManaged
 		}
 		if in.AccountID == 0 {
 			in.AccountID = orig.AccountID
@@ -183,7 +194,7 @@ func (s *TransactionService) guardOpen(periodKey string) error {
 }
 
 // Create 记一笔：权限由调用方（handler）先过 CanCreateTransaction，此处管账务规则。
-func (s *TransactionService) Create(actor *model.User, in TxnInput) (*model.Transaction, error) {
+func (s *TransactionService) create(actor *model.User, in TxnInput) (*model.Transaction, error) {
 	if !CanCreateTransaction(actor) {
 		return nil, ErrTxnForbidden
 	}
@@ -202,6 +213,7 @@ func (s *TransactionService) Create(actor *model.User, in TxnInput) (*model.Tran
 		EntryDate: in.EntryDate,
 		PeriodKey: periodKey,
 		Note:      in.Note,
+		Platform:  in.Platform,
 		CreatedBy: actor.ID,
 		Source:    model.SourceManual,
 	}
@@ -219,6 +231,9 @@ func (s *TransactionService) Create(actor *model.User, in TxnInput) (*model.Tran
 	if err := s.deps.Txns.Create(t); err != nil {
 		return nil, err
 	}
+	if err := s.ensurePlatform(t.Platform); err != nil {
+		return nil, err
+	}
 	s.fireWrite()
 	s.firePeriods(periodKey)
 	return t, nil
@@ -227,7 +242,7 @@ func (s *TransactionService) Create(actor *model.User, in TxnInput) (*model.Tran
 // CreateFromRule 周期模板生成流水（系统动作，任务 9.1/9.2）：
 // 复用同一套账务校验、归期物化与写钩子，标记 source=recurring + rule_id，
 // created_by 取模板创建者；封账目标期返回 ErrTxnClosedPeriod 由生成器跳过。
-func (s *TransactionService) CreateFromRule(rule *model.RecurringRule, date time.Time) (*model.Transaction, error) {
+func (s *TransactionService) createFromRule(rule *model.RecurringRule, date time.Time) (*model.Transaction, error) {
 	cat, err := s.deps.Cats.GetByID(rule.CategoryID)
 	if err != nil {
 		return nil, err
@@ -276,7 +291,7 @@ func (s *TransactionService) CreateFromRule(rule *model.RecurringRule, date time
 }
 
 // Update 改一笔：属主校验 + 新旧归期都要未封账，归期随日期重新物化。
-func (s *TransactionService) Update(actor *model.User, id int64, in TxnInput) (*model.Transaction, error) {
+func (s *TransactionService) update(actor *model.User, id int64, in TxnInput) (*model.Transaction, error) {
 	t, err := s.deps.Txns.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -286,6 +301,9 @@ func (s *TransactionService) Update(actor *model.User, id int64, in TxnInput) (*
 	}
 	if !CanModifyTransaction(actor, t.CreatedBy) {
 		return nil, ErrTxnForbidden
+	}
+	if t.IsVoucher() {
+		return nil, ErrTxnVoucherManaged
 	}
 	if err := s.validate(&in); err != nil {
 		return nil, err
@@ -305,6 +323,7 @@ func (s *TransactionService) Update(actor *model.User, id int64, in TxnInput) (*
 	t.EntryDate = in.EntryDate
 	t.PeriodKey = newPeriod
 	t.Note = in.Note
+	t.Platform = in.Platform
 	if in.Kind == model.TxnTransfer {
 		tid := in.TransferAccountID
 		t.TransferAccountID = &tid
@@ -327,13 +346,16 @@ func (s *TransactionService) Update(actor *model.User, id int64, in TxnInput) (*
 	if err := s.deps.Txns.Update(t); err != nil {
 		return nil, err
 	}
+	if err := s.ensurePlatform(t.Platform); err != nil {
+		return nil, err
+	}
 	s.fireWrite()
 	s.firePeriods(oldPeriod, newPeriod)
 	return t, nil
 }
 
 // Delete 删一笔：属主校验 + 归期未封账。
-func (s *TransactionService) Delete(actor *model.User, id int64) error {
+func (s *TransactionService) delete(actor *model.User, id int64) error {
 	t, err := s.deps.Txns.GetByID(id)
 	if err != nil {
 		return err
@@ -343,6 +365,9 @@ func (s *TransactionService) Delete(actor *model.User, id int64) error {
 	}
 	if !CanModifyTransaction(actor, t.CreatedBy) {
 		return ErrTxnForbidden
+	}
+	if t.IsVoucher() {
+		return ErrTxnVoucherManaged
 	}
 	if err := s.guardOpen(t.PeriodKey); err != nil {
 		return err
@@ -375,6 +400,7 @@ func (s *TransactionService) List(actor *model.User, f repository.TxnFilter) ([]
 		return nil, 0, err
 	}
 	s.fillRefunded(list)
+	s.fillEffects(list)
 	return list, total, nil
 }
 
@@ -410,5 +436,9 @@ func (s *TransactionService) ExportRows(actor *model.User, f repository.TxnFilte
 	if !CanView(actor) {
 		return nil, ErrTxnForbidden
 	}
-	return s.deps.Txns.ListAll(f)
+	rows, err := s.deps.Txns.ListAll(f)
+	if err == nil {
+		s.fillEffects(rows)
+	}
+	return rows, err
 }

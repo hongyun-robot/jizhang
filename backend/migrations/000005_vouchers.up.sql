@@ -1,0 +1,65 @@
+CREATE TABLE vouchers (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(128) NOT NULL,
+    platform VARCHAR(128) NOT NULL DEFAULT '',
+    note VARCHAR(255) NOT NULL DEFAULT '',
+    paid_amount DECIMAL(12,2) NOT NULL,
+    purchase_date DATE NOT NULL,
+    account_id BIGINT NOT NULL,
+    category_id BIGINT NOT NULL,
+    total_units INT NOT NULL,
+    expires_on DATE NULL,
+    auto_refund_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    auto_refund_suspended BOOLEAN NOT NULL DEFAULT FALSE,
+    schedule_version BIGINT NOT NULL DEFAULT 1,
+    revision BIGINT NOT NULL DEFAULT 1,
+    created_by BIGINT NOT NULL,
+    create_request_key VARCHAR(64) NOT NULL,
+    create_payload_hash CHAR(64) NOT NULL,
+    last_error VARCHAR(255) NOT NULL DEFAULT '',
+    last_attempt_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_voucher_create (created_by, create_request_key),
+    KEY idx_voucher_due (auto_refund_enabled, auto_refund_suspended, expires_on),
+    KEY idx_voucher_deleted (deleted_at),
+    CONSTRAINT chk_voucher_amount CHECK (paid_amount > 0),
+    CONSTRAINT chk_voucher_units CHECK (total_units > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE voucher_events (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    voucher_id BIGINT NOT NULL,
+    action VARCHAR(16) NOT NULL,
+    units INT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    entry_date DATE NOT NULL,
+    period_key CHAR(7) NOT NULL,
+    account_id BIGINT NOT NULL,
+    category_id BIGINT NOT NULL,
+    created_by BIGINT NOT NULL,
+    source VARCHAR(16) NOT NULL,
+    request_key VARCHAR(64) NOT NULL,
+    payload_hash CHAR(64) NOT NULL,
+    schedule_version BIGINT NULL,
+    voided_at DATETIME NULL,
+    voided_by BIGINT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_voucher_event_request (voucher_id, request_key),
+    KEY idx_voucher_event_active (voucher_id, voided_at, id),
+    CONSTRAINT fk_voucher_event_voucher FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT,
+    CONSTRAINT chk_voucher_event_amount CHECK (amount >= 0),
+    CONSTRAINT chk_voucher_event_units CHECK (units > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE transactions
+    ADD COLUMN purpose VARCHAR(32) NOT NULL DEFAULT 'regular',
+    ADD COLUMN voucher_event_id BIGINT NULL,
+    ADD UNIQUE KEY uk_txn_voucher_event (voucher_event_id),
+    ADD CONSTRAINT fk_txn_voucher_event FOREIGN KEY (voucher_event_id) REFERENCES voucher_events(id) ON DELETE RESTRICT,
+    MODIFY source ENUM('manual','recurring','voucher_auto') NOT NULL DEFAULT 'manual';
+
+INSERT IGNORE INTO settings (`key`, `value`) VALUES ('ledger_write_guard', '1');

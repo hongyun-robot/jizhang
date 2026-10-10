@@ -32,6 +32,7 @@ import { useAuth } from '../stores/auth';
 import Money from '../components/Money';
 import PeriodPicker, { presetRange } from '../components/PeriodPicker';
 import TxnFormModal, { type TxnRefill } from '../components/TxnFormModal';
+import { VOUCHER_PURPOSE_LABEL } from '../labels';
 
 const PAGE_SIZE = 20;
 
@@ -153,6 +154,7 @@ export default function Records() {
   };
 
   const canEdit = (t: Transaction) => {
+    if (t.voucher_event_id || (t.purpose && t.purpose !== 'regular')) return false;
     if (!user || user.role === 'viewer') return false;
     if (user.role === 'admin' || user.role === 'recorder') return true;
     return t.created_by === user.id;
@@ -178,6 +180,7 @@ export default function Records() {
       category_id: t.category_id ?? undefined,
       related_amount: t.amount,
       refunded: Number(t.refunded_amount ?? 0),
+      platform: t.platform,
     });
     setFormOpen(true);
   };
@@ -217,7 +220,7 @@ export default function Records() {
     t.kind === 'income' || t.kind === 'refund' ? t.amount : `-${t.amount}`;
 
   const actions = (t: Transaction) =>
-    canEdit(t) ? (
+    t.voucher_id ? <Button type="link" size="small" onClick={() => navigate(`/vouchers?id=${t.voucher_id}`)}>查看券</Button> : canEdit(t) ? (
       <span className="row-actions">
         <Button type="link" size="small" onClick={() => openEdit(t)}>
           编辑
@@ -250,8 +253,9 @@ export default function Records() {
       width: 116,
       render: (k: TxnKind, t: Transaction) => (
         <>
-          {kindTag(k)}
+          {(t.purpose && VOUCHER_PURPOSE_LABEL[t.purpose]) || kindTag(k)}
           {t.source === 'recurring' && <Tag className="src-tag">自动</Tag>}
+          {t.source === 'voucher_auto' && <Tag className="src-tag">到期自动</Tag>}
           {k === 'expense' && Number(t.refunded_amount ?? 0) > 0 && (
             <Tag
               className="refunded-tag"
@@ -289,8 +293,9 @@ export default function Records() {
       key: 'amount',
       align: 'right' as const,
       width: 120,
-      render: (_: string, t: Transaction) => <Money value={amountOf(t)} tone={tone(t.kind)} />,
+      render: (_: string, t: Transaction) => <><Money value={amountOf(t)} tone={tone(t.kind)} />{t.voucher_event_id && <div className="txn-effects">余额 {t.balance_effect} · 消费 {t.expense_effect}</div>}</>,
     },
+    { title: '平台 / 商家', dataIndex: 'platform', key: 'platform', width: 130, ellipsis: true },
     { title: '备注', dataIndex: 'note', key: 'note', ellipsis: true },
     { title: '', key: 'actions', width: 130, render: (_: unknown, t: Transaction) => actions(t) },
   ];
@@ -366,7 +371,7 @@ export default function Records() {
         <Input
           size="small"
           allowClear
-          placeholder="备注关键字"
+          placeholder="备注 / 平台 / 商家"
           style={{ width: 130 }}
           value={filters.keyword}
           onChange={(e) => patch({ keyword: e.target.value })}
@@ -402,10 +407,11 @@ export default function Records() {
                 <div className="txn-main">
                   <div className="txn-title">
                     <span className="txn-cat">
-                      {t.kind === 'transfer'
+                      {(t.purpose && VOUCHER_PURPOSE_LABEL[t.purpose]) || (t.kind === 'transfer'
                         ? '转账'
-                        : (t.category_id ? catInfo.get(t.category_id)?.full : undefined) ?? '未分类'}
+                        : (t.category_id ? catInfo.get(t.category_id)?.full : undefined) ?? '未分类')}
                       {t.source === 'recurring' && <Tag className="src-tag">自动</Tag>}
+                      {t.source === 'voucher_auto' && <Tag className="src-tag">到期自动</Tag>}
                       {t.kind === 'expense' && Number(t.refunded_amount ?? 0) > 0 && (
                         <Tag
                           className="refunded-tag"
@@ -423,8 +429,10 @@ export default function Records() {
                     {t.kind === 'transfer'
                       ? `${acctName.get(t.account_id) ?? ''} → ${acctName.get(t.transfer_account_id ?? 0) ?? ''}`
                       : acctName.get(t.account_id) ?? ''}
+                    {t.platform ? ` · ${t.platform}` : ''}
                     {t.note ? ` · ${t.note}` : ''}
                   </div>
+                  {t.voucher_event_id && <div className="txn-effects">余额 {t.balance_effect} · 消费 {t.expense_effect}</div>}
                 </div>
                 <div className="txn-actions">{actions(t)}</div>
               </div>
@@ -445,7 +453,7 @@ export default function Records() {
             dataSource={list.data?.items ?? []}
             columns={columns}
             pagination={false}
-            scroll={{ x: 860 }}
+            scroll={{ x: 990 }}
             onRow={(record) =>
               ({ 'data-txn-id': record.id }) as HTMLAttributes<HTMLTableRowElement>
             }

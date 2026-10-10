@@ -32,7 +32,7 @@ func newRecurringEnv(t *testing.T) *recurringEnv {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&model.Account{}, &model.Category{}, &model.Transaction{},
+	if err := db.AutoMigrate(&model.Setting{}, &model.Account{}, &model.Category{}, &model.Transaction{},
 		&model.PeriodClosing{}, &model.RecurringRule{}, &model.Notification{}, &model.User{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

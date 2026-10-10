@@ -30,13 +30,10 @@ func (r *AccountRepo) List() ([]model.Account, error) {
 	}
 
 	// 流水净额：资产/负债共用同一口径（信用卡支出=余额变负，还款=转入回正，退款=资金回流）
-	const netSQL = `
+	netSQL := `
 		SELECT aid, SUM(v) AS net FROM (
 			SELECT account_id AS aid,
-			       CASE kind WHEN 'income' THEN amount
-			                 WHEN 'refund' THEN amount
-			                 WHEN 'expense' THEN -amount
-			                 WHEN 'transfer' THEN -amount END AS v
+			       ` + balanceEffectSQL("") + ` AS v
 			FROM transactions
 			UNION ALL
 			SELECT transfer_account_id AS aid, amount AS v

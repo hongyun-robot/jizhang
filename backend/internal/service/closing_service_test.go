@@ -27,7 +27,7 @@ func newClosingEnv(t *testing.T, settings map[string]string) *closingEnv {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&model.Account{}, &model.Category{}, &model.Transaction{},
+	if err := db.AutoMigrate(&model.Setting{}, &model.Account{}, &model.Category{}, &model.Transaction{},
 		&model.PeriodClosing{}, &model.AuditLog{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

@@ -1005,6 +1005,10 @@ p {
   gap: 14px;
 }
 
+.txn-platform-field .pick-label {
+  display: block;
+}
+
 .amount-row {
   display: flex;
   align-items: center;
@@ -2447,4 +2451,47 @@ tr.flash > td {
   .ant-skeleton .ant-skeleton-input {
     animation: none !important;
   }
+}
+/* 券：沿用纸面账簿的平面列表、数字对齐与主题变量。 */
+.voucher-summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px 24px; padding: 22px 26px; margin-bottom: 22px; }
+.voucher-summary > .money { font-size: 30px; }
+.voucher-list { padding: 0 24px; }
+.voucher-list > .ant-empty, .voucher-list > .ant-skeleton { padding: 32px 0; }
+.voucher-row { appearance: none; width: 100%; display: flex; justify-content: space-between; gap: 20px; text-align: left; color: var(--text); background: transparent; border: 0; border-bottom: 1px solid var(--line); padding: 22px 0; cursor: pointer; font: inherit; }
+.voucher-row:last-child { border-bottom: 0; }
+.voucher-row:hover { background: var(--hover-soft); }
+.voucher-row:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.voucher-row-main { min-width: 0; }
+.voucher-row-title { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 6px; }
+.voucher-row-title strong { font-size: 17px; overflow-wrap: anywhere; }
+.voucher-expiry { margin-top: 8px; color: var(--text-2); font-size: 12px; }
+.voucher-error { color: var(--expense); margin-top: 6px; }
+.voucher-row-amount { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; gap: 3px; }
+.voucher-row-amount > .money { font-size: 22px; }
+.voucher-row-amount .muted { font-size: 12px; }
+.voucher-detail { display: flex; flex-direction: column; gap: 20px; }
+.voucher-detail-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.voucher-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding-block: 20px; border-block: 1px solid var(--line); }
+.voucher-metrics > div { display: flex; flex-direction: column; gap: 6px; }
+.voucher-metrics > div > span:first-child { color: var(--muted); font-size: 12px; }
+.voucher-metrics > div > .money { font-size: 24px; }
+.voucher-facts { line-height: 1.9; overflow-wrap: anywhere; }
+.voucher-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.voucher-detail h3 { margin: 10px 0 0; font-size: 16px; }
+.voucher-event { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-block: 15px; border-bottom: 1px solid var(--line); }
+.voucher-event.is-voided { color: var(--muted); }
+.voucher-event-end { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.voucher-form .ant-alert { margin-bottom: 16px; }
+.voucher-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.voucher-switch .muted { margin-left: 12px; font-size: 12px; }
+.voucher-operation { display: flex; flex-direction: column; gap: 18px; }
+.voucher-operation label { display: flex; flex-direction: column; gap: 6px; }
+.txn-effects { font-size: 11px; color: var(--muted); line-height: 1.5; white-space: normal; }
+@media (max-width: 767px) {
+  .voucher-summary { padding: 18px; gap: 8px 16px; }
+  .voucher-summary > .muted { flex-basis: 100%; font-size: 12px; }
+  .voucher-list { padding: 0 16px; }
+  .voucher-row { gap: 12px; }
+  .voucher-row-title strong { font-size: 15px; }
+  .voucher-row-amount > .money { font-size: 20px; }
 }

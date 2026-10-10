@@ -16,7 +16,7 @@ import (
 var csvBOM = []byte{0xEF, 0xBB, 0xBF}
 
 // csvHeader 导出列头（与流水页列表列一致）。
-const csvHeader = "日期,类型,分类,账户,转入账户,金额,备注,来源\r\n"
+const csvHeader = "日期,类型,分类,账户,转入账户,金额,备注,来源,用途,券编号,余额影响,消费影响,平台 / 商家\r\n"
 
 // plainNum 纯数字（含负数金额）。负数以 - 开头但不是公式，不参与公式前缀转义，
 // 保证 Excel 中金额列仍可直接求和。
@@ -51,10 +51,27 @@ func kindLabel(k model.TxnKind) string {
 }
 
 func sourceLabel(s model.TxnSource) string {
+	if s == model.SourceVoucherAuto {
+		return "券到期自动退款"
+	}
 	if s == model.SourceRecurring {
 		return "自动"
 	}
 	return "手动"
+}
+
+func purposeLabel(p model.TxnPurpose) string {
+	switch p {
+	case model.PurposeVoucherPurchase:
+		return "购券"
+	case model.PurposeVoucherRedemption:
+		return "券核销"
+	case model.PurposeVoucherRefund:
+		return "券退款"
+	case model.PurposeVoucherWriteoff:
+		return "券作废"
+	}
+	return "普通记账"
 }
 
 // catFullPaths 分类 id → 全路径（一级/二级，如「餐饮/午餐」）。
@@ -115,6 +132,12 @@ func buildTxnCSV(rows []model.Transaction, acctNames map[int64]string, catPaths 
 			t.Note,
 			sourceLabel(t.Source),
 		}
+		voucherID := ""
+		if t.VoucherID != nil {
+			voucherID = strconv.FormatInt(*t.VoucherID, 10)
+		}
+		balance, expense := t.Effects()
+		cells = append(cells, purposeLabel(t.Purpose), voucherID, balance.StringFixed(2), expense.StringFixed(2), t.Platform)
 		for i, cell := range cells {
 			if i > 0 {
 				b.WriteByte(',')

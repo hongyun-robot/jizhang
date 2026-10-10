@@ -1,0 +1,2 @@
+ALTER TABLE transactions
+    ADD COLUMN platform VARCHAR(128) NOT NULL DEFAULT '' AFTER note;

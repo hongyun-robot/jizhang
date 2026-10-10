@@ -7,6 +7,8 @@ import { rootsOfKind } from '../api/category';
 import type { TxnKind, Transaction } from '../api/types';
 import { errMsg } from '../api/client';
 import { useAuth } from '../stores/auth';
+import VoucherFormModal from './VoucherFormModal';
+import VoucherPlatformInput from './VoucherPlatformInput';
 
 const KIND_OPTIONS = [
   { value: 'expense', label: '支出' },
@@ -27,6 +29,7 @@ export interface TxnRefill {
   related_amount?: string;
   /** 原支出已退累计 */
   refunded?: number;
+  platform?: string;
 }
 
 interface Props {
@@ -67,11 +70,14 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   const [activeRootId, setActiveRootId] = useState<number | undefined>();
   const [date, setDate] = useState<Dayjs>(() => dayjs());
   const [note, setNote] = useState('');
+  const [platform, setPlatform] = useState('');
+  const [creatingPlatform, setCreatingPlatform] = useState(false);
   // 退款关联上下文：关联 id / 原支出金额 / 已退累计 / 超额二次确认
   const [relatedId, setRelatedId] = useState<number | undefined>();
   const [relatedAmount, setRelatedAmount] = useState<string | undefined>();
   const [refundedBase, setRefundedBase] = useState(0);
   const [overAck, setOverAck] = useState(false);
+  const [voucherOpen, setVoucherOpen] = useState(false);
 
   // 打开时初始化（编辑回填 / 行内退款预填 / 新建默认今天）
   useEffect(() => {
@@ -85,6 +91,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
       setCategoryId(editing.category_id ?? undefined);
       setDate(dayjs(editing.entry_date));
       setNote(editing.note ?? '');
+      setPlatform(editing.platform ?? '');
       setRelatedId(editing.related_txn_id ?? undefined);
       setRelatedAmount(undefined);
       setRefundedBase(0);
@@ -97,6 +104,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
       setActiveRootId(undefined);
       setDate(dayjs());
       setNote('');
+      setPlatform(refill.platform ?? '');
       setRelatedId(refill.related_txn_id);
       setRelatedAmount(refill.related_amount);
       setRefundedBase(refill.refunded ?? 0);
@@ -108,6 +116,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
       setCategoryId(undefined);
       setDate(dayjs());
       setNote('');
+      setPlatform('');
       setRelatedId(undefined);
       setRelatedAmount(undefined);
       setRefundedBase(0);
@@ -153,6 +162,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   };
 
   const validate = (): string | null => {
+    if (Array.from(platform.trim()).length > 128) return '平台 / 商家名称最多 128 字';
     if (!/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) {
       return '请输入大于 0 的金额，最多两位小数';
     }
@@ -174,6 +184,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   const isOver = overTotal !== null && relatedAmount !== undefined && overTotal > Number(relatedAmount);
 
   const submit = async () => {
+    if (creatingPlatform || createTxn.isPending || updateTxn.isPending) return;
     const err = validate();
     if (err) {
       message.warning(err);
@@ -196,6 +207,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
       ...(kind === 'refund' && relatedId ? { related_txn_id: relatedId } : {}),
       entry_date: date.format('YYYY-MM-DD'),
       note: note || undefined,
+      platform: platform.trim(),
     };
     try {
       if (editing) {
@@ -218,22 +230,25 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   }));
 
   return (
+    <>
     <Modal
       open={open}
       onCancel={onClose}
       title={editing ? '编辑流水' : '记一笔'}
       width={isMobile ? '100%' : 520}
       style={isMobile ? { top: 0, maxWidth: '100%', paddingBottom: 0 } : undefined}
+      styles={{ body: { maxHeight: `calc(100dvh - ${isMobile ? 160 : 240}px)`, overflowY: 'auto' } }}
       footer={[
         <Button key="cancel" onClick={onClose}>
           取消
         </Button>,
-        <Button key="ok" type="primary" loading={saving} onClick={submit}>
+        <Button key="ok" type="primary" loading={saving} disabled={creatingPlatform} onClick={submit}>
           {editing ? '保存' : '记账'}
         </Button>,
       ]}
     >
       <div className="txn-form">
+        {!editing && user?.role !== 'viewer' && <Button onClick={() => { setVoucherOpen(true); onClose(); }}>购券：先付款，使用时计消费</Button>}
         <Segmented
           block
           value={kind}
@@ -318,6 +333,19 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
           </div>
         )}
 
+        <div className="txn-platform-field">
+          <label className="pick-label" htmlFor="txn-platform">平台 / 商家</label>
+          <VoucherPlatformInput
+            key={editing?.id ?? 'new'}
+            id="txn-platform"
+            value={platform}
+            onChange={setPlatform}
+            active={open}
+            disabled={saving}
+            onCreatingChange={setCreatingPlatform}
+          />
+        </div>
+
         {/* 账户 */}
         {kind === 'transfer' ? (
           <div className="transfer-row">
@@ -379,5 +407,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
         />
       </div>
     </Modal>
+    <VoucherFormModal open={voucherOpen} onClose={() => setVoucherOpen(false)} />
+    </>
   );
 }

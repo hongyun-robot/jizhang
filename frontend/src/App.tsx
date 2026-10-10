@@ -17,6 +17,7 @@ import Audit from './pages/Audit';
 import Budgets from './pages/Budgets';
 import Recurring from './pages/Recurring';
 import Notifications from './pages/Notifications';
+import Vouchers from './pages/Vouchers';
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/records" element={<Records />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/mine" element={<Mine />} />
+          <Route path="/vouchers" element={<Vouchers />} />
           {/* 预算：查看对四档角色开放，配置仅管理员（后端 + 页面内双重门禁，specs/budgets） */}
           <Route path="/budgets" element={<Budgets />} />
           {/* 提醒列表：四档角色可读可标已读（specs/notifications，任务 10.3） */}

@@ -4,6 +4,12 @@ export type Role = 'admin' | 'recorder' | 'member' | 'viewer';
 export type AccountType = 'asset' | 'liability';
 export type Status = 'active' | 'disabled';
 export type TxnKind = 'expense' | 'income' | 'transfer' | 'refund';
+export type TxnPurpose =
+  | 'regular'
+  | 'voucher_purchase'
+  | 'voucher_redemption'
+  | 'voucher_refund'
+  | 'voucher_writeoff';
 export type CategoryKind = 'expense' | 'income';
 
 export interface Account {
@@ -57,8 +63,14 @@ export interface Transaction {
   entry_date: string;
   period_key: string;
   note?: string;
+  platform?: string;
   created_by: number;
-  source: 'manual' | 'recurring';
+  source: 'manual' | 'recurring' | 'voucher_auto';
+  purpose?: TxnPurpose;
+  voucher_event_id?: number | null;
+  voucher_id?: number | null;
+  balance_effect?: string;
+  expense_effect?: string;
   created_at: string;
   updated_at: string;
 }
@@ -284,7 +296,10 @@ export interface RuleInput {
 
 // ---------- 站内提醒（specs/notifications，任务 10.x） ----------
 
-export type NotifKind = 'budget_overdue' | 'repayment_due' | 'recurring_patched';
+export type NotifKind =
+  | 'budget_overdue'
+  | 'repayment_due'
+  | 'recurring_patched';
 
 /** 提醒 payload：按 kind 取所需字段（服务端写入时已序列化为 JSON 字符串）。 */
 export interface NotifPayload {
@@ -320,4 +335,85 @@ export interface Notification {
 export interface NotifListResp {
   list: Notification[];
   unread: number;
+}
+
+export type VoucherAction = 'purchase' | 'redeem' | 'refund' | 'writeoff';
+export interface VoucherPlatform {
+  id: number;
+  name: string;
+}
+export interface Voucher {
+  id: number;
+  name: string;
+  platform: string;
+  note: string;
+  paid_amount: string;
+  purchase_date: string;
+  account_id: number;
+  category_id: number;
+  total_units: number;
+  expires_on: string | null;
+  auto_refund_enabled: boolean;
+  auto_refund_suspended: boolean;
+  created_by: number;
+  schedule_version: number;
+  last_error: string;
+  last_attempt_at: string | null;
+  used_units: number;
+  refunded_units: number;
+  written_off_units: number;
+  remaining_units: number;
+  used_amount: string;
+  refunded_amount: string;
+  written_off_amount: string;
+  remaining_amount: string;
+  next_unit_amount: string;
+  status: 'pending' | 'settled' | 'expired' | 'failed';
+  settlement: '' | 'used' | 'refunded' | 'written_off';
+  can_edit: boolean;
+  can_edit_purchase: boolean;
+  can_delete: boolean;
+  can_operate: boolean;
+}
+export interface VoucherEvent {
+  id: number;
+  action: VoucherAction;
+  units: number;
+  amount: string;
+  entry_date: string;
+  period_key: string;
+  created_by: number;
+  source: 'manual' | 'auto';
+  voided_at: string | null;
+  voided_by: number | null;
+  can_undo: boolean;
+}
+export interface VoucherDetail extends Voucher {
+  events: VoucherEvent[];
+}
+export interface VoucherListResp {
+  items: Voucher[];
+  total: number;
+  page: number;
+  page_size: number;
+  unused_amount: string;
+}
+export interface VoucherInput {
+  name: string;
+  platform?: string;
+  note?: string;
+  paid_amount: string;
+  purchase_date: string;
+  account_id: number;
+  category_id: number;
+  total_units: number;
+  expires_on: string | null;
+  auto_refund_enabled: boolean;
+  resume_auto_refund?: boolean;
+  request_key?: string;
+}
+export interface VoucherOperationInput {
+  entry_date: string;
+  units?: number;
+  request_key: string;
 }

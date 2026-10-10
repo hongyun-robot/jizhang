@@ -100,6 +100,7 @@ func main() {
 		Notifs:   repository.NewNotificationRepo(db),
 		Accounts: accountRepo,
 	})
+	voucherSvc := service.NewVoucherService(db, txnSvc)
 	// 写操作主动失效统计缓存（30 秒缓存的写后一致性）
 	txnSvc.OnWrite = statsSvc.InvalidateAll
 	accountSvc.OnWrite = statsSvc.InvalidateAll
@@ -125,6 +126,7 @@ func main() {
 		BudgetSvc:    budgetSvc,
 		RecurringSvc: recurringSvc,
 		NotifSvc:     notifSvc,
+		VoucherSvc:   voucherSvc,
 
 		BackupStatusFile: cfg.BackupStatusFile,
 	})
@@ -132,6 +134,20 @@ func main() {
 	// 周期记账：进程内 cron 每 5 分钟生成到期流水（设计 D7；
 	// 前端每次打开应用还会调 POST /recurring/ensure 懒补齐，两者共用幂等生成）
 	recurringCron := cron.New()
+	ensureVouchers := func() {
+		result, err := voucherSvc.EnsureDue(time.Now())
+		if err != nil {
+			logger.L().Warn("voucher ensure failed", zap.Error(err))
+			return
+		}
+		if result.Generated > 0 || result.Failed > 0 {
+			logger.L().Info("voucher ensure", zap.Int("generated", result.Generated), zap.Int("failed", result.Failed))
+		}
+	}
+	if _, err := recurringCron.AddFunc("@every 1m", ensureVouchers); err != nil {
+		logger.L().Fatal("voucher cron schedule failed", zap.Error(err))
+	}
+	ensureVouchers()
 	if _, err := recurringCron.AddFunc("@every 5m", func() {
 		n, err := recurringSvc.EnsureDue(time.Now())
 		if err != nil {

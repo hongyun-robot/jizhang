@@ -10,9 +10,9 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 
-import { useBudgets, useEnsureRecurring, useStatsCompare } from '../api/hooks';
+import { useBudgets, useEnsureRecurring, useEnsureVouchers, useStatsCompare } from '../api/hooks';
 import { ROLE_LABEL } from '../labels';
-import { useAuth } from '../stores/auth';
+import { canRecord, useAuth } from '../stores/auth';
 import { resolve, useTheme } from '../stores/theme';
 import Brand from './Brand';
 import Money, { fmtMoney } from './Money';
@@ -36,6 +36,7 @@ export const navItems: NavItem[] = [
 ];
 
 function activeKey(pathname: string): string {
+  if (pathname.startsWith('/vouchers')) return 'mine';
   if (pathname === '/') return 'dash';
   return navItems.find((i) => i.path !== '/' && pathname.startsWith(i.path))?.key ?? 'dash';
 }
@@ -173,10 +174,18 @@ export default function AppShell() {
   // 懒补齐（任务 9.3 / specs「打开页面懒补齐」）：应用打开时触发一次到期生成，
   // 兜底 cron 停摆；生成幂等，失败静默（下一次打开重试）。
   const ensure = useEnsureRecurring();
+  const ensureVouchers = useEnsureVouchers();
+  const voucherWriter = canRecord(useAuth((s) => s.user?.role));
   useEffect(() => {
     ensure.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    if (!voucherWriter) return;
+    ensureVouchers.mutate();
+    const timer = window.setInterval(() => ensureVouchers.mutate(), 60_000);
+    return () => window.clearInterval(timer);
+  }, [voucherWriter, ensureVouchers.mutate]);
   // 路由切换回到顶部：SPA 换页不会重置滚动位置，长列表翻页后跳统计页会停在半截。
   // 定位高亮跳转（首页 → 流水页 locateId）由流水页自己 scrollIntoView，这里必须让行；
   // 依赖只挂 pathname：清掉 locateId 的 replace 导航不触发复位，避免把刚定位的行又滚走。

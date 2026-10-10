@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Card, Empty, Grid, Skeleton } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 
-import { useAccounts, useBudgets, useStatsCompare, useTxnList } from '../api/hooks';
+import { useAccounts, useBudgets, useStatsCompare, useTxnList, useVouchers } from '../api/hooks';
 import type { Transaction } from '../api/types';
-import { ROLE_LABEL } from '../labels';
+import { ROLE_LABEL, VOUCHER_PURPOSE_LABEL } from '../labels';
 import { useAuth } from '../stores/auth';
 import Money from '../components/Money';
 import BudgetProgress from '../components/BudgetProgress';
@@ -33,6 +33,7 @@ export default function Dashboard() {
   const accounts = useAccounts();
   const recent = useTxnList({ page: 1, page_size: 10 });
   const budgets = useBudgets(); // 当前账期预算（后端推 period_key）
+  const vouchers = useVouchers({ page_size: 1 });
   const isAdmin = user?.role === 'admin';
 
   const totalAssets = useMemo(
@@ -110,6 +111,10 @@ export default function Dashboard() {
 
         <div className="hero-side">
           <div className="hero-stat">
+            <div className="k">未用券金额</div><div className="v"><Money value={vouchers.data?.unused_amount ?? '0'} animate /></div>
+            <div className="s"><Button type="link" size="small" onClick={() => navigate('/vouchers')}>查看我的券</Button></div>
+          </div>
+          <div className="hero-stat">
             <div className="k">总资产</div>
             <div className="v">
               {accounts.data ? <Money value={totalAssets} animate /> : <span className="muted">—</span>}
@@ -183,7 +188,7 @@ export default function Dashboard() {
                   <span className="recent-note">
                     {t.kind === 'transfer'
                       ? `转账 ${acctName.get(t.account_id) ?? ''}→${acctName.get(t.transfer_account_id ?? 0) ?? ''}`
-                      : t.note || acctName.get(t.account_id) || '—'}
+                      : `${t.purpose && VOUCHER_PURPOSE_LABEL[t.purpose] ? `${VOUCHER_PURPOSE_LABEL[t.purpose]} · ` : ''}${t.note || acctName.get(t.account_id) || '—'}`}
                   </span>
                   <Money
                     value={

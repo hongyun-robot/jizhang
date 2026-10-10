@@ -24,6 +24,7 @@ type Deps struct {
 	BudgetSvc    *service.BudgetService
 	RecurringSvc *service.RecurringService
 	NotifSvc     *service.NotificationService
+	VoucherSvc   *service.VoucherService
 	// BackupStatusFile 备份状态文件路径（health 暴露最近备份时间，任务 11.3）。
 	BackupStatusFile string
 }
@@ -95,6 +96,26 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 		}
 
 		// 统计：区间查询全部角色可读；30 秒缓存，写操作主动失效
+		vh := handler.NewVoucher(d.VoucherSvc)
+		// 名称目录不是账务写入，所有已登录角色均可读取和创建。
+		platforms := v1.Group("/voucher-platforms", middleware.Auth(d.AuthSvc))
+		platforms.GET("", vh.ListPlatforms)
+		platforms.POST("", vh.CreatePlatform)
+		vouchers := v1.Group("/vouchers", middleware.Auth(d.AuthSvc))
+		{
+			vouchers.GET("", vh.List)
+			vouchers.GET("/:id", vh.Detail)
+			writers := vouchers.Group("", middleware.RequireRoles(model.RoleAdmin, model.RoleRecorder, model.RoleMember))
+			writers.POST("", vh.Create)
+			writers.POST("/ensure", vh.Ensure)
+			writers.PUT("/:id", vh.Update)
+			writers.DELETE("/:id", vh.Delete)
+			writers.POST("/:id/redeem", vh.Operate(model.VoucherRedeem))
+			writers.POST("/:id/refund", vh.Operate(model.VoucherRefund))
+			writers.POST("/:id/writeoff", vh.Operate(model.VoucherWriteoff))
+			writers.POST("/:id/events/:eventId/undo", vh.Undo)
+		}
+
 		stath := handler.NewStats(d.StatsSvc)
 		stats := v1.Group("/stats", middleware.Auth(d.AuthSvc))
 		{
