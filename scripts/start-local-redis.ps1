@@ -21,7 +21,7 @@ if ($listeners.Count -gt 0) {
     New-Item -ItemType Directory -Path $dataDirectory -Force | Out-Null
     $configuration = @'
 bind 127.0.0.1
-protected-mode yes
+# Windows 自带 Redis 3.0 不认识 protected-mode（启动即退出）；bind 127.0.0.1 已限定回环。
 port 6380
 daemonize no
 dir ./
