@@ -97,7 +97,8 @@ try {
   const addBtn = page.locator('.page-head').getByRole('button', { name: '记一笔' }).first();
   ok((await addBtn.count()) > 0, '流水页存在「记一笔」入口');
   await addBtn.click();
-  const modal = page.locator('.ant-modal-container');
+  // 记账弹窗内还挂了个 forceRender 的购券弹窗（隐藏、0×0），必须只取可见的那个容器
+  const modal = page.locator('.ant-modal-container:visible');
   await modal.waitFor({ state: 'visible', timeout: 10000 });
   ok(true, '记账弹窗打开');
   await shot(page, 'prod-03-txn-modal');
