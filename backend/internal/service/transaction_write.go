@@ -77,6 +77,7 @@ func (s *TransactionService) Delete(actor *model.User, id int64) error {
 }
 
 func (s *TransactionService) fillEffects(rows []model.Transaction) {
+	s.fillLiabilityLinks(rows)
 	var ids []int64
 	for i := range rows {
 		rows[i].FillEffects()

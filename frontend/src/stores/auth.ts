@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { queryClient } from '../api/queryClient';
 
 export type Role = 'admin' | 'recorder' | 'member' | 'viewer';
 export type UserStatus = 'active' | 'disabled';
@@ -35,9 +36,9 @@ export const useAuth = create<AuthState>((set) => ({
   token: null,
   user: null,
   booted: false,
-  setSession: (token, user) => set({ token, user, booted: true }),
+  setSession: (token, user) => {if(useAuth.getState().user?.id!==user?.id)queryClient.clear();set({ token, user, booted: true });},
   setToken: (token) => set({ token }),
   setUser: (user) => set({ user }),
   markBooted: () => set({ booted: true }),
-  clear: () => set({ token: null, user: null, booted: true }),
+  clear: () => {queryClient.clear();set({ token: null, user: null, booted: true });},
 }));

@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"jizhang/internal/cache"
+	"jizhang/internal/liability"
 	"jizhang/internal/model"
 	"jizhang/internal/repository"
 	"jizhang/internal/router"
@@ -18,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -27,6 +29,17 @@ func TestVoucherBrowserServer(t *testing.T) {
 	if os.Getenv("VOUCHER_BROWSER_SERVER") != "1" {
 		t.Skip("explicit browser fixture only")
 	}
+	runBrowserServer(t, false)
+}
+
+func TestLiabilityBrowserServer(t *testing.T) {
+	if os.Getenv("LIABILITY_BROWSER_SERVER") != "1" {
+		t.Skip("explicit isolated liability browser fixture only")
+	}
+	runBrowserServer(t, true)
+}
+
+func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatal(err)
@@ -38,6 +51,12 @@ func TestVoucherBrowserServer(t *testing.T) {
 	pool.SetMaxOpenConns(1)
 	defer pool.Close()
 	if err := db.AutoMigrate(&model.User{}, &model.Setting{}, &model.Account{}, &model.Category{}, &model.Transaction{}, &model.Budget{}, &model.RecurringRule{}, &model.PeriodClosing{}, &model.AuditLog{}, &model.Notification{}, &model.Voucher{}, &model.VoucherEvent{}, &model.VoucherPlatform{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(model.LiabilityModels()...); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&[]model.LiabilityAccountType{{Code: "credit_card", Name: "信用卡", DefaultAccount: true}, {Code: "huabei", Name: "花呗", Sort: 1, DefaultAccount: true}, {Code: "jd_baitiao", Name: "京东白条", Sort: 2, DefaultAccount: true}, {Code: "douyin_monthly", Name: "抖音月付", Sort: 3, DefaultAccount: true}, {Code: "meituan_monthly", Name: "美团月付", Sort: 4, DefaultAccount: true}, {Code: "other_consumer", Name: "其他消费信用", Sort: 5}, {Code: "test_monthly", Name: "测试月付", Sort: 6}}).Error; err != nil {
 		t.Fatal(err)
 	}
 	password, err := bcrypt.GenerateFromPassword([]byte("voucher-test-only"), bcrypt.MinCost)
@@ -72,6 +91,13 @@ func TestVoucherBrowserServer(t *testing.T) {
 	stats := service.NewStatsService(statsRepo, accounts, cats, periods, cache.NewStatsCache(client))
 	budgets := service.NewBudgetService(service.BudgetDeps{Budgets: repository.NewBudgetRepo(db), Stats: statsRepo, Cats: cats, Notifs: notifs, Periods: periods})
 	txn.OnWrite = stats.InvalidateAll
+	liab := service.NewLiabilityService(db, txn)
+	var browserTime atomic.Int64
+	initialDate, _ := liability.Parse("2026-11-01")
+	browserTime.Store(initialDate.Unix())
+	if liabilityFixture {
+		liab.Now = func() time.Time { return time.Unix(browserTime.Load(), 0).In(liability.Location) }
+	}
 	txn.OnWritePeriod = func(keys ...string) {
 		for _, key := range keys {
 			if err := budgets.Evaluate(key); err != nil {
@@ -79,9 +105,38 @@ func TestVoucherBrowserServer(t *testing.T) {
 			}
 		}
 	}
-	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: service.NewAccountService(accounts), CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn)})
+	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601", "http://127.0.0.1:5602"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: service.NewAccountService(accounts), CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn), LiabilitySvc: liab})
 	stop := make(chan struct{}, 1)
-	r.GET("/api/v1/__test__/info", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"fixture": "voucher-browser"}) })
+	r.GET("/api/v1/__test__/info", func(c *gin.Context) {
+		name := "voucher-browser"
+		if liabilityFixture {
+			name = "liability-browser"
+		}
+		c.JSON(http.StatusOK, gin.H{"fixture": name})
+	})
+	if liabilityFixture {
+		r.POST("/api/v1/__test__/date", func(c *gin.Context) {
+			var in struct {
+				Date string `json:"date"`
+			}
+			if c.ShouldBindJSON(&in) != nil {
+				c.Status(400)
+				return
+			}
+			date, e := liability.Parse(in.Date)
+			if e != nil {
+				c.Status(400)
+				return
+			}
+			browserTime.Store(date.Unix())
+			_, e = liab.EnsureDue(date)
+			if e != nil {
+				c.JSON(500, gin.H{"error": e.Error()})
+				return
+			}
+			c.JSON(200, gin.H{"date": in.Date})
+		})
+	}
 	r.POST("/__test__/stop", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 		select {
@@ -89,7 +144,11 @@ func TestVoucherBrowserServer(t *testing.T) {
 		default:
 		}
 	})
-	listener, err := net.Listen("tcp", "127.0.0.1:18084")
+	address := "127.0.0.1:18084"
+	if liabilityFixture {
+		address = "127.0.0.1:18085"
+	}
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +158,7 @@ func TestVoucherBrowserServer(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	t.Log("VOUCHER_BROWSER_READY http://127.0.0.1:18084")
+	t.Log("BROWSER_READY http://" + address)
 	select {
 	case <-stop:
 	case <-time.After(20 * time.Minute):

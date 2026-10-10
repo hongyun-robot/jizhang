@@ -163,6 +163,9 @@ func (s *RecurringService) List(actor *model.User) ([]RuleView, error) {
 		}
 	}
 	for _, r := range rules {
+		if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, r.AccountID); e != nil {
+			continue
+		}
 		views = append(views, RuleView{RecurringRule: r, CreatedByName: names[r.CreatedBy]})
 	}
 	return views, nil
@@ -176,6 +179,9 @@ func (s *RecurringService) Create(actor *model.User, in RuleInput) (*model.Recur
 	}
 	if err := s.validate(&in); err != nil {
 		return nil, err
+	}
+	if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, in.AccountID); e != nil {
+		return nil, ErrRuleForbidden
 	}
 	r := &model.RecurringRule{
 		Amount:      in.Amount,
@@ -207,6 +213,9 @@ func (s *RecurringService) Update(actor *model.User, id int64, in RuleInput) (*m
 		return nil, ErrRuleNotFound
 	}
 	if !CanManageRule(actor, r) {
+		return nil, ErrRuleForbidden
+	}
+	if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, r.AccountID, in.AccountID); e != nil {
 		return nil, ErrRuleForbidden
 	}
 	if err := s.validate(&in); err != nil {
@@ -241,6 +250,9 @@ func (s *RecurringService) SetStatus(actor *model.User, id int64, status model.R
 	if !CanManageRule(actor, r) {
 		return ErrRuleForbidden
 	}
+	if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, r.AccountID); e != nil {
+		return ErrRuleForbidden
+	}
 	if status != model.RuleEnabled && status != model.RulePaused {
 		return ErrRuleStatusInvalid
 	}
@@ -258,6 +270,9 @@ func (s *RecurringService) Delete(actor *model.User, id int64) error {
 		return ErrRuleNotFound
 	}
 	if !CanManageRule(actor, r) {
+		return ErrRuleForbidden
+	}
+	if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, r.AccountID); e != nil {
 		return ErrRuleForbidden
 	}
 	return s.deps.Rules.Delete(id)

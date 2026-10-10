@@ -6,6 +6,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"jizhang/internal/liability"
 	"jizhang/internal/model"
 	"jizhang/internal/repository"
 )
@@ -140,6 +141,9 @@ func (s *TransactionService) validate(in *TxnInput) error {
 	if acc == nil || acc.Status != model.StatusActive {
 		return ErrTxnAccountInvalid
 	}
+	if acc.Type == model.AccountLiability && !acc.BillingEnabled {
+		return liability.ErrSetup
+	}
 
 	if in.Kind == model.TxnTransfer {
 		if in.TransferAccountID == in.AccountID {
@@ -151,6 +155,9 @@ func (s *TransactionService) validate(in *TxnInput) error {
 		}
 		if tAcc == nil || tAcc.Status != model.StatusActive {
 			return ErrTxnAccountInvalid
+		}
+		if tAcc.Type == model.AccountLiability && !tAcc.BillingEnabled {
+			return liability.ErrSetup
 		}
 		in.CategoryID = 0 // 转账无分类
 		return nil
@@ -195,11 +202,17 @@ func (s *TransactionService) guardOpen(periodKey string) error {
 
 // Create 记一笔：权限由调用方（handler）先过 CanCreateTransaction，此处管账务规则。
 func (s *TransactionService) create(actor *model.User, in TxnInput) (*model.Transaction, error) {
+	if r, ok := s.deps.Txns.(*repository.TransactionRepo); ok && actor != nil {
+		s.deps.Txns = r.WithActor(actor.ID)
+	}
 	if !CanCreateTransaction(actor) {
 		return nil, ErrTxnForbidden
 	}
 	if err := s.validate(&in); err != nil {
 		return nil, err
+	}
+	if e := s.checkInputOwnership(actor, in); e != nil {
+		return nil, e
 	}
 	periodKey := s.deps.Periods.KeyForDate(in.EntryDate)
 	if err := s.guardOpen(periodKey); err != nil {
@@ -243,6 +256,9 @@ func (s *TransactionService) create(actor *model.User, in TxnInput) (*model.Tran
 // 复用同一套账务校验、归期物化与写钩子，标记 source=recurring + rule_id，
 // created_by 取模板创建者；封账目标期返回 ErrTxnClosedPeriod 由生成器跳过。
 func (s *TransactionService) createFromRule(rule *model.RecurringRule, date time.Time) (*model.Transaction, error) {
+	if e := s.checkInputOwnership(&model.User{ID: rule.CreatedBy}, TxnInput{AccountID: rule.AccountID}); e != nil {
+		return nil, e
+	}
 	cat, err := s.deps.Cats.GetByID(rule.CategoryID)
 	if err != nil {
 		return nil, err
@@ -292,6 +308,9 @@ func (s *TransactionService) createFromRule(rule *model.RecurringRule, date time
 
 // Update 改一笔：属主校验 + 新旧归期都要未封账，归期随日期重新物化。
 func (s *TransactionService) update(actor *model.User, id int64, in TxnInput) (*model.Transaction, error) {
+	if r, ok := s.deps.Txns.(*repository.TransactionRepo); ok && actor != nil {
+		s.deps.Txns = r.WithActor(actor.ID)
+	}
 	t, err := s.deps.Txns.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -302,8 +321,17 @@ func (s *TransactionService) update(actor *model.User, id int64, in TxnInput) (*
 	if !CanModifyTransaction(actor, t.CreatedBy) {
 		return nil, ErrTxnForbidden
 	}
+	if e := s.checkPostingOwnership(actor, t); e != nil {
+		return nil, e
+	}
+	if e := s.checkInputOwnership(actor, in); e != nil {
+		return nil, e
+	}
 	if t.IsVoucher() {
 		return nil, ErrTxnVoucherManaged
+	}
+	if t.InstallmentPlanID != nil || t.LiabilityTermID != nil || t.LiabilityOperationID != nil {
+		return nil, liability.ErrManaged
 	}
 	if err := s.validate(&in); err != nil {
 		return nil, err
@@ -356,6 +384,9 @@ func (s *TransactionService) update(actor *model.User, id int64, in TxnInput) (*
 
 // Delete 删一笔：属主校验 + 归期未封账。
 func (s *TransactionService) delete(actor *model.User, id int64) error {
+	if r, ok := s.deps.Txns.(*repository.TransactionRepo); ok && actor != nil {
+		s.deps.Txns = r.WithActor(actor.ID)
+	}
 	t, err := s.deps.Txns.GetByID(id)
 	if err != nil {
 		return err
@@ -366,8 +397,14 @@ func (s *TransactionService) delete(actor *model.User, id int64) error {
 	if !CanModifyTransaction(actor, t.CreatedBy) {
 		return ErrTxnForbidden
 	}
+	if e := s.checkPostingOwnership(actor, t); e != nil {
+		return e
+	}
 	if t.IsVoucher() {
 		return ErrTxnVoucherManaged
+	}
+	if t.InstallmentPlanID != nil || t.LiabilityTermID != nil || t.LiabilityOperationID != nil {
+		return liability.ErrManaged
 	}
 	if err := s.guardOpen(t.PeriodKey); err != nil {
 		return err
@@ -395,6 +432,7 @@ func (s *TransactionService) List(actor *model.User, f repository.TxnFilter) ([]
 	if !CanView(actor) {
 		return nil, 0, ErrTxnForbidden
 	}
+	f = s.personalFilter(actor, f)
 	list, total, err := s.deps.Txns.List(f)
 	if err != nil {
 		return nil, 0, err
@@ -436,6 +474,7 @@ func (s *TransactionService) ExportRows(actor *model.User, f repository.TxnFilte
 	if !CanView(actor) {
 		return nil, ErrTxnForbidden
 	}
+	f = s.personalFilter(actor, f)
 	rows, err := s.deps.Txns.ListAll(f)
 	if err == nil {
 		s.fillEffects(rows)

@@ -73,6 +73,10 @@ func TestVoucherMySQL(t *testing.T) {
 	mustOK(t, db.Exec(up).Error)
 	mustOK(t, db.Exec(readMigration("000006_voucher_platforms.up.sql")).Error)
 	mustOK(t, db.Exec(readMigration("000007_transaction_platform.up.sql")).Error)
+	mustOK(t, db.Exec(readMigration("000008_liability_billing.up.sql")).Error)
+	// This fixture intentionally replays older voucher migrations; align its
+	// account row shape with the current service without seeding new catalogs.
+	mustOK(t, db.Exec("ALTER TABLE accounts ADD COLUMN owner_id BIGINT NULL").Error)
 
 	t.Run("double-instance-auto-refund", func(t *testing.T) {
 		e := seedVoucherEnv(t, db)

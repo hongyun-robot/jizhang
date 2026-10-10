@@ -8,6 +8,7 @@ import (
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 
+	"jizhang/internal/liability"
 	"jizhang/internal/model"
 	"jizhang/internal/repository"
 )
@@ -31,6 +32,8 @@ func newNotifEnv(t *testing.T) *notifEnv {
 	if err := db.AutoMigrate(&model.Account{}, &model.Transaction{}, &model.Notification{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
+	mustOK(t, db.AutoMigrate(append(model.LiabilityModels(), &model.Setting{})...))
+	mustOK(t, db.Create(&model.LiabilityAccountType{Code: "credit_card", Name: "信用卡"}).Error)
 	accRepo := repository.NewAccountRepo(db)
 	notifs := repository.NewNotificationRepo(db)
 	return &notifEnv{
@@ -48,11 +51,28 @@ func (e *notifEnv) creditCard(name string, opening string, day int, status model
 	a := &model.Account{
 		Name:           name,
 		Type:           model.AccountLiability,
-		OpeningBalance: dec(opening),
+		OpeningBalance: dec("0"),
 		Status:         status,
 		RepaymentDay:   &day,
 	}
+	owner := int64(1)
+	a.OwnerID = &owner
 	mustOK(e.t, e.accRepo.Create(a))
+	_, cfgErr := liability.Configure(e.db, a.ID, "credit_card", 31, day, 1, 0, mustDate(e.t, "2026-09-01"))
+	mustOK(e.t, cfgErr)
+	amount := dec(opening)
+	if !amount.IsZero() {
+		kind := model.TxnExpense
+		if amount.IsPositive() {
+			kind = model.TxnIncome
+		}
+		t := model.Transaction{Kind: kind, Amount: amount.Abs(), AccountID: a.ID, EntryDate: mustDate(e.t, "2026-09-15"), Source: model.SourceManual, CreatedBy: 1}
+		mustOK(e.t, repository.NewTransactionRepo(e.db).Create(&t))
+	}
+	b, err := liability.StatementFor(e.db, a.ID, "2026-09-15")
+	mustOK(e.t, err)
+	issued := mustDate(e.t, "2026-10-01")
+	mustOK(e.t, e.db.Model(&b).Update("issued_at", issued).Error)
 	return a
 }
 
@@ -157,8 +177,8 @@ func TestRepaymentOverdueReminder(t *testing.T) {
 	mustOK(t, env.svc.EvaluateRepayment(mustDate(t, "2026-11-08")))
 	list, err := env.notifs.List(model.NotifRepaymentDue)
 	mustOK(t, err)
-	if len(list) != 2 {
-		t.Errorf("跨月后条数 = %d，want 2", len(list))
+	if len(list) != 1 {
+		t.Errorf("同一未还账单跨月仍只一条提醒，条数 = %d，want 1", len(list))
 	}
 }
 

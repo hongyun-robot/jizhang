@@ -1,0 +1,25 @@
+.liability-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px; border-block: 1px solid var(--line,#dce1dd); padding: 25px 0; margin: 12px 0 20px; }
+.liability-summary > div { display: flex; flex-direction: column; gap: 8px; }
+.liability-summary > div > span:first-child { font-size: 13px; color: var(--muted); }
+.liability-summary .money { font-size: clamp(24px,3vw,36px); font-weight: 600; }
+.liability-breakdown { display: flex; flex-wrap: wrap; gap: 12px 28px; padding-bottom: 10px; }
+.liability-accounts { border-top: 1px solid var(--line,#dce1dd); }
+.liability-account-row { appearance: none; display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 24px; padding: 25px 8px; border: 0; border-bottom: 1px solid var(--line,#dce1dd); color: inherit; background: transparent; font: inherit; cursor: pointer; text-align: left; }
+.liability-account-row:hover { background: color-mix(in srgb,var(--primary,#1e6b54) 6%,transparent); }
+.liability-account-row > span { display: block; }
+.liability-account-row > span:last-child { text-align: right; }
+.liability-account-row small { display: block; color: var(--muted); margin-top: 6px; font-size: 12px; }
+.liability-account-row > span:last-child > .money { font-size: 24px; }
+.liability-plan { border-bottom: 1px solid var(--line,#dce1dd); padding: 16px 0 28px; }
+.liability-plan h3 { font-size: 18px; margin-bottom: 8px; }
+.liability-note { padding: 6px 0 15px; }
+.liability-toolbar { margin: 14px 0; }
+.liability-form-row { display: flex; flex-wrap: wrap; width: 100%; gap: 8px 16px; margin-top: 12px; }
+.liability-form-row > .ant-space-item { flex: 1 1 150px; min-width: 0; }
+.liability-form-row .ant-select { max-width: 100%; }
+.liability-form-row .ant-form-item { margin-bottom: 12px; }
+.liability-term-edit { border-bottom: 1px solid var(--line,#dce1dd); padding: 12px 0; }
+.liability-problem { display: block; font-size: 12px; color: var(--expense,#af523d); max-width: 280px; white-space: normal; }
+.liability-preview { padding: 16px 0 0; }
+.liability-detail .ant-alert { margin-block: 12px; }
+@media (max-width: 600px) { .liability-summary { gap: 10px; padding-block: 18px; } .liability-summary .money { font-size: 22px; } .liability-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px; } .liability-account-row { gap: 12px; padding-inline: 0; } .liability-summary > div > span:first-child { min-height: 36px; font-size: 11px; } .liability-detail .page-head { flex-wrap: wrap; } }

@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
+	"jizhang/internal/liability"
 	"jizhang/internal/middleware"
 	"jizhang/internal/model"
 	"jizhang/internal/repository"
@@ -27,23 +28,26 @@ func NewTxn(svc *service.TransactionService) *txnHandler {
 }
 
 type txnReq struct {
-	Purpose           json.RawMessage `json:"purpose"`
-	VoucherEventID    json.RawMessage `json:"voucher_event_id"`
-	VoucherID         json.RawMessage `json:"voucher_id"`
-	Source            json.RawMessage `json:"source"`
-	Kind              model.TxnKind   `json:"kind" binding:"required"`
-	Amount            string          `json:"amount" binding:"required"`
-	AccountID         int64           `json:"account_id"` // 必填语义由服务层校验；退款带关联时可省略（按原支出预填）
-	TransferAccountID int64           `json:"transfer_account_id"`
-	CategoryID        int64           `json:"category_id"`
-	RelatedTxnID      int64           `json:"related_txn_id"` // 退款关联原支出，0=无
-	EntryDate         string          `json:"entry_date" binding:"required"`
-	Note              string          `json:"note" binding:"max=255"`
-	Platform          string          `json:"platform"`
+	Purpose              json.RawMessage `json:"purpose"`
+	VoucherEventID       json.RawMessage `json:"voucher_event_id"`
+	VoucherID            json.RawMessage `json:"voucher_id"`
+	Source               json.RawMessage `json:"source"`
+	InstallmentPlanID    json.RawMessage `json:"installment_plan_id"`
+	LiabilityTermID      json.RawMessage `json:"liability_term_id"`
+	LiabilityOperationID json.RawMessage `json:"liability_operation_id"`
+	Kind                 model.TxnKind   `json:"kind" binding:"required"`
+	Amount               string          `json:"amount" binding:"required"`
+	AccountID            int64           `json:"account_id"` // 必填语义由服务层校验；退款带关联时可省略（按原支出预填）
+	TransferAccountID    int64           `json:"transfer_account_id"`
+	CategoryID           int64           `json:"category_id"`
+	RelatedTxnID         int64           `json:"related_txn_id"` // 退款关联原支出，0=无
+	EntryDate            string          `json:"entry_date" binding:"required"`
+	Note                 string          `json:"note" binding:"max=255"`
+	Platform             string          `json:"platform"`
 }
 
 func (r *txnReq) parse() (service.TxnInput, bool) {
-	if len(r.Purpose)+len(r.VoucherEventID)+len(r.VoucherID)+len(r.Source) > 0 {
+	if r.hasReservedFields() {
 		return service.TxnInput{}, false
 	}
 	amt, err := decimal.NewFromString(r.Amount)
@@ -68,11 +72,13 @@ func (r *txnReq) parse() (service.TxnInput, bool) {
 }
 
 func (r *txnReq) hasReservedFields() bool {
-	return len(r.Purpose)+len(r.VoucherEventID)+len(r.VoucherID)+len(r.Source) > 0
+	return len(r.Purpose)+len(r.VoucherEventID)+len(r.VoucherID)+len(r.Source)+len(r.InstallmentPlanID)+len(r.LiabilityTermID)+len(r.LiabilityOperationID) > 0
 }
 
 func mapTxnErr(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, liability.ErrSetup), errors.Is(err, liability.ErrManaged), errors.Is(err, liability.ErrConflict), errors.Is(err, liability.ErrInvariant):
+		response.Conflict(c, err.Error())
 	case errors.Is(err, service.ErrTxnNotFound):
 		response.NotFound(c, err.Error())
 	case errors.Is(err, service.ErrTxnForbidden):

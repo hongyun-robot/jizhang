@@ -6,6 +6,7 @@ import {
   SyncOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { useNavigate } from 'react-router-dom';
 
 import { useNotifMutations, useNotifications } from '../api/hooks';
 import type { NotifKind, NotifPayload, Notification } from '../api/types';
@@ -33,6 +34,7 @@ function notifText(kind: NotifKind, p: NotifPayload): string {
       return `${scope}已超支 ¥${p.over_amount ?? '0.00'}（预算 ¥${p.budget ?? '0'}，已用 ¥${p.consumed ?? '0'}，账期 ${p.period_key ?? ''}）`;
     }
     case 'repayment_due': {
+      if(p.resolved)return `${p.account_name??'信用账户'}账单已还清（原提醒金额 ¥${p.initial_debt??p.debt??'0.00'}）`;
       const when = p.overdue
         ? `已过还款日 ${p.repayment_date}`
         : `距还款日 ${p.days} 天（${p.repayment_date}）`;
@@ -50,6 +52,7 @@ function notifText(kind: NotifKind, p: NotifPayload): string {
  * 单条已读 + 一键全部已读；已读行保留可回看。对四档角色开放。
  */
 export default function Notifications() {
+  const navigate=useNavigate();
   const notifs = useNotifications();
   const { markRead, markAllRead } = useNotifMutations();
 
@@ -85,7 +88,7 @@ export default function Notifications() {
         <ul className="notif-list">
           {list.map((n: Notification) => {
             const meta = KIND_META[n.kind] ?? { title: n.kind, icon: null, color: 'var(--muted)' };
-            const isUnread = !n.read_at;
+            const isUnread = !n.read_at&&!n.resolved_at;
             return (
               <li key={n.id} className={`notif-row${isUnread ? ' unread' : ''}`}>
                 <span className="notif-icon" style={{ color: meta.color }}>
@@ -99,6 +102,7 @@ export default function Notifications() {
                     </Tag>
                   </div>
                   <div className="notif-text">{notifText(n.kind, parsePayload(n.payload))}</div>
+                  {n.kind==='repayment_due'&&parsePayload(n.payload).account_id&&<Button type="link" size="small" onClick={()=>navigate(`/liabilities/${parsePayload(n.payload).account_id}?bill=${n.statement_id??parsePayload(n.payload).statement_id??''}`)}>查看账单</Button>}
                 </div>
                 {isUnread && (
                   <Button
@@ -110,6 +114,7 @@ export default function Notifications() {
                   </Button>
                 )}
                 {n.read_at && <span className="notif-read small muted">已读</span>}
+                {n.resolved_at&&<Tag>已解决</Tag>}
               </li>
             );
           })}

@@ -39,6 +39,15 @@ type StatsService struct {
 	cats    *repository.CategoryRepo
 	periods *PeriodService
 	cache   cache.StatsCache
+	ownerID int64
+}
+
+func (s *StatsService) ForUser(actor *model.User) *StatsService {
+	copy := *s
+	if actor != nil {
+		copy.ownerID = actor.ID
+	}
+	return &copy
 }
 
 // NewStatsService 构造统计服务（cache 可为 nil，测试环境降级为无缓存）。
@@ -84,6 +93,9 @@ func (s *StatsService) resolveRange(start, end string) (time.Time, time.Time, er
 
 // cached 30 秒缓存读穿：命中返回原始 JSON，未命中构建后写缓存。
 func (s *StatsService) cached(key string, build func() (any, error)) (json.RawMessage, bool, error) {
+	if s.ownerID > 0 {
+		key = fmt.Sprintf("stats:user:%d:%s", s.ownerID, key)
+	}
 	if s.cache != nil {
 		if v, ok, err := s.cache.Get(key); err == nil && ok {
 			return json.RawMessage(v), true, nil
@@ -482,6 +494,15 @@ func (s *StatsService) Assets(start, end string) (json.RawMessage, bool, error) 
 		accounts, err := s.accts.List()
 		if err != nil {
 			return nil, err
+		}
+		if s.ownerID > 0 {
+			visible := []model.Account{}
+			for _, a := range accounts {
+				if a.Type == model.AccountAsset || (a.OwnerID != nil && *a.OwnerID == s.ownerID) {
+					visible = append(visible, a)
+				}
+			}
+			accounts = visible
 		}
 		nets, err := s.repo.DailyAccountNets(en)
 		if err != nil {

@@ -181,6 +181,7 @@ function useTxnInvalidate() {
     void qc.invalidateQueries({ queryKey: ['txns'] });
     void qc.invalidateQueries({ queryKey: ['voucher-platforms'] });
     void qc.invalidateQueries({ queryKey: ['accounts'] });
+    void qc.invalidateQueries({ queryKey: ['liabilities'] });
     void qc.invalidateQueries({ queryKey: ['stats'] });
     void qc.invalidateQueries({ queryKey: ['budgets'] });
     // 写流水可能触发预算超支提醒（OnWritePeriod），铃铛红点随之刷新
@@ -243,6 +244,7 @@ function useVoucherInvalidate() {
       'voucher-platforms',
       'txns',
       'accounts',
+      'liabilities',
       'stats',
       'budgets',
       'notifications',
@@ -359,6 +361,9 @@ export interface AccountInput {
   type: 'asset' | 'liability';
   opening_balance?: string;
   repayment_day?: number;
+  liability_type?: string;
+  statement_day?: number;
+  repayment_month_offset?: number;
   sort?: number;
   status?: 'active' | 'disabled';
 }
@@ -366,6 +371,7 @@ export interface AccountInput {
 export function useAccountMutations() {
   const qc = useQueryClient();
   const done = () => {
+    void qc.invalidateQueries({ queryKey: ['liabilities'] });
     void qc.invalidateQueries({ queryKey: ['accounts'] });
     void qc.invalidateQueries({ queryKey: ['stats'] });
   };
@@ -642,6 +648,7 @@ export function useEnsureRecurring() {
         void qc.invalidateQueries({ queryKey: ['txns'] });
         void qc.invalidateQueries({ queryKey: ['stats'] });
         void qc.invalidateQueries({ queryKey: ['accounts'] });
+        void qc.invalidateQueries({ queryKey: ['liabilities'] });
         void qc.invalidateQueries({ queryKey: ['budgets'] });
         // 懒补齐会新增一条「已补记」提醒（specs/notifications）
         void qc.invalidateQueries({ queryKey: ['notifications'] });

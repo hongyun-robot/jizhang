@@ -6,6 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 
+	"jizhang/internal/liability"
+	"jizhang/internal/middleware"
 	"jizhang/internal/model"
 	"jizhang/internal/response"
 	"jizhang/internal/service"
@@ -21,19 +23,23 @@ func NewAccount(svc *service.AccountService) *accountHandler {
 }
 
 type accountReq struct {
-	Name           string            `json:"name" binding:"required,max=64"`
-	Type           model.AccountType `json:"type" binding:"required"`
-	OpeningBalance *string           `json:"opening_balance"`
-	RepaymentDay   *int              `json:"repayment_day"`
-	Sort           *int              `json:"sort"`
-	Status         model.UserStatus  `json:"status"`
+	Name                 string            `json:"name" binding:"required,max=64"`
+	Type                 model.AccountType `json:"type" binding:"required"`
+	OpeningBalance       *string           `json:"opening_balance"`
+	RepaymentDay         *int              `json:"repayment_day"`
+	LiabilityType        string            `json:"liability_type"`
+	StatementDay         *int              `json:"statement_day"`
+	RepaymentMonthOffset *int              `json:"repayment_month_offset"`
+	Sort                 *int              `json:"sort"`
+	Status               model.UserStatus  `json:"status"`
 }
 
 func (r *accountReq) parse() (service.CreateAccountInput, bool) {
 	in := service.CreateAccountInput{
-		Name:         r.Name,
-		Type:         r.Type,
-		RepaymentDay: r.RepaymentDay,
+		Name:          r.Name,
+		Type:          r.Type,
+		RepaymentDay:  r.RepaymentDay,
+		LiabilityType: r.LiabilityType, StatementDay: r.StatementDay, RepaymentMonthOffset: r.RepaymentMonthOffset,
 	}
 	if r.OpeningBalance != nil && *r.OpeningBalance != "" {
 		amt, err := decimal.NewFromString(*r.OpeningBalance)
@@ -50,6 +56,12 @@ func (r *accountReq) parse() (service.CreateAccountInput, bool) {
 
 func mapAccountErr(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, service.ErrTxnForbidden):
+		response.Forbidden(c, "只能管理自己的负债账户")
+	case errors.Is(err, liability.ErrSetup), errors.Is(err, liability.ErrConflict), errors.Is(err, liability.ErrManaged):
+		response.Conflict(c, err.Error())
+	case errors.Is(err, liability.ErrInvalid):
+		response.Invalid(c, "账单日和还款日须为 1–31，同月还款必须晚于账单日（包含短月份）；请选择有效规则")
 	case errors.Is(err, service.ErrAccountNotFound):
 		response.NotFound(c, err.Error())
 	case errors.Is(err, service.ErrAccountHasTransactions):
@@ -65,12 +77,20 @@ func mapAccountErr(c *gin.Context, err error) {
 
 // List GET /api/v1/accounts（全部角色可看余额）
 func (h *accountHandler) List(c *gin.Context) {
-	accounts, err := h.svc.List()
+	accounts, err := h.svc.ListFor(middleware.CurrentUser(c))
 	if err != nil {
 		response.Internal(c, "查询失败")
 		return
 	}
 	response.OK(c, accounts)
+}
+func (h *accountHandler) LiabilityTypes(c *gin.Context) {
+	rows, err := h.svc.LiabilityTypes()
+	if err != nil {
+		response.Internal(c, "账户类型查询失败")
+		return
+	}
+	response.OK(c, rows)
 }
 
 // Create POST /api/v1/accounts（管理员）
@@ -81,11 +101,14 @@ func (h *accountHandler) Create(c *gin.Context) {
 		return
 	}
 	in, ok := req.parse()
+	if actor := middleware.CurrentUser(c); actor != nil {
+		in.ActorID = actor.ID
+	}
 	if !ok {
 		response.Invalid(c, response.MsgInvalidAmount)
 		return
 	}
-	a, err := h.svc.Create(in)
+	a, err := h.svc.CreateFor(middleware.CurrentUser(c), in)
 	if err != nil {
 		mapAccountErr(c, err)
 		return
@@ -105,6 +128,9 @@ func (h *accountHandler) Update(c *gin.Context) {
 		return
 	}
 	in, ok := req.parse()
+	if actor := middleware.CurrentUser(c); actor != nil {
+		in.ActorID = actor.ID
+	}
 	if !ok {
 		response.Invalid(c, response.MsgInvalidAmount)
 		return
@@ -113,7 +139,7 @@ func (h *accountHandler) Update(c *gin.Context) {
 	if status == "" {
 		status = model.StatusActive
 	}
-	a, err := h.svc.Update(id, in, status)
+	a, err := h.svc.UpdateFor(middleware.CurrentUser(c), id, in, status)
 	if err != nil {
 		mapAccountErr(c, err)
 		return
@@ -127,7 +153,7 @@ func (h *accountHandler) Delete(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.svc.Delete(id); err != nil {
+	if err := h.svc.DeleteFor(middleware.CurrentUser(c), id); err != nil {
 		mapAccountErr(c, err)
 		return
 	}

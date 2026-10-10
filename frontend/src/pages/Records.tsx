@@ -154,6 +154,7 @@ export default function Records() {
   };
 
   const canEdit = (t: Transaction) => {
+    if(t.installment_plan_id||t.liability_term_id||t.liability_operation_id)return false;
     if (t.voucher_event_id || (t.purpose && t.purpose !== 'regular')) return false;
     if (!user || user.role === 'viewer') return false;
     if (user.role === 'admin' || user.role === 'recorder') return true;
@@ -181,6 +182,8 @@ export default function Records() {
       related_amount: t.amount,
       refunded: Number(t.refunded_amount ?? 0),
       platform: t.platform,
+      installment_plan_id:t.installment_plan_id??undefined,
+      liability_account_id:t.liability_account_id??undefined,
     });
     setFormOpen(true);
   };
@@ -220,7 +223,7 @@ export default function Records() {
     t.kind === 'income' || t.kind === 'refund' ? t.amount : `-${t.amount}`;
 
   const actions = (t: Transaction) =>
-    t.voucher_id ? <Button type="link" size="small" onClick={() => navigate(`/vouchers?id=${t.voucher_id}`)}>查看券</Button> : canEdit(t) ? (
+    <>{t.liability_account_id && !t.installment_plan_id && !t.liability_term_id && !t.liability_operation_id && <Button type="link" size="small" onClick={()=>navigate(`/liabilities/${t.liability_account_id}?source=${t.id}`)}>账单</Button>}{t.installment_plan_id||t.liability_term_id||t.liability_operation_id ? <Button type="link" size="small" onClick={()=>navigate(`/liabilities/${t.liability_account_id??(t.kind==='transfer'?t.transfer_account_id:t.account_id)}?source=${t.id}`)}>查看负债记录</Button> : t.voucher_id ? <Button type="link" size="small" onClick={() => navigate(`/vouchers?id=${t.voucher_id}`)}>查看券</Button> : canEdit(t) ? (
       <span className="row-actions">
         <Button type="link" size="small" onClick={() => openEdit(t)}>
           编辑
@@ -230,13 +233,14 @@ export default function Records() {
             退款
           </Button>
         )}
+        {t.kind === 'expense' && accounts.data?.find((a)=>a.id===t.account_id)?.type==='liability' && <Button type="link" size="small" onClick={()=>navigate(`/liabilities/${t.account_id}`,{state:{liabilityDraft:{source_txn_id:t.id,entry_date:t.entry_date}}})}>转分期</Button>}
         <Popconfirm title="删除这笔流水？" onConfirm={() => doDelete(t)}>
           <Button type="link" size="small" danger>
             删除
           </Button>
         </Popconfirm>
       </span>
-    ) : null;
+    ) : null}</>;
 
   const columns = [
     {
@@ -256,6 +260,7 @@ export default function Records() {
           {(t.purpose && VOUCHER_PURPOSE_LABEL[t.purpose]) || kindTag(k)}
           {t.source === 'recurring' && <Tag className="src-tag">自动</Tag>}
           {t.source === 'voucher_auto' && <Tag className="src-tag">到期自动</Tag>}
+          {t.source === 'liability_auto' && <Tag className="src-tag">分期费用</Tag>}
           {k === 'expense' && Number(t.refunded_amount ?? 0) > 0 && (
             <Tag
               className="refunded-tag"
@@ -412,6 +417,7 @@ export default function Records() {
                         : (t.category_id ? catInfo.get(t.category_id)?.full : undefined) ?? '未分类')}
                       {t.source === 'recurring' && <Tag className="src-tag">自动</Tag>}
                       {t.source === 'voucher_auto' && <Tag className="src-tag">到期自动</Tag>}
+                      {t.source === 'liability_auto' && <Tag className="src-tag">分期费用</Tag>}
                       {t.kind === 'expense' && Number(t.refunded_amount ?? 0) > 0 && (
                         <Tag
                           className="refunded-tag"

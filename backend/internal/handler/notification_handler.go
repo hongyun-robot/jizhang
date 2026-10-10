@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"jizhang/internal/middleware"
 	"jizhang/internal/response"
 	"jizhang/internal/service"
 )
@@ -20,7 +21,7 @@ func NewNotification(svc *service.NotificationService) *notificationHandler {
 
 // List GET /api/v1/notifications 列表（新的在前）+ 未读数，铃铛与列表页共用一次请求。
 func (h *notificationHandler) List(c *gin.Context) {
-	list, unread, err := h.svc.List()
+	list, unread, err := h.svc.ForUser(middleware.CurrentUser(c)).List()
 	if err != nil {
 		response.Internal(c, "读取提醒失败")
 		return
@@ -34,7 +35,7 @@ func (h *notificationHandler) MarkRead(c *gin.Context) {
 	if !ok {
 		return
 	}
-	unread, err := h.svc.MarkRead(id)
+	unread, err := h.svc.ForUser(middleware.CurrentUser(c)).MarkRead(id)
 	if err != nil {
 		if errors.Is(err, service.ErrNotifNotFound) {
 			response.NotFound(c, err.Error())
@@ -48,7 +49,7 @@ func (h *notificationHandler) MarkRead(c *gin.Context) {
 
 // MarkAllRead POST /api/v1/notifications/read-all 一键全部已读（未读归零，红点消失）。
 func (h *notificationHandler) MarkAllRead(c *gin.Context) {
-	unread, err := h.svc.MarkAllRead()
+	unread, err := h.svc.ForUser(middleware.CurrentUser(c)).MarkAllRead()
 	if err != nil {
 		response.Internal(c, "操作失败")
 		return

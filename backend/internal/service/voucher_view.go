@@ -83,6 +83,21 @@ func (s *VoucherService) List(actor *model.User, keyword, status string, page, s
 		if e != nil {
 			return e
 		}
+		var accounts []model.Account
+		if e := tx.Find(&accounts).Error; e != nil {
+			return e
+		}
+		visible := map[int64]bool{}
+		for _, a := range accounts {
+			visible[a.ID] = a.Type == model.AccountAsset || ownsLiability(actor, a)
+		}
+		selected := []model.Voucher{}
+		for _, v := range rows {
+			if visible[v.AccountID] {
+				selected = append(selected, v)
+			}
+		}
+		rows = selected
 		ids := make([]int64, 0, len(rows))
 		for _, v := range rows {
 			ids = append(ids, v.ID)
@@ -142,6 +157,9 @@ func (s *VoucherService) Detail(actor *model.User, id int64) (VoucherDetail, err
 		}
 		if v == nil {
 			return ErrVoucherNotFound
+		}
+		if e := checkAccountOwnership(tx, actor, v.AccountID); e != nil {
+			return e
 		}
 		sums, e := r.Summaries([]int64{id})
 		if e != nil {

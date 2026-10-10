@@ -16,8 +16,12 @@ export interface Account {
   id: number;
   name: string;
   type: AccountType;
+	owner_id?: number | null;
   opening_balance: string;
   repayment_day?: number | null;
+  liability_type?: string;
+  billing_enabled?: boolean;
+  has_financial_history?: boolean;
   sort: number;
   status: Status;
   /** 仅列表接口返回：期初 + 流水净额 */
@@ -65,7 +69,11 @@ export interface Transaction {
   note?: string;
   platform?: string;
   created_by: number;
-  source: 'manual' | 'recurring' | 'voucher_auto';
+  source: 'manual' | 'recurring' | 'voucher_auto' | 'liability_auto';
+  installment_plan_id?: number | null;
+  liability_term_id?: number | null;
+  liability_operation_id?: number | null;
+  liability_account_id?: number | null;
   purpose?: TxnPurpose;
   voucher_event_id?: number | null;
   voucher_id?: number | null;
@@ -318,6 +326,9 @@ export interface NotifPayload {
   repayment_date?: string;
   days?: number;
   overdue?: boolean;
+  statement_id?: number;
+  resolved?: boolean;
+  initial_debt?: string;
   /** recurring_patched */
   generated?: number;
 }
@@ -328,6 +339,8 @@ export interface Notification {
   /** JSON 字符串，前端 JSON.parse 后按 kind 展示 */
   payload: string;
   read_at: string | null;
+  statement_id?: number | null;
+  resolved_at?: string | null;
   created_at: string;
 }
 

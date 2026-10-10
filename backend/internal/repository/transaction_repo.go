@@ -7,12 +7,18 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 
+	"jizhang/internal/liability"
 	"jizhang/internal/model"
 )
 
 // TransactionRepo transactions 表数据访问。
 type TransactionRepo struct {
-	db *gorm.DB
+	db      *gorm.DB
+	actorID int64
+}
+
+func (r *TransactionRepo) WithActor(id int64) *TransactionRepo {
+	return &TransactionRepo{db: r.db, actorID: id}
 }
 
 func NewTransactionRepo(db *gorm.DB) *TransactionRepo { return &TransactionRepo{db: db} }
@@ -21,22 +27,31 @@ func (r *TransactionRepo) DB() *gorm.DB { return r.db }
 
 // TxnFilter 列表过滤条件（specs/transactions 查询场景）。
 type TxnFilter struct {
-	PeriodKey    string        // 精确归期
-	StartDate    *string       // YYYY-MM-DD 起（含）
-	EndDate      *string       // YYYY-MM-DD 止（含）
-	Kind         model.TxnKind // 限定类型
-	AccountID    int64
-	CategoryID   int64
-	AmountMin    *string // 金额区间下界（含）
-	AmountMax    *string // 金额区间上界（含）
-	Keyword      string  // 备注或平台 / 商家模糊
-	RelatedTxnID int64   // 定位关联到该流水的退款（>0 时过滤）
-	Page         int     // 从 1 开始
-	PageSize     int
+	PeriodKey             string        // 精确归期
+	StartDate             *string       // YYYY-MM-DD 起（含）
+	EndDate               *string       // YYYY-MM-DD 止（含）
+	Kind                  model.TxnKind // 限定类型
+	AccountID             int64
+	CategoryID            int64
+	AmountMin             *string // 金额区间下界（含）
+	AmountMax             *string // 金额区间上界（含）
+	Keyword               string  // 备注或平台 / 商家模糊
+	RelatedTxnID          int64   // 定位关联到该流水的退款（>0 时过滤）
+	Page                  int     // 从 1 开始
+	PageSize              int
+	PersonalOwnerID       int64
+	IncludeLiabilityLinks bool
 }
 
 // applyFilter 组装筛选条件（List / ListAll 共用，导出与列表同一套筛选语义）。
 func applyFilter(q *gorm.DB, f TxnFilter) *gorm.DB {
+	if f.PersonalOwnerID > 0 {
+		link := "a.id = transactions.account_id OR a.id = transactions.transfer_account_id OR a.id IN (SELECT original.account_id FROM transactions original WHERE original.id = transactions.related_txn_id)"
+		if f.IncludeLiabilityLinks {
+			link += " OR a.id IN (SELECT account_id FROM liability_operations WHERE id = transactions.liability_operation_id) OR a.id IN (SELECT p.account_id FROM installment_terms term JOIN installment_plans p ON p.id = term.plan_id WHERE term.id = transactions.liability_term_id)"
+		}
+		q = q.Where("NOT EXISTS (SELECT 1 FROM accounts a WHERE a.type = 'liability' AND (a.owner_id IS NULL OR a.owner_id <> ?) AND ("+link+"))", f.PersonalOwnerID)
+	}
 	if f.PeriodKey != "" {
 		q = q.Where("period_key = ?", f.PeriodKey)
 	}
@@ -119,14 +134,41 @@ func (r *TransactionRepo) GetByID(id int64) (*model.Transaction, error) {
 }
 
 // Create 新建流水（period_key 由 service 写入前物化）。
-func (r *TransactionRepo) Create(t *model.Transaction) error { return r.db.Create(t).Error }
+func (r *TransactionRepo) Create(t *model.Transaction) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if e := tx.Create(t).Error; e != nil {
+			return e
+		}
+		return liability.RecordChange(tx, nil, t, r.actorID)
+	})
+}
 
 // Update 保存修改。
-func (r *TransactionRepo) Update(t *model.Transaction) error { return r.db.Save(t).Error }
+func (r *TransactionRepo) Update(t *model.Transaction) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var old model.Transaction
+		if e := tx.First(&old, t.ID).Error; e != nil {
+			return e
+		}
+		if e := tx.Save(t).Error; e != nil {
+			return e
+		}
+		return liability.RecordChange(tx, &old, t, r.actorID)
+	})
+}
 
 // Delete 硬删除流水。
 func (r *TransactionRepo) Delete(id int64) error {
-	return r.db.Delete(&model.Transaction{}, id).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var old model.Transaction
+		if e := tx.First(&old, id).Error; e != nil {
+			return e
+		}
+		if e := tx.Delete(&old).Error; e != nil {
+			return e
+		}
+		return liability.RecordChange(tx, &old, nil, r.actorID)
+	})
 }
 
 // ExistsByRuleDate 周期幂等检查：同一模板同一归属日唯一（uk_txn_rule_date）。

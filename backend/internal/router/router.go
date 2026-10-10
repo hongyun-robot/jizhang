@@ -25,6 +25,7 @@ type Deps struct {
 	RecurringSvc *service.RecurringService
 	NotifSvc     *service.NotificationService
 	VoucherSvc   *service.VoucherService
+	LiabilitySvc *service.LiabilityService
 	// BackupStatusFile 备份状态文件路径（health 暴露最近备份时间，任务 11.3）。
 	BackupStatusFile string
 }
@@ -69,12 +70,33 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 		accounts := v1.Group("/accounts", middleware.Auth(d.AuthSvc))
 		{
 			accounts.GET("", accth.List)
-			accounts.POST("", middleware.RequireRoles(model.RoleAdmin), accth.Create)
-			accounts.PUT("/:id", middleware.RequireRoles(model.RoleAdmin), accth.Update)
-			accounts.DELETE("/:id", middleware.RequireRoles(model.RoleAdmin), accth.Delete)
+			accounts.GET("/liability-types", accth.LiabilityTypes)
+			accounts.POST("", accth.Create)
+			accounts.PUT("/:id", accth.Update)
+			accounts.DELETE("/:id", accth.Delete)
 		}
 
 		// 分类：读全部角色，写仅管理员
+		if d.LiabilitySvc != nil {
+			lh := handler.NewLiability(d.LiabilitySvc)
+			accounts.GET("/:id/liability", lh.Detail)
+			accounts.GET("/:id/statements", lh.Bills)
+			accounts.PUT("/:id/liability-settings", lh.Settings)
+			v1.GET("/statements/:id", middleware.Auth(d.AuthSvc), lh.Bill)
+			v1.POST("/statements/:id/reconcile", middleware.Auth(d.AuthSvc), lh.Reconcile)
+			liabilities := v1.Group("/liabilities", middleware.Auth(d.AuthSvc))
+			liabilities.GET("", lh.List)
+			liabilities.POST("/ensure", lh.Ensure)
+			liabilities.POST("/repayments", lh.Repay)
+			liabilities.PUT("/repayments/:id/allocations", lh.Allocate)
+			liabilities.POST("/installments", lh.CreatePlan)
+			liabilities.GET("/installments/:id", lh.Plan)
+			liabilities.PATCH("/installments/:id", lh.UpdatePlan)
+			liabilities.POST("/installments/:id/refund-adjustments", lh.RefundPlan)
+			liabilities.POST("/installments/:id/settlement-preview", lh.Preview)
+			liabilities.POST("/installments/:id/settle", lh.Settle)
+			liabilities.POST("/operations/:id/reverse", lh.Reverse)
+		}
 		cath := handler.NewCategory(d.CategorySvc)
 		categories := v1.Group("/categories", middleware.Auth(d.AuthSvc))
 		{

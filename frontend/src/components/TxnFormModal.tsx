@@ -9,6 +9,10 @@ import { errMsg } from '../api/client';
 import { useAuth } from '../stores/auth';
 import VoucherFormModal from './VoucherFormModal';
 import VoucherPlatformInput from './VoucherPlatformInput';
+import { useNavigate } from 'react-router-dom';
+import { useLiabilityDetail } from '../api/liability';
+import { plannedBills } from '../lib/liability';
+import { cents, money } from '../lib/money';
 
 const KIND_OPTIONS = [
   { value: 'expense', label: '支出' },
@@ -30,6 +34,8 @@ export interface TxnRefill {
   /** 原支出已退累计 */
   refunded?: number;
   platform?: string;
+  installment_plan_id?: number;
+  liability_account_id?: number;
 }
 
 interface Props {
@@ -50,6 +56,7 @@ interface Props {
  */
 export default function TxnFormModal({ open, onClose, editing, refill }: Props) {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
 
@@ -78,6 +85,10 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   const [refundedBase, setRefundedBase] = useState(0);
   const [overAck, setOverAck] = useState(false);
   const [voucherOpen, setVoucherOpen] = useState(false);
+  const creditAccount = (accounts.data ?? []).find((a) => a.id === (kind === 'transfer' ? transferId : accountId) && a.type === 'liability');
+  const liability = useLiabilityDetail(creditAccount?.id ?? 0);
+  const managed = !!editing && !!(editing.installment_plan_id || editing.liability_term_id || editing.liability_operation_id);
+  const cycle = plannedBills(liability.data?.rules ?? [], date.format('YYYY-MM-DD'), 1)[0];
 
   // 打开时初始化（编辑回填 / 行内退款预填 / 新建默认今天）
   useEffect(() => {
@@ -157,8 +168,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   };
 
   const setQuick = (v: number) => {
-    const base = Number(amount) || 0;
-    setAmount(String(Number((base + v).toFixed(2))));
+    setAmount(money(cents(amount) + BigInt(v) * 100n));
   };
 
   const validate = (): string | null => {
@@ -167,6 +177,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
       return '请输入大于 0 的金额，最多两位小数';
     }
     if (!accountId) return '请选择账户';
+    if (creditAccount && !creditAccount.billing_enabled) return '请在我的负债账户中设置此账户的账单日和还款日';
     if (kind === 'transfer') {
       if (!transferId) return '请选择转入账户';
       if (transferId === accountId) return '转出与转入账户不能相同';
@@ -178,13 +189,14 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
 
   // 超额黄条：累计退款（已退 + 本次）超过原支出（specs/refunds 超额仅提示不拦截）
   const overTotal =
-    relatedId && relatedAmount && Number(amount) > 0
-      ? refundedBase + Number(amount)
+    relatedId && relatedAmount && cents(amount) > 0n
+      ? cents(String(refundedBase)) + cents(amount)
       : null;
-  const isOver = overTotal !== null && relatedAmount !== undefined && overTotal > Number(relatedAmount);
+  const isOver = overTotal !== null && relatedAmount !== undefined && overTotal > cents(relatedAmount);
 
   const submit = async () => {
     if (creatingPlatform || createTxn.isPending || updateTxn.isPending) return;
+    if (managed) return;
     const err = validate();
     if (err) {
       message.warning(err);
@@ -193,7 +205,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
     if (isOver && !overAck) {
       setOverAck(true);
       message.warning(
-        `累计退款 ¥${overTotal} 已超过原支出 ¥${relatedAmount}，如确认请再次点击提交`,
+        `累计退款 ¥${money(overTotal!)} 已超过原支出 ¥${relatedAmount}，如确认请再次点击提交`,
       );
       return;
     }
@@ -218,6 +230,10 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
         message.success('已记一笔');
       }
       onClose();
+      if (kind === 'refund' && refill?.installment_plan_id && refill.liability_account_id) {
+        message.info('退款已入账，请核对剩余分期期次；手续费按实际退款处理');
+        navigate(`/liabilities/${refill.liability_account_id}?plan=${refill.installment_plan_id}`);
+      }
     } catch (e) {
       message.error(errMsg(e));
     }
@@ -228,6 +244,12 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
     value: a.id,
     label: `${a.name}${a.type === 'liability' ? '（信用）' : ''}`,
   }));
+  const startPlan = () => {
+    const error = validate();
+    if (error) { message.warning(error); return; }
+    onClose();
+    navigate(`/liabilities/${creditAccount!.id}`, { state: { liabilityDraft: { amount, entry_date: date.format('YYYY-MM-DD'), category_id: categoryId, note, platform:platform.trim(), source_txn_id: editing?.id } } });
+  };
 
   return (
     <>
@@ -242,12 +264,13 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
         <Button key="cancel" onClick={onClose}>
           取消
         </Button>,
-        <Button key="ok" type="primary" loading={saving} disabled={creatingPlatform} onClick={submit}>
+        <Button key="ok" type="primary" loading={saving} disabled={creatingPlatform || managed} onClick={submit}>
           {editing ? '保存' : '记账'}
         </Button>,
       ]}
     >
       <div className="txn-form">
+        {managed && <Alert type="info" title="此流水由负债计划管理" description={<Button type="link" onClick={() => { onClose(); navigate(`/liabilities/${editing!.liability_account_id ?? editing!.account_id}`); }}>查看计划、费用与修正入口</Button>} />}
         {!editing && user?.role !== 'viewer' && <Button onClick={() => { setVoucherOpen(true); onClose(); }}>购券：先付款，使用时计消费</Button>}
         <Segmented
           block
@@ -333,6 +356,8 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
           </div>
         )}
 
+        {creditAccount && <Alert type={creditAccount.billing_enabled ? 'info' : 'warning'} title={creditAccount.billing_enabled ? kind === 'transfer' ? '转入负债账户会记录还款' : kind === 'refund' ? '同账户退款优先抵扣原未还本金' : '消费时计支出，下月还款记转账' : '此账户尚未配置账单规则'} description={<>{cycle && kind === 'expense' && <p>归属 {cycle.close} 账单，{cycle.due} 到期。还款本金不会再计支出。</p>}{kind === 'transfer' && <p>先还最早到期账单，超额保留待抵扣，可在负债详情调整分配。</p>}{!managed && kind === 'expense' && creditAccount.billing_enabled && user?.role !== 'viewer' && <Button onClick={startPlan}>{editing ? '将这笔消费转为固定分期' : '填写期次和手续费，记固定分期'}</Button>}</>} />}
+
         <div className="txn-platform-field">
           <label className="pick-label" htmlFor="txn-platform">平台 / 商家</label>
           <VoucherPlatformInput
@@ -350,6 +375,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
         {kind === 'transfer' ? (
           <div className="transfer-row">
             <Select
+              showSearch optionFilterProp="label"
               placeholder="转出账户"
               options={accountOptions}
               value={accountId}
@@ -358,6 +384,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
             />
             <span className="transfer-arrow">→</span>
             <Select
+              showSearch optionFilterProp="label"
               placeholder="转入账户"
               options={accountOptions.filter((o) => o.value !== accountId)}
               value={transferId}
@@ -367,6 +394,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
           </div>
         ) : (
           <Select
+            showSearch optionFilterProp="label"
             placeholder="账户"
             options={accountOptions}
             value={accountId}
@@ -387,7 +415,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
             type="warning"
             showIcon
             className="refund-over"
-            message={`累计退款 ¥${overTotal} 超过原支出 ¥${relatedAmount}（本次 ¥${amount}），如确认请再次点击「${editing ? '保存' : '记账'}」`}
+            message={`累计退款 ¥${money(overTotal)} 超过原支出 ¥${relatedAmount}（本次 ¥${amount}），如确认请再次点击「${editing ? '保存' : '记账'}」`}
           />
         )}
 

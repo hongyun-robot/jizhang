@@ -11,6 +11,7 @@ import Records from './pages/Records';
 import Stats from './pages/Stats';
 import Mine from './pages/Mine';
 import Accounts from './pages/Accounts';
+import Liabilities from './pages/Liabilities';
 import Categories from './pages/Categories';
 import Settings from './pages/Settings';
 import Audit from './pages/Audit';
@@ -36,6 +37,8 @@ export default function App() {
           <Route path="/stats" element={<Stats />} />
           <Route path="/mine" element={<Mine />} />
           <Route path="/vouchers" element={<Vouchers />} />
+          <Route path="/liabilities" element={<Liabilities />} />
+          <Route path="/liabilities/:id" element={<Liabilities />} />
           {/* 预算：查看对四档角色开放，配置仅管理员（后端 + 页面内双重门禁，specs/budgets） */}
           <Route path="/budgets" element={<Budgets />} />
           {/* 提醒列表：四档角色可读可标已读（specs/notifications，任务 10.3） */}

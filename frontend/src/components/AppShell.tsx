@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 
 import { useBudgets, useEnsureRecurring, useEnsureVouchers, useStatsCompare } from '../api/hooks';
+import { useEnsureLiabilities } from '../api/liability';
 import { ROLE_LABEL } from '../labels';
 import { canRecord, useAuth } from '../stores/auth';
 import { resolve, useTheme } from '../stores/theme';
@@ -36,7 +37,7 @@ export const navItems: NavItem[] = [
 ];
 
 function activeKey(pathname: string): string {
-  if (pathname.startsWith('/vouchers')) return 'mine';
+  if (pathname.startsWith('/vouchers') || pathname.startsWith('/liabilities')) return 'mine';
   if (pathname === '/') return 'dash';
   return navItems.find((i) => i.path !== '/' && pathname.startsWith(i.path))?.key ?? 'dash';
 }
@@ -175,6 +176,8 @@ export default function AppShell() {
   // 兜底 cron 停摆；生成幂等，失败静默（下一次打开重试）。
   const ensure = useEnsureRecurring();
   const ensureVouchers = useEnsureVouchers();
+  const ensureLiabilities=useEnsureLiabilities();
+  useEffect(()=>{ensureLiabilities.mutate();const timer=window.setInterval(()=>ensureLiabilities.mutate(),60_000);return()=>window.clearInterval(timer);},[ensureLiabilities.mutate]);
   const voucherWriter = canRecord(useAuth((s) => s.user?.role));
   useEffect(() => {
     ensure.mutate();

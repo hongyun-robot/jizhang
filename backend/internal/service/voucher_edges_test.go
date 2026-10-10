@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"jizhang/internal/liability"
 	"jizhang/internal/model"
 	"jizhang/internal/repository"
 	"testing"
@@ -42,7 +43,11 @@ func TestVoucherFailureIsolationAndStaleFailure(t *testing.T) {
 
 func TestVoucherLiabilityAccount(t *testing.T) {
 	e := newVoucherEnv(t)
-	mustOK(t, e.db.Model(&model.Account{}).Where("id = ?", e.account).Updates(map[string]any{"type": model.AccountLiability, "opening_balance": 0}).Error)
+	mustOK(t, e.db.Model(&model.Account{}).Where("id = ?", e.account).Updates(map[string]any{"type": model.AccountLiability, "opening_balance": 0, "owner_id": 1}).Error)
+	mustOK(t, e.db.AutoMigrate(model.LiabilityModels()...))
+	mustOK(t, e.db.Create(&model.LiabilityAccountType{Code: "credit_card", Name: "信用卡"}).Error)
+	_, cfgErr := liability.Configure(e.db, e.account, "credit_card", 31, 10, 1, 1, vdate(t, "2026-10-01"))
+	mustOK(t, cfgErr)
 	v := e.buy(t, "100", 5, "")
 	e.balance(t, "-100")
 	e.op(t, v.ID, model.VoucherRedeem, "2026-11-01", 2)

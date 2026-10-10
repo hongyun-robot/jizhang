@@ -16,6 +16,8 @@ type AccountRepo struct {
 
 func NewAccountRepo(db *gorm.DB) *AccountRepo { return &AccountRepo{db: db} }
 
+func (r *AccountRepo) DB() *gorm.DB { return r.db }
+
 // netRow 中间聚合结果。
 type netRow struct {
 	Aid int64
@@ -51,7 +53,23 @@ func (r *AccountRepo) List() ([]model.Account, error) {
 		netByID[row.Aid] = row.Net
 	}
 	for i := range accounts {
-		accounts[i].Balance = accounts[i].OpeningBalance.Add(netByID[accounts[i].ID])
+		accounts[i].Balance = accounts[i].OpeningBalance.Add(netByID[accounts[i].ID]).Round(2)
+	}
+	historySQL := `SELECT DISTINCT aid FROM (SELECT account_id AS aid FROM transactions UNION ALL SELECT transfer_account_id AS aid FROM transactions WHERE transfer_account_id IS NOT NULL`
+	if r.db.Migrator().HasTable(&model.LiabilityStatement{}) {
+		historySQL += ` UNION ALL SELECT account_id AS aid FROM liability_statements UNION ALL SELECT account_id AS aid FROM liability_operations WHERE kind <> 'settings'`
+	}
+	historySQL += `) h`
+	var history []struct{ Aid int64 }
+	if e := r.db.Raw(historySQL).Scan(&history).Error; e != nil {
+		return nil, e
+	}
+	seen := map[int64]bool{}
+	for _, x := range history {
+		seen[x.Aid] = true
+	}
+	for i := range accounts {
+		accounts[i].HasFinancialHistory = seen[accounts[i].ID]
 	}
 	return accounts, nil
 }

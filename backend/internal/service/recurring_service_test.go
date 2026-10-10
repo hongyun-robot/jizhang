@@ -390,6 +390,7 @@ func TestRecurringLazyPatchNotify(t *testing.T) {
 // 管理员见全部且带创建人姓名；普通成员仅见自己的；只读成员返回自己的空列表。
 func TestRecurringListScope(t *testing.T) {
 	e := newRecurringEnv(t)
+	e.seed()
 
 	users := []model.User{
 		{ID: 1, Username: "admin", Role: model.RoleAdmin, Status: model.StatusActive},

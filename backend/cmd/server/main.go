@@ -40,9 +40,6 @@ func main() {
 	if err := seed.Admin(db, cfg); err != nil {
 		logger.L().Fatal("seed admin failed", zap.Error(err))
 	}
-	if err := seed.Defaults(db); err != nil {
-		logger.L().Fatal("seed defaults failed", zap.Error(err))
-	}
 	rdb := cache.Init(cfg)
 
 	userRepo := repository.NewUserRepo(db)
@@ -101,6 +98,14 @@ func main() {
 		Accounts: accountRepo,
 	})
 	voucherSvc := service.NewVoucherService(db, txnSvc)
+	liabilitySvc := service.NewLiabilityService(db, txnSvc)
+	liabilitySvc.BeforeEnsure = func(now time.Time) error {
+		if _, e := recurringSvc.EnsureDue(now); e != nil {
+			return e
+		}
+		_, e := voucherSvc.EnsureDue(now)
+		return e
+	}
 	// 写操作主动失效统计缓存（30 秒缓存的写后一致性）
 	txnSvc.OnWrite = statsSvc.InvalidateAll
 	accountSvc.OnWrite = statsSvc.InvalidateAll
@@ -127,6 +132,7 @@ func main() {
 		RecurringSvc: recurringSvc,
 		NotifSvc:     notifSvc,
 		VoucherSvc:   voucherSvc,
+		LiabilitySvc: liabilitySvc,
 
 		BackupStatusFile: cfg.BackupStatusFile,
 	})
@@ -148,6 +154,12 @@ func main() {
 		logger.L().Fatal("voucher cron schedule failed", zap.Error(err))
 	}
 	ensureVouchers()
+	ensureLiabilities := func() {
+		if _, err := liabilitySvc.EnsureDue(time.Now()); err != nil {
+			logger.L().Warn("liability ensure failed", zap.Error(err))
+		}
+	}
+	ensureLiabilities()
 	if _, err := recurringCron.AddFunc("@every 5m", func() {
 		n, err := recurringSvc.EnsureDue(time.Now())
 		if err != nil {
@@ -157,11 +169,15 @@ func main() {
 		if n > 0 {
 			logger.L().Info("recurring generated", zap.Int("count", n))
 		}
+		ensureVouchers()
+		ensureLiabilities()
 	}); err != nil {
 		logger.L().Fatal("recurring cron schedule failed", zap.Error(err))
 	}
 	// 每日 08:00 评估还款日提醒与预算超支（设计 D7；重复评估由 dedup_key 去重）
 	if _, err := recurringCron.AddFunc("0 8 * * *", func() {
+		ensureVouchers()
+		ensureLiabilities()
 		if err := notifSvc.EvaluateRepayment(time.Now()); err != nil {
 			logger.L().Warn("repayment evaluate failed", zap.Error(err))
 		}

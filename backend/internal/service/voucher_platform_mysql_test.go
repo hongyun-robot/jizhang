@@ -53,6 +53,8 @@ func TestVoucherPlatformMySQL(t *testing.T) {
 	for _, file := range []string{"000001_init.up.sql", "000002_settings.up.sql", "000003_recurring_idempotency.up.sql", "000004_refund.up.sql", "000005_vouchers.up.sql"} {
 		migration(file)
 	}
+	migration("000008_liability_billing.up.sql")
+	mustOK(t, db.Exec("ALTER TABLE accounts ADD COLUMN owner_id BIGINT NULL").Error)
 	mustOK(t, db.Exec("INSERT INTO users (id,username,password_hash,role,status) VALUES (1,'platform-test','test','admin','active')").Error)
 	e := seedVoucherEnv(t, db)
 	for _, platform := range []string{"美团", "美团", "JD", "jd", ""} {

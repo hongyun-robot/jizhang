@@ -13,11 +13,15 @@ const (
 // Payload 存 JSON 字符串，内含 dedup_key（如 budget_overdue:2026-10:cat:1），
 // 「同账期同预算不重复提醒」在 service 层按它去重。
 type Notification struct {
-	ID        int64      `gorm:"primaryKey" json:"id"`
-	Kind      string     `gorm:"type:varchar(32)" json:"kind"`
-	Payload   string     `gorm:"type:varchar(1000)" json:"payload"`
-	ReadAt    *time.Time `json:"read_at"`
-	CreatedAt time.Time  `json:"created_at"`
+	OwnerID     *int64     `json:"-"`
+	ID          int64      `gorm:"primaryKey" json:"id"`
+	Kind        string     `gorm:"type:varchar(32)" json:"kind"`
+	Payload     string     `gorm:"type:varchar(1000)" json:"payload"`
+	ReadAt      *time.Time `json:"read_at"`
+	StatementID *int64     `json:"statement_id"`
+	DedupKey    *string    `gorm:"size:128;uniqueIndex" json:"dedup_key"`
+	ResolvedAt  *time.Time `json:"resolved_at"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 func (Notification) TableName() string { return "notifications" }

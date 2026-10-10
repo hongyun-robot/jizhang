@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"jizhang/internal/middleware"
 	"jizhang/internal/response"
 	"jizhang/internal/service"
 )
@@ -47,33 +48,33 @@ func emit(c *gin.Context, raw json.RawMessage, fromCache bool, err error) {
 // CategoryShare GET /api/v1/stats/category?start_date&end_date
 func (h *statsHandler) CategoryShare(c *gin.Context) {
 	q := c.Request.URL.Query()
-	raw, hit, err := h.svc.CategoryShare(q.Get("start_date"), q.Get("end_date"))
+	raw, hit, err := h.svc.ForUser(middleware.CurrentUser(c)).CategoryShare(q.Get("start_date"), q.Get("end_date"))
 	emit(c, raw, hit, err)
 }
 
 // Trend GET /api/v1/stats/trend?start_date&end_date&granularity=day|week|month
 func (h *statsHandler) Trend(c *gin.Context) {
 	q := c.Request.URL.Query()
-	raw, hit, err := h.svc.Trend(q.Get("start_date"), q.Get("end_date"), q.Get("granularity"))
+	raw, hit, err := h.svc.ForUser(middleware.CurrentUser(c)).Trend(q.Get("start_date"), q.Get("end_date"), q.Get("granularity"))
 	emit(c, raw, hit, err)
 }
 
 // Compare GET /api/v1/stats/compare?start_date&end_date
 func (h *statsHandler) Compare(c *gin.Context) {
 	q := c.Request.URL.Query()
-	raw, hit, err := h.svc.Compare(q.Get("start_date"), q.Get("end_date"))
+	raw, hit, err := h.svc.ForUser(middleware.CurrentUser(c)).Compare(q.Get("start_date"), q.Get("end_date"))
 	emit(c, raw, hit, err)
 }
 
 // PeriodSummary GET /api/v1/stats/periods?year=
 func (h *statsHandler) PeriodSummary(c *gin.Context) {
-	raw, hit, err := h.svc.PeriodSummary(c.Query("year"))
+	raw, hit, err := h.svc.ForUser(middleware.CurrentUser(c)).PeriodSummary(c.Query("year"))
 	emit(c, raw, hit, err)
 }
 
 // Assets GET /api/v1/stats/assets?start_date&end_date
 func (h *statsHandler) Assets(c *gin.Context) {
 	q := c.Request.URL.Query()
-	raw, hit, err := h.svc.Assets(q.Get("start_date"), q.Get("end_date"))
+	raw, hit, err := h.svc.ForUser(middleware.CurrentUser(c)).Assets(q.Get("start_date"), q.Get("end_date"))
 	emit(c, raw, hit, err)
 }

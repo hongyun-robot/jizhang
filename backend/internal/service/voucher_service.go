@@ -156,6 +156,9 @@ func (s *VoucherService) Create(actor *model.User, in VoucherInput) (*model.Vouc
 	var out *model.Voucher
 	created := false
 	err = repository.LedgerWrite(s.db, func(tx *gorm.DB) error {
+		if e := checkAccountOwnership(tx, actor, in.AccountID); e != nil {
+			return e
+		}
 		r := repository.NewVoucherRepo(tx)
 		existing, e := r.ByCreateKey(actor.ID, key)
 		if e != nil {
@@ -239,6 +242,16 @@ func (s *VoucherService) project(tx *gorm.DB, v *model.Voucher, e *model.Voucher
 func (s *VoucherService) Operate(actor *model.User, id int64, action model.VoucherAction, in VoucherOperation) (*model.VoucherEvent, error) {
 	if !CanCreateTransaction(actor) {
 		return nil, ErrTxnForbidden
+	}
+	v, err := repository.NewVoucherRepo(s.db).Get(id, false)
+	if err != nil {
+		return nil, err
+	}
+	if v == nil {
+		return nil, ErrVoucherNotFound
+	}
+	if e := checkAccountOwnership(s.db, actor, v.AccountID); e != nil {
+		return nil, e
 	}
 	key, err := voucherManualKey(in.RequestKey)
 	if err != nil {
@@ -362,9 +375,19 @@ func (s *VoucherService) Undo(actor *model.User, id, eventID int64) error {
 	if !CanCreateTransaction(actor) {
 		return ErrTxnForbidden
 	}
+	v, err := repository.NewVoucherRepo(s.db).Get(id, false)
+	if err != nil {
+		return err
+	}
+	if v == nil {
+		return ErrVoucherNotFound
+	}
+	if e := checkAccountOwnership(s.db, actor, v.AccountID); e != nil {
+		return e
+	}
 	changed := false
 	var period string
-	err := repository.LedgerWrite(s.db, func(tx *gorm.DB) error {
+	err = repository.LedgerWrite(s.db, func(tx *gorm.DB) error {
 		r := repository.NewVoucherRepo(tx)
 		v, e := r.Get(id, true)
 		if e != nil {
@@ -411,8 +434,14 @@ func (s *VoucherService) Undo(actor *model.User, id, eventID int64) error {
 		if e := r.SaveEvent(target); e != nil {
 			return e
 		}
-		if e := tx.Where("voucher_event_id = ?", target.ID).Delete(&model.Transaction{}).Error; e != nil {
+		var projections []model.Transaction
+		if e := tx.Where("voucher_event_id = ?", target.ID).Find(&projections).Error; e != nil {
 			return e
+		}
+		for _, projection := range projections {
+			if e := repository.NewTransactionRepo(tx).WithActor(actor.ID).Delete(projection.ID); e != nil {
+				return e
+			}
 		}
 		if target.Source == "auto" {
 			v.AutoRefundSuspended = true
@@ -445,8 +474,18 @@ func (s *VoucherService) Update(actor *model.User, id int64, in VoucherInput) (*
 	if err := in.normalize(); err != nil {
 		return nil, err
 	}
+	v, err := repository.NewVoucherRepo(s.db).Get(id, false)
+	if err != nil {
+		return nil, err
+	}
+	if v == nil {
+		return nil, ErrVoucherNotFound
+	}
+	if e := checkAccountOwnership(s.db, actor, v.AccountID, in.AccountID); e != nil {
+		return nil, e
+	}
 	var out *model.Voucher
-	err := repository.LedgerWrite(s.db, func(tx *gorm.DB) error {
+	err = repository.LedgerWrite(s.db, func(tx *gorm.DB) error {
 		r := repository.NewVoucherRepo(tx)
 		v, e := r.Get(id, true)
 		if e != nil {
@@ -516,7 +555,7 @@ func (s *VoucherService) Update(actor *model.User, id int64, in VoucherInput) (*
 			projection.AccountID = in.AccountID
 			projection.CategoryID = &in.CategoryID
 			projection.Note = in.Name
-			if e := tx.Save(&projection).Error; e != nil {
+			if e := repository.NewTransactionRepo(tx).WithActor(actor.ID).Update(&projection); e != nil {
 				return e
 			}
 		}
@@ -554,7 +593,17 @@ func (s *VoucherService) Delete(actor *model.User, id int64) error {
 	if !CanCreateTransaction(actor) {
 		return ErrTxnForbidden
 	}
-	err := repository.LedgerWrite(s.db, func(tx *gorm.DB) error {
+	v, err := repository.NewVoucherRepo(s.db).Get(id, false)
+	if err != nil {
+		return err
+	}
+	if v == nil {
+		return ErrVoucherNotFound
+	}
+	if e := checkAccountOwnership(s.db, actor, v.AccountID); e != nil {
+		return e
+	}
+	err = repository.LedgerWrite(s.db, func(tx *gorm.DB) error {
 		r := repository.NewVoucherRepo(tx)
 		v, e := r.Get(id, true)
 		if e != nil {
@@ -592,8 +641,14 @@ func (s *VoucherService) Delete(actor *model.User, id int64) error {
 		if e := r.SaveEvent(purchase); e != nil {
 			return e
 		}
-		if e := tx.Where("voucher_event_id = ?", purchase.ID).Delete(&model.Transaction{}).Error; e != nil {
+		var projections []model.Transaction
+		if e := tx.Where("voucher_event_id = ?", purchase.ID).Find(&projections).Error; e != nil {
 			return e
+		}
+		for _, projection := range projections {
+			if e := repository.NewTransactionRepo(tx).WithActor(actor.ID).Delete(projection.ID); e != nil {
+				return e
+			}
 		}
 		return r.Delete(v)
 	})
