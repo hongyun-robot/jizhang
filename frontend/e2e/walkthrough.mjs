@@ -29,6 +29,22 @@ function ok(cond, label, extra = '') {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: true });
 
+/** 轮询直到 fn 为真（SPA 同文档导航没有 load 事件，用于等异步列表落定）。 */
+async function until(fn, ms = 10000, every = 150) {
+  const end = Date.now() + ms;
+  for (;;) {
+    let v = false;
+    try {
+      v = await fn();
+    } catch {
+      /* DOM 抖动继续等 */
+    }
+    if (v) return true;
+    if (Date.now() > end) return false;
+    await sleep(every);
+  }
+}
+
 /** 点击 Segmented 项（scope 选择器限定所属控件）。 */
 async function clickSeg(page, scopeSel, label) {
   const scope = scopeSel ? page.locator(scopeSel) : page.locator('body');
@@ -40,6 +56,49 @@ async function clickSeg(page, scopeSel, label) {
     return;
   }
   await item.click();
+}
+
+// ---- API 直连辅助（4.5 类型筛选=转账：测试内自造一笔转账，不依赖基线数据） ----
+const API = process.env.API ?? 'http://127.0.0.1:8080/api/v1';
+let TOKEN = '';
+async function apiLogin(u = 'admin', p = 'admin123') {
+  const r = await fetch(`${API}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: u, password: p }),
+  });
+  const j = await r.json();
+  if (j.code !== 0) throw new Error(j.message);
+  TOKEN = j.data.access_token;
+}
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, {
+    ...opts,
+    headers: { ...(opts.headers ?? {}), authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' },
+  });
+  return { status: r.status, json: await r.json().catch(() => null) };
+}
+/** 造一笔转账（转出=第 1 个账户，转入=第 2 个），返回 id；结束时删除。 */
+async function seedTransfer(note) {
+  const accts = await api('/accounts');
+  const list = accts.json?.data ?? [];
+  const from = list[0]?.id;
+  const to = list.find((a) => a.id !== list[0]?.id)?.id;
+  if (!from || !to) throw new Error('seed transfer: need 2 accounts');
+  const d = new Date();
+  const { status, json } = await api('/transactions', {
+    method: 'POST',
+    body: JSON.stringify({
+      kind: 'transfer',
+      amount: '50.00',
+      account_id: from,
+      transfer_account_id: to,
+      entry_date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+      note,
+    }),
+  });
+  if (status >= 400) throw new Error('seed transfer failed: ' + JSON.stringify(json));
+  return json?.data?.id;
 }
 
 async function login(page, username, password) {
@@ -171,13 +230,29 @@ async function main() {
     await page.locator('input[placeholder="金额≥"]').fill('');
     await sleep(600);
 
-    // 类型筛选：转账
+    // 类型筛选：转账（测试内自造一笔,基线数据不保证有转账）
+    // 先清掉前面步骤残留的 keyword/金额条件,否则 kind=transfer 与关键字取交集为空。
+    // fill('') 后必须等 React 受控 value 落定,否则点击「转账」时 patch 闭包里还是旧 keyword
+    await page.locator('input[placeholder="备注 / 平台 / 商家"]').fill('');
+    await page.locator('input[placeholder="金额≥"]').fill('');
+    await until(
+      async () =>
+        (await page.locator('input[placeholder="备注 / 平台 / 商家"]').inputValue()) === '' &&
+        (await page.locator('input[placeholder="金额≥"]').inputValue()) === '' &&
+        new URL(page.url()).search === '',
+      8000,
+    );
+    await apiLogin();
+    const transferNote = `e2e-tr-${Date.now()}`;
+    const transferId = await seedTransfer(transferNote);
     await clickSeg(page, '.filter-bar', '转账');
-    await sleep(800);
+    // 轮询等筛选结果落定（列表按 kind=transfer 重新拉取）
+    await until(async () => (await page.locator('.ant-table-tbody').innerText().catch(() => '')).includes('→'), 10000);
     const transferTxt = await page.locator('.ant-table-tbody').innerText().catch(() => '');
     ok(transferTxt.includes('→'), '4.5 类型筛选=转账（行内含→）');
     await clickSeg(page, '.filter-bar', '全部');
     await sleep(600);
+    await api(`/transactions/${transferId}`, { method: 'DELETE' }); // 清理自造转账
 
     // 编辑
     await page.locator('input[placeholder="备注 / 平台 / 商家"]').fill(NOTE);

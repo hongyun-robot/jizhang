@@ -173,6 +173,10 @@ async function main() {
   await api('PUT', '/settings', tok, { settlement_day: 1 });
   sql('DELETE FROM transactions WHERE rule_id IS NOT NULL');
   sql('DELETE FROM recurring_rules');
+  // 基线会随其他 e2e 的种子数据缓慢增长 → 当期支出基线动态捕获（同 interaction_upgrade 的 P3ROWS 自适应）
+  const octBase = sql(
+    "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE period_key='2026-10' AND kind='expense'",
+  );
 
   // 分类全程复用基线种子（严禁增删分类——基线 36 个、8 个支出根）
   const forest = (await api('GET', '/categories', tok)).body.data;
@@ -300,7 +304,8 @@ async function main() {
     'member 模板生成流水 source=recurring、金额 80.00',
     `count=${mTxn.length}`,
   );
-  await p2.goto(BASE + '/records');
+  // 基线流水随时间增长会超过一页 → 带 keyword 让目标行落在第 1 页（keyword 只匹配 note/platform）
+  await p2.goto(BASE + '/records?keyword=' + encodeURIComponent('游戏会员'));
   await p2.waitForSelector('.ant-table-tbody tr.ant-table-row', { timeout: 10000 });
   const mTxnRow = p2
     .locator('.ant-table-tbody tr.ant-table-row', { hasText: '游戏会员' })
@@ -388,7 +393,7 @@ async function main() {
       `${rent[0].source} / ${rent[0].amount}`,
     );
   }
-  await page.goto(BASE + '/records');
+  await page.goto(BASE + '/records?keyword=' + encodeURIComponent('房租'));
   await page.waitForSelector('.ant-table-tbody tr.ant-table-row', { timeout: 10000 });
   const rentRow = page.locator('.ant-table-tbody tr.ant-table-row', { hasText: '房租' }).first();
   ok(await rentRow.isVisible().catch(() => false), '流水页出现生成的房租行');
@@ -429,7 +434,7 @@ async function main() {
   await shot(page, 'recurring-05-catchup');
 
   // ================= 6. 生成笔改删独立（spec 场景 3） =================
-  await page.goto(BASE + '/records');
+  await page.goto(BASE + '/records?keyword=' + encodeURIComponent('水电费'));
   await page.waitForSelector('.ant-table-tbody tr.ant-table-row', { timeout: 10000 });
   const utilRow = page.locator('.ant-table-tbody tr.ant-table-row', { hasText: '水电费' }).first();
   await utilRow.getByRole('button', { name: /编\s*辑/ }).click();
@@ -527,7 +532,11 @@ async function main() {
   const exp = sql(
     "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE period_key='2026-10' AND kind='expense'",
   );
-  ok(Number(exp) === 922.66, '基线恢复：2026-10 支出回到 922.66', `got=${exp}`);
+  ok(
+    Number(exp) === Number(octBase),
+    '基线恢复：2026-10 支出回到基线（动态捕获）',
+    `got=${exp} base=${octBase}`,
+  );
   ok(sql('SELECT COUNT(*) FROM recurring_rules') === '0', '基线恢复：模板表清空');
   ok(ruleTxns().length === 0, '基线恢复：生成笔清空', `got=${ruleTxns().length}`);
   await page.goto(BASE + '/records');

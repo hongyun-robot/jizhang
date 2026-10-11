@@ -45,8 +45,8 @@
 
 ## 6. 收敛与集成验收
 
-- [ ] 6.1 断点收敛：CSS 断点 `560/767/860/900/1023` → `600/768/992`，删除与 JS 打架的 860 档（`.two` 栅格交 CSS 单一来源）；验证：375/768/900/1440 四档截图逐页对照，diff 均为预期修复并记录在提交说明
-- [ ] 6.2 底部留白合并：`styles.css:437-440` 与 `2369-2372` 合并为 `.mobile-shell` 单一来源；验证：375px 各页底部不被 Tab 遮挡、无多余空白（截图）
-- [ ] 6.3 逐页 ≤600px 挤压修复：预算行换行、账期摘要降列、券表单单列、统计/首页双列转单列（由既有 ui-shell「手机访问 → 单列布局」覆盖）；验证：360px 各页截图无溢出与压扁
-- [ ] 6.4 全量回归：`pnpm build` 通过；`node e2e/interaction_upgrade.mjs`、`interaction_shell.mjs`、`interaction_feedback.mjs`、`walkthrough.mjs`、`darkmode.mjs`、`export.mjs`、`recurring.mjs` 全部 PASS
-- [ ] 6.5 `openspec validate upgrade-mobile-web-interaction` 通过；`openspec status --change upgrade-mobile-web-interaction` 四个 artifact 全部 done；两个变更的实施状态在各自 `tasks.md` 中如实勾选
+- [x] 6.1 断点收敛：CSS 断点 `560/767/860/900/1023` → `600/768/992`，删除与 JS 打架的 860 档（`.two` 栅格交 CSS 单一来源）；验证：375/768/900/1440 四档截图逐页对照，diff 均为预期修复并记录在提交说明
+- [x] 6.2 底部留白合并：`styles.css:437-440` 与 `2369-2372` 合并为 `.mobile-shell` 单一来源；验证：375px 各页底部不被 Tab 遮挡、无多余空白（截图）
+- [x] 6.3 逐页 ≤600px 挤压修复：预算行换行、账期摘要降列、券表单单列、统计/首页双列转单列（由既有 ui-shell「手机访问 → 单列布局」覆盖）；验证：360px 各页截图无溢出与压扁
+- [x] 6.4 全量回归：`pnpm build` 通过；`node e2e/interaction_upgrade.mjs`、`interaction_shell.mjs`、`interaction_feedback.mjs`、`walkthrough.mjs`、`darkmode.mjs`、`export.mjs`、`recurring.mjs` 全部 PASS
+- [x] 6.5 `openspec validate upgrade-mobile-web-interaction` 通过；`openspec status --change upgrade-mobile-web-interaction` 四个 artifact 全部 done；两个变更的实施状态在各自 `tasks.md` 中如实勾选

@@ -2480,9 +2480,13 @@ tr.flash > td {
   font-weight: 500;
 }
 
-/* ---------- 28. 响应式 ---------- */
+/* ---------- 28. 响应式 ----------
+   断点收敛为 600/768/992 三档（specs/ui-shell）：
+   - 992 与 JS `screens.lg`（侧栏/底部 Tab 形态切换）同源
+   - 768 与 JS `screens.md`（isMobile）同源，CSS 侧一律写 max-width: 767px
+   - 600 为纯 CSS 细分档（不影响 JS 形态判定） */
 
-@media (max-width: 1023px) {
+@media (max-width: 991px) {
   .app-content {
     padding: 22px 20px 48px;
   }
@@ -2491,14 +2495,14 @@ tr.flash > td {
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   .mine-menu {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-/* 登录页：窄屏单列，样张压缩成页头 */
-@media (max-width: 900px) {
+/* 登录页：≤991px 单列（与导航形态断点同源），≤600px 样张压成品牌头 */
+@media (max-width: 991px) {
   .login {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2543,17 +2547,28 @@ tr.flash > td {
   }
 }
 
-@media (max-width: 860px) {
-  .dash-grid.two,
-  .stats-grid.two {
-    grid-template-columns: minmax(0, 1fr);
+/* ≤600px 挤压修复：Card 头部 title+extra 换行（统计页「按天/按周/按月」Segmented 不再溢出）；
+   区间预设 Segmented（本月/上月/今年/自定义）360px 一行放不下,允许换行 */
+@media (max-width: 600px) {
+  .panel > .ant-card-head {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .panel > .ant-card-head .ant-card-extra {
+    margin-inline-start: 0;
+  }
+  .period-picker .ant-segmented {
+    flex-wrap: wrap;
+  }
+  .period-picker .ant-segmented-group {
+    flex-wrap: wrap;
+    row-gap: 2px;
   }
 }
 
 @media (max-width: 767px) {
-  .app-content {
-    padding: 16px 14px 40px;
-  }
+  /* 底部留白单一来源：.mobile-shell .app-content（第 6 节）已含 Tab 高 + 安全区让位,
+     此处不再重复定义 .app-content padding,避免两处打架 */
   .page {
     gap: 14px;
   }
