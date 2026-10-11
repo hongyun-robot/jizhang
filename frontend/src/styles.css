@@ -2374,6 +2374,17 @@ tr.flash > td {
     flex: 1 1 auto;
     overflow: auto;
   }
+
+  /* 平台/商家等下拉：高度封顶到「可视高度 - 键盘遮挡」，列表内部滚动。
+     弹层挂载在触发器父级（popupInParent），随触发器定位；rc-trigger 移动端不做
+     useAlign 重排、也不会因 --kb-inset 收缩弹窗而重新测量，故选项一多就会顶出
+     可视区、与输入框脱节（登记券字段靠上不易察觉）。用 --kb-inset（键盘未弹为 0）
+     把下拉限高到键盘之上的可视区，触发器、输入框、选项三者始终相连、不被键盘遮挡。 */
+  .ant-select-dropdown,
+  .voucher-platform-dropdown {
+    max-height: calc(100vh - var(--kb-inset) - 120px);
+    overflow-y: auto;
+  }
 }
 
 /* 分页 */
@@ -2681,6 +2692,109 @@ tr.flash > td {
     align-items: center;
     padding-inline: 8px;
   }
+
+  /* 防 iOS 聚焦自动放大：iOS 只要获焦输入框字号 <16px 就整页放大且收起键盘不复位。
+     表单控件字号提到 16px（行高/占位仍随原尺寸），消除「弹键盘页面放大、还要手动缩小」。
+     覆盖普通输入、自动补全输入框（平台/商家）、文本域与下拉搜索框。 */
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-input-affix-wrapper input,
+  .ant-select-selection-search-input,
+  .ant-select-auto-complete .ant-input,
+  textarea.ant-input,
+  .ant-picker-input input,
+  .ant-input-number-input {
+    font-size: 16px;
+  }
+
+  /* 平台/商家移动端改用底部浮层：触发器外观对齐 antd 输入框，点开浮层而非弹键盘，
+     绕开下拉定位在软键盘/滚动下的错乱。 */
+  .voucher-platform-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 40px;
+    padding: 0 11px;
+    text-align: start;
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-ctl);
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1.5;
+    cursor: pointer;
+  }
+  .voucher-platform-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .voucher-platform-trigger-value {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .voucher-platform-trigger-placeholder {
+    flex: 1 1 auto;
+    color: var(--muted);
+  }
+  .voucher-platform-trigger-arrow {
+    flex: none;
+    color: var(--muted);
+  }
+}
+
+/* 平台/商家底部浮层（移动端专属；桌面仍用下拉框）：
+   固定覆盖层，不受软键盘与滚动容器位移影响。 */
+.voucher-platform-sheet .ant-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.voucher-platform-sheet-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+.voucher-platform-sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  text-align: start;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-row);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+}
+.voucher-platform-sheet-item:active {
+  background: var(--hover-soft);
+}
+.voucher-platform-sheet-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.voucher-platform-sheet-item.is-create {
+  color: var(--primary);
+  font-weight: 600;
+}
+.voucher-platform-sheet-item-icon {
+  flex: none;
+}
+.voucher-platform-sheet-empty {
+  padding: 16px 12px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
 }
 
 /* ---------- 29. 无障碍：减弱动效 ---------- */

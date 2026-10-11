@@ -7,6 +7,7 @@ export default defineConfig({
   base: process.env.VITE_BASE || '/',
   plugins: [react()],
   server: {
+    host: true, // 绑定 0.0.0.0：局域网内其他设备（如手机调试移动端）可通过本机 IP 访问
     port: 5600,
     proxy: {
       '/api': {
