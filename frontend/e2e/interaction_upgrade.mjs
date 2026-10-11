@@ -572,6 +572,100 @@ async function main() {
     await ctx.close();
   }
 
+  // ================= 组 4：软键盘避让（4.1–4.3，375px） =================
+  // 真机键盘在 headless 下不可触发：注入 fake visualViewport（可调 height + 手动派发 resize），
+  // 验证 hook 的 --kb-inset 写入/复位与弹窗避让布局（4.1 的 interactive-widget 为声明式 meta，无法在
+  // headless 断言，随 4.3 的变量断言一并覆盖链路）。
+  {
+    const ctx = await browser.newContext({
+      viewport: { width: 375, height: 667 },
+      isMobile: true,
+      hasTouch: true,
+    });
+    const page = await ctx.newPage();
+    await login(page, 'admin', 'admin123');
+    // 4.1 viewport meta 带 interactive-widget=resizes-content（Android Chrome 键盘收缩布局的开关）
+    await page.goto(BASE + '/records');
+    const vp = await page.locator('meta[name="viewport"]').getAttribute('content');
+    ok(vp.includes('interactive-widget=resizes-content'), '4.1 viewport 声明 interactive-widget', vp);
+
+    // fake visualViewport：height 可调，手动派发 resize（hook 内 rAF 合帧，等待一帧后读值）
+    await page.evaluate(() => {
+      const base = window.visualViewport;
+      const fake = new EventTarget();
+      let h = base.height;
+      for (const k of ['width', 'offsetLeft', 'scale', 'pageTop']) {
+        Object.defineProperty(fake, k, { get: () => base[k] });
+      }
+      Object.defineProperty(fake, 'offsetTop', { get: () => 0 });
+      Object.defineProperty(fake, 'height', { get: () => h });
+      Object.defineProperty(window, 'visualViewport', { get: () => fake });
+      window.__kbSet = (newH) => {
+        h = newH;
+        fake.dispatchEvent(new Event('resize'));
+      };
+    });
+    const kbInset = () =>
+      page.evaluate(() => document.documentElement.style.getPropertyValue('--kb-inset'));
+
+    // 打开记一笔弹窗 → hook 激活并初始化变量
+    await page.locator('.page-head').getByRole('button', { name: '记一笔' }).click();
+    const modal = page.locator('.ant-modal-container:visible');
+    await modal.waitFor({ state: 'visible' });
+    await until(async () => (await kbInset()) !== '', 8000);
+    ok((await kbInset()) === '0px', '4.2 弹窗打开写入 --kb-inset（无键盘为 0）', await kbInset());
+
+    // 模拟键盘弹出（遮挡 300px）→ 变量跟随 + 提交按钮仍在视口内
+    await page.evaluate(() => window.__kbSet(window.innerHeight - 300));
+    await until(async () => (await kbInset()) === '300px', 8000);
+    ok((await kbInset()) === '300px', '4.3 键盘弹出 --kb-inset=300px', await kbInset());
+    // CSS 侧生效：.ant-modal 限高为「100vh - 遮挡 - 16px 边距」，body 内部滚动 → footer 上移
+    const visH = await page.evaluate(() => window.visualViewport.height);
+    const vh = await page.evaluate(() => window.innerHeight);
+    const modalMaxH = await page
+      .locator('.ant-modal-wrap .ant-modal')
+      .filter({ visible: true })
+      .first()
+      .evaluate((el) => getComputedStyle(el).maxHeight);
+    ok(modalMaxH === `${vh - (vh - visH) - 16}px`, '4.3 弹窗限高=100vh-遮挡-16px（CSS 吃 --kb-inset）', modalMaxH);
+    const submitBtn = modal.locator('.ant-modal-footer .ant-btn-primary');
+    const btnBox = await submitBtn.boundingBox();
+    ok(
+      !!btnBox && btnBox.y + btnBox.height <= visH,
+      '4.3 键盘弹出下「记一笔」按钮仍完全可视',
+      `btnBottom=${btnBox ? Math.round(btnBox.y + btnBox.height) : '?'} visH=${Math.round(visH)}`,
+    );
+    await shot(page, 'upgrade-08-keyboard-avoid');
+
+    // 关闭弹窗 → 变量清理复位（hook 卸载）
+    await page.evaluate(() => window.__kbSet(window.innerHeight)); // 键盘收起，避免关闭瞬间残留
+    await modal.locator('.ant-modal-close').click();
+    await until(async () => !(await page.evaluate(() => document.documentElement.style.getPropertyValue('--kb-inset'))), 8000);
+    ok(
+      (await kbInset()) === '',
+      '4.3 关闭弹窗后 --kb-inset 清理复位',
+    );
+    await ctx.close();
+
+    // ---- 4.4 桌面弹窗无偏移（1440px 下 --kb-inset 不参与，弹窗居中） ----
+    const dctx = await browser.newContext(desktop);
+    const dpage = await dctx.newPage();
+    await login(dpage, 'admin', 'admin123');
+    await dpage.goto(BASE + '/records');
+    await dpage.locator('.page-head').getByRole('button', { name: '记一笔' }).click();
+    const dmodal = dpage.locator('.ant-modal-container:visible');
+    await dmodal.waitFor({ state: 'visible' });
+    // 桌面 ≥768px 不进避让 media query：.ant-modal 无限高（桌面弹窗本可内滚/超屏，保持原形态）
+    const dMaxH = await dpage
+      .locator('.ant-modal-wrap .ant-modal')
+      .filter({ visible: true })
+      .first()
+      .evaluate((el) => getComputedStyle(el).maxHeight);
+    ok(dMaxH === 'none', '4.4 桌面弹窗无键盘避让限高', `maxHeight=${dMaxH}`);
+    await shot(dpage, 'upgrade-09-desktop-modal');
+    await dctx.close();
+  }
+
   await browser.close();
 
   const failed = results.filter((r) => !r.pass);

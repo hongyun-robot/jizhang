@@ -30,10 +30,10 @@
 
 ## 4. 软键盘避让
 
-- [ ] 4.1 `index.html` viewport 增加 `interactive-widget=resizes-content`；验证：Android Chrome（或 DevTools 设备模拟）聚焦输入框时布局随键盘收缩
-- [ ] 4.2 新增 `hooks/useVisualViewportKeyboard.ts`：监听 `visualViewport.resize/scroll`，`rAF` 合帧写 `--kb-inset`，卸载/弹窗关闭时清理复位；验证：单测或 Storybook 无（项目无单测）→ 以 e2e 移动视口 + 键盘模拟断言变量写入与清理
-- [ ] 4.3 接入 4 个弹窗（`TxnFormModal` / `Categories` / `Recurring` / `Accounts`）：body/footer 按 `--kb-inset` 加避让，提交按钮始终可视；验证：e2e 375px 视口打开记一笔 → 聚焦金额 → 断言"记账"按钮 `boundingBox` 位于视口内且可点击；关闭弹窗后变量复位
-- [ ] 4.4 本组 e2e 断言追加进 `interaction_upgrade.mjs`；验证：脚本全部 PASS，桌面弹窗无偏移（截图对比）
+- [x] 4.1 `index.html` viewport 增加 `interactive-widget=resizes-content`；验证：Android Chrome（或 DevTools 设备模拟）聚焦输入框时布局随键盘收缩
+- [x] 4.2 新增 `hooks/useVisualViewportKeyboard.ts`：监听 `visualViewport.resize/scroll`，`rAF` 合帧写 `--kb-inset`，卸载/弹窗关闭时清理复位；验证：单测或 Storybook 无（项目无单测）→ 以 e2e 移动视口 + 键盘模拟断言变量写入与清理
+- [x] 4.3 接入 4 个弹窗（`TxnFormModal` / `Categories` / `Recurring` / `Accounts`）：body/footer 按 `--kb-inset` 加避让，提交按钮始终可视；验证：e2e 375px 视口打开记一笔 → 聚焦金额 → 断言"记账"按钮 `boundingBox` 位于视口内且可点击；关闭弹窗后变量复位
+- [x] 4.4 本组 e2e 断言追加进 `interaction_upgrade.mjs`；验证：脚本全部 PASS，桌面弹窗无偏移（截图对比）
 
 ## 5. 移动端性能、可及性与登录首屏
 

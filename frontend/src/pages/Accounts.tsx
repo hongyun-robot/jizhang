@@ -27,6 +27,7 @@ import { useLiabilityDetail, useLiabilityTypes } from '../api/liability';
 import dayjs from 'dayjs';
 import { plannedBills, ruleError } from '../lib/liability';
 import { popupInParent } from '../lib/popup';
+import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 
 interface FormValues {
   name: string;
@@ -53,6 +54,7 @@ export default function Accounts() {
   const { create, update, remove } = useAccountMutations();
 
   const [open, setOpen] = useState(false);
+  useVisualViewportKeyboard(open);
   const [editing, setEditing] = useState<Account | null>(null);
   const [form] = Form.useForm<FormValues>();
   const values = Form.useWatch([], form) as FormValues | undefined;

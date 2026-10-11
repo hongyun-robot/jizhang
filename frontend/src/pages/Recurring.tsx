@@ -19,6 +19,7 @@ import { PauseOutlined, PlayCircleOutlined, PlusOutlined } from '@ant-design/ico
 import { errMsg } from '../api/client';
 import { rootsOfKind } from '../api/category';
 import { useAccounts, useCategoryForest, useRuleMutations, useRules } from '../api/hooks';
+import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 import type { CategoryForest, CategoryKind, RecurringRule, RuleFreq } from '../api/types';
 import { useAuth } from '../stores/auth';
 import { popupInParent } from '../lib/popup';
@@ -97,6 +98,7 @@ export default function Recurring() {
   const { create, update, setStatus, remove } = useRuleMutations();
 
   const [open, setOpen] = useState(false);
+  useVisualViewportKeyboard(open);
   const [editing, setEditing] = useState<RecurringRule | null>(null);
   const [form, setForm] = useState<FormState>(defaultForm);
   const patch = (p: Partial<FormState>) => setForm((f) => ({ ...f, ...p }));

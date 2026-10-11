@@ -7,6 +7,7 @@ import { rootsOfKind } from '../api/category';
 import type { TxnKind, Transaction } from '../api/types';
 import { errMsg } from '../api/client';
 import { useAuth } from '../stores/auth';
+import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 import VoucherFormModal from './VoucherFormModal';
 import VoucherPlatformInput from './VoucherPlatformInput';
 import { useNavigate } from 'react-router-dom';
@@ -60,6 +61,7 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   const navigate = useNavigate();
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
+  useVisualViewportKeyboard(open);
 
   const accounts = useAccounts();
   const forest = useCategoryForest();

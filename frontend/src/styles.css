@@ -2304,6 +2304,31 @@ tr.flash > td {
   border-radius: 8px;
 }
 
+/* 软键盘避让（specs/transactions 软键盘避让）：
+   --kb-inset 由 useVisualViewportKeyboard 写入键盘遮挡高度（无键盘/布局已自收缩时为 0）。
+   仅 ≤767px 生效：.ant-modal 限高为「可视高度 - 遮挡高度」、body 内部滚动，
+   提交按钮始终落在可视区内；kb-inset=0 时即 100vh 限高（移动端弹窗本就 ≤1 屏高，形态不变）；桌面不受影响。 */
+@media (max-width: 767px) {
+  :root {
+    --kb-inset: 0px;
+  }
+  .ant-modal {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - var(--kb-inset) - 16px);
+  }
+  .ant-modal-container {
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+    overflow: hidden;
+  }
+  .ant-modal-body {
+    flex: 1 1 auto;
+    overflow: auto;
+  }
+}
+
 /* 分页 */
 .ant-pagination .ant-pagination-item {
   border-radius: 8px;

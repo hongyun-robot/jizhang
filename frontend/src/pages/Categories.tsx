@@ -4,6 +4,7 @@ import { PlusOutlined } from '@ant-design/icons';
 
 import { errMsg } from '../api/client';
 import { useCategoryForest, useCategoryMutations } from '../api/hooks';
+import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 import { rootsOfKind } from '../api/category';
 import type { CategoryKind, CategoryTreeNode } from '../api/types';
 
@@ -17,6 +18,7 @@ export default function Categories() {
   const { create, update, remove } = useCategoryMutations();
 
   const [open, setOpen] = useState(false);
+  useVisualViewportKeyboard(open);
   const [kind, setKind] = useState<CategoryKind>('expense');
   const [parent, setParent] = useState<CategoryTreeNode | null>(null);
   const [name, setName] = useState('');
