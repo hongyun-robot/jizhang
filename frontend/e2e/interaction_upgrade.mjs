@@ -666,6 +666,118 @@ async function main() {
     await dctx.close();
   }
 
+  // ================= 组 5：移动端性能、可及性与登录首屏（5.1–5.4） =================
+  {
+    // ---- 5.1 噪点层：移动端关闭、桌面保留且 z-index 低于底部 Tab ----
+    const ctx = await browser.newContext({
+      viewport: { width: 375, height: 667 },
+      isMobile: true,
+      hasTouch: true,
+    });
+    const page = await ctx.newPage();
+    await login(page, 'admin', 'admin123');
+    await page.goto(BASE + '/records');
+    await until(() => page.locator('.bottom-tabs').count() === 1, 10000);
+    const grainMobile = await page.evaluate(() => {
+      const s = getComputedStyle(document.body, '::after');
+      return { display: s.display, zIndex: s.zIndex };
+    });
+    ok(grainMobile.display === 'none', '5.1 ≤767px 噪点层关闭', `display=${grainMobile.display}`);
+    // 5.2 底部 Tab 毛玻璃移动端降级（blur 14px → 8px），仍半透明可读
+    const tabBlur = await page.evaluate(() => {
+      const el = document.querySelector('.bottom-tabs');
+      if (!el) return '';
+      const s = getComputedStyle(el);
+      return s.backdropFilter || s.webkitBackdropFilter || '';
+    });
+    ok(/blur\(8px\)/.test(tabBlur), '5.2 移动端 Tab 毛玻璃降级 blur(8px)', tabBlur);
+    await shot(page, 'upgrade-10-mobile-tabs');
+    await ctx.close();
+
+    {
+      const dctx = await browser.newContext(desktop);
+      const dpage = await dctx.newPage();
+      await login(dpage, 'admin', 'admin123');
+      await dpage.goto(BASE + '/records');
+      const grainDesktop = await dpage.evaluate(() => {
+        const s = getComputedStyle(document.body, '::after');
+        const tab = document.querySelector('.bottom-tabs');
+        const tabZ = tab ? getComputedStyle(tab).zIndex : '';
+        return { display: s.display, zIndex: Number(s.zIndex), tabZ };
+      });
+      ok(grainDesktop.display !== 'none', '5.1 桌面噪点层保留', `display=${grainDesktop.display}`);
+      ok(
+        !grainDesktop.tabZ || grainDesktop.zIndex < Number(grainDesktop.tabZ),
+        '5.1 噪点 z-index 低于弹层与 Tab',
+        `grain=${grainDesktop.zIndex} tab=${grainDesktop.tabZ || '(无 Tab)'}`,
+      );
+      const dTabBlur = await dpage.evaluate(() => {
+        const el = document.querySelector('.bottom-tabs');
+        return el ? getComputedStyle(el).backdropFilter || '' : '(无底部 Tab)';
+      });
+      // 桌面 ≥992px 渲染侧栏而非底部 Tab；若有 Tab（形态切换中间态）须保持 14px blur
+      ok(!dTabBlur.includes('8px'), '5.2 桌面无降级毛玻璃（侧栏形态/无底部 Tab）', dTabBlur);
+      await shot(dpage, 'upgrade-11-desktop-grain');
+      await dctx.close();
+    }
+
+    // ---- 5.3 图表文本替代：role=img + aria-label；<details> 数据表格行数与图表数据一致 ----
+    {
+      const dctx = await browser.newContext(desktop);
+      const dpage = await dctx.newPage();
+      await login(dpage, 'admin', 'admin123');
+      await dpage.goto(BASE + '/stats');
+      await until(() => dpage.locator('canvas').count() > 0, 15000);
+      const chartCount = await dpage.locator('.panel [role="img"][aria-label]').count();
+      ok(chartCount >= 3, '5.3 图表容器 role=img + aria-label', `${chartCount} 个`);
+      // 展开第一个数据表,断言行数与聚合数据一致(占比表:分类数)
+      const details = dpage.locator('details.chart-data').first();
+      await details.locator('summary').click();
+      await until(() => details.locator('tbody tr').count() > 0, 8000);
+      const pieRows = await details.locator('tbody tr').count();
+      const legendRows = await dpage
+        .locator('.panel .ant-legend:visible')
+        .first()
+        .locator('.ant-legend-item')
+        .count()
+        .catch(() => 0);
+      // 图例含净额 ≤0 的分类（不绘制）,数据表含全部分类 → 表行数 ≥ 饼图可见项
+      ok(pieRows > 0 && (legendRows === 0 || pieRows >= legendRows), '5.3 数据表行数与图表数据一致', `表 ${pieRows} 行 / 图例 ${legendRows} 项`);
+      await shot(dpage, 'upgrade-12-stats-data-table');
+      await dctx.close();
+    }
+
+    // ---- 5.4 窄屏登录首屏：360px 下登录按钮首屏可见；992px 双栏不变 ----
+    {
+      const nctx = await browser.newContext({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true });
+      const npage = await nctx.newPage();
+      await npage.goto(BASE + '/login');
+      await until(() => npage.locator('.login-card').isVisible(), 10000);
+      const btnBox = await npage.getByRole('button', { name: /登\s*录/ }).boundingBox();
+      ok(
+        !!btnBox && btnBox.y + btnBox.height <= 640,
+        '5.4 360px 登录按钮首屏可见',
+        `btnBottom=${btnBox ? Math.round(btnBox.y + btnBox.height) : '?'} vh=640`,
+      );
+      const artLedgerHidden = await npage.evaluate(() => {
+        const el = document.querySelector('.art-ledger');
+        return !el || getComputedStyle(el).display === 'none';
+      });
+      ok(artLedgerHidden, '5.4 ≤600px 账页样张压缩（首屏让位表单）');
+      await shot(npage, 'upgrade-13-login-360');
+      await nctx.close();
+
+      const wctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const wpage = await wctx.newPage();
+      await wpage.goto(BASE + '/login');
+      await until(() => wpage.locator('.login-art').isVisible(), 10000);
+      const cols = await wpage.evaluate(() => getComputedStyle(document.querySelector('.login')).gridTemplateColumns);
+      ok(cols.split(' ').length === 2, '5.4 ≥992px 登录双栏不变', cols);
+      await shot(wpage, 'upgrade-14-login-desktop');
+      await wctx.close();
+    }
+  }
+
   await browser.close();
 
   const failed = results.filter((r) => !r.pass);

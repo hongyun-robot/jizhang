@@ -37,6 +37,30 @@ function cmpPct(p: number | null, goodWhenUp: boolean) {
   return { ...base, cls: good ? 'pct-up' : 'pct-down' };
 }
 
+/**
+ * 图表数据的文本替代（可及性，specs/statistics 图表文本替代）：
+ * 同一份聚合数据渲染成 <details> 内的表格，默认收起不占首屏；行数由调用方数据决定。
+ */
+function ChartDataTable({ label, head, rows }: { label: string; head: string[]; rows: (string | number)[][] }) {
+  return (
+    <details className="chart-data">
+      <summary className="muted small">{label}</summary>
+      <table>
+        <thead>
+          <tr>{head.map((h) => <th key={h} scope="col">{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i}>
+              {r.map((c, j) => (j === 0 ? <th key={j} scope="row">{c}</th> : <td key={j}>{c}</td>))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
+  );
+}
+
 /** 统计页（specs/statistics）：占比/趋势/环比/汇总/资产走势，共用区间选择器。 */
 export default function Stats() {
   const screens = Grid.useBreakpoint();
@@ -234,7 +258,16 @@ export default function Stats() {
               <div className="share-total">
                 合计 <Money value={share?.total} tone={shareKind} />
               </div>
-              <EChart option={pieOption} height={260} />
+              <EChart
+                option={pieOption}
+                height={260}
+                ariaLabel={`${shareKind === 'expense' ? '支出' : '收入'}分类占比，合计 ${fmtMoney(share?.total)}`}
+              />
+              <ChartDataTable
+                label="查看数据表"
+                head={['分类', '金额']}
+                rows={(share?.items ?? []).map((i) => [i.name, fmtMoney(Number(i.amount))])}
+              />
             </>
           </QueryState>
         </Card>
@@ -263,7 +296,17 @@ export default function Stats() {
             onRetry={() => void trend.refetch()}
             skeleton={<Spin />}
           >
-            <EChart option={trendOption} height={260} />
+            <EChart option={trendOption} height={260} ariaLabel="收支趋势" />
+            <ChartDataTable
+              label="查看数据表"
+              head={['周期', '收入', '支出', '结余']}
+              rows={(trend.data?.points ?? []).map((p) => [
+                p.label,
+                fmtMoney(Number(p.income)),
+                fmtMoney(Number(p.expense)),
+                fmtMoney(Number(p.balance)),
+              ])}
+            />
           </QueryState>
         </Card>
 
@@ -280,7 +323,16 @@ export default function Stats() {
                 {compare.data?.start} ~ {compare.data?.end} vs {compare.data?.previous_start} ~{' '}
                 {compare.data?.previous_end}
               </div>
-              <EChart option={compareOption} height={200} />
+              <EChart option={compareOption} height={200} ariaLabel="本期环比" />
+              <ChartDataTable
+                label="查看数据表"
+                head={['指标', '本期', '上期']}
+                rows={[
+                  ['收入', fmtMoney(cur?.income), fmtMoney(prev?.income)],
+                  ['支出', fmtMoney(cur?.expense), fmtMoney(prev?.expense)],
+                  ['结余', fmtMoney(cur?.balance), fmtMoney(prev?.balance)],
+                ]}
+              />
               <div className="cmp-row">
                 <span className={cmpPct(ch?.income_percent ?? null, true).cls}>
                   收入 {cmpPct(ch?.income_percent ?? null, true).text}

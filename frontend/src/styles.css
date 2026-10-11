@@ -78,7 +78,8 @@ html {
   --radius-row: 10px;
   --radius-ctl: 9px;
 
-  --z-grain: 60;
+  /* 噪点层：低于底部 Tab（20）与一切弹层（1000+），不遮挡任何交互层 */
+  --z-grain: 10;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -132,7 +133,9 @@ body {
   font-synthesis-weight: none;
 }
 
-/* 纸面颗粒：固定在最上层的极淡噪点，破掉数字平面的塑料感 */
+/* 纸面颗粒：极淡噪点，破掉数字平面的塑料感。
+   z-index 低于弹层（Modal/Drawer=1000+），避免噪点盖住弹窗；
+   ≤767px 关闭：移动设备 GPU 合成开销敏感，噪点层是每帧全屏合成（specs/transactions 移动端性能） */
 body::after {
   content: '';
   position: fixed;
@@ -144,6 +147,11 @@ body::after {
 }
 [data-theme='dark'] body::after {
   opacity: 0.05;
+}
+@media (max-width: 767px) {
+  body::after {
+    display: none;
+  }
 }
 
 ::selection {
@@ -1696,6 +1704,38 @@ p {
   word-break: break-all;
 }
 
+/* 图表数据表（可及性）：<details> 默认收起,展开后全宽细表 */
+.chart-data {
+  margin-top: 8px;
+}
+.chart-data summary {
+  cursor: pointer;
+  user-select: none;
+  list-style-position: outside;
+}
+.chart-data table {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.chart-data th,
+.chart-data td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  font-weight: 400;
+}
+.chart-data th:first-child,
+.chart-data td:first-child {
+  text-align: left;
+}
+.chart-data thead th {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .period-table {
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -1751,6 +1791,13 @@ p {
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 20;
   box-shadow: 0 -8px 24px -20px rgba(0, 0, 0, 0.5);
+}
+/* ≤767px 毛玻璃降级为轻 blur：全宽 backdrop-filter 每帧合成开销高，滚动列表易掉帧 */
+@media (max-width: 767px) {
+  .bottom-tabs {
+    backdrop-filter: saturate(1.2) blur(8px);
+    -webkit-backdrop-filter: saturate(1.2) blur(8px);
+  }
 }
 
 .bottom-tabs .tab {
@@ -2476,6 +2523,23 @@ tr.flash > td {
   }
   .login-panel {
     padding: 30px 22px 44px;
+  }
+}
+
+/* ≤600px 登录首屏：样张压成一行品牌头（.art-top 含品牌名；标题/副题/账页样张让位），
+   登录表单与按钮首屏可见（specs/transactions 窄屏登录首屏） */
+@media (max-width: 600px) {
+  .login-art {
+    gap: 0;
+    padding: 14px 22px;
+  }
+  .login-art::after,
+  .art-copy,
+  .art-ledger {
+    display: none;
+  }
+  .login-panel {
+    padding: 24px 22px 36px;
   }
 }
 

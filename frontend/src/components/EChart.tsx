@@ -98,8 +98,21 @@ function applyTheme(option: EChartsOption, p: Palette): EChartsOption {
   return out as unknown as EChartsOption;
 }
 
-/** ECharts 轻封装：初始化/尺寸自适应/卸载释放；option 变化直接 setOption（跟随亮暗主题）。 */
-export default function EChart({ option, height = 280 }: { option: EChartsOption; height?: number }) {
+/**
+ * ECharts 轻封装：初始化/尺寸自适应/卸载释放；option 变化直接 setOption（跟随亮暗主题）。
+ * 可及性：容器 role="img" + 由 option 生成的 aria-label（标题/图例/数据点摘要），
+ * 屏幕阅读器可读图表语义；详情数据表由调用方（Stats）以 <details> 提供。
+ */
+export default function EChart({
+  option,
+  height = 280,
+  ariaLabel,
+}: {
+  option: EChartsOption;
+  height?: number;
+  /** 无障碍标签：调用方给业务语义（如「本月支出分类占比」）；缺省从 option 摘要生成 */
+  ariaLabel?: string;
+}) {
   const domRef = useRef<HTMLDivElement>(null);
   const instRef = useRef<echarts.ECharts | null>(null);
   const mode = useResolvedTheme();
@@ -124,5 +137,34 @@ export default function EChart({ option, height = 280 }: { option: EChartsOption
     instRef.current?.setOption(themed, true);
   }, [themed]);
 
-  return <div ref={domRef} style={{ width: '100%', height }} />;
+  const autoLabel = useMemo(() => describeOption(option), [option]);
+
+  return <div ref={domRef} role="img" aria-label={ariaLabel ?? autoLabel} style={{ width: '100%', height }} />;
+}
+
+/** 从 option 摘要生成图表 aria-label：标题 + 图例 + 各系列数据点（文本截断防过长）。 */
+function describeOption(option: EChartsOption): string {
+  const o = option as unknown as AnyOpt;
+  const clip = (s: unknown) => String(s ?? '').slice(0, 24);
+  const parts: string[] = [];
+  if (o.title?.text) parts.push(clip(o.title.text));
+  if (Array.isArray(o.legend?.data) && o.legend.data.length) {
+    parts.push(`图例：${o.legend.data.map(clip).join('、')}`);
+  }
+  const series = Array.isArray(o.series) ? o.series : o.series ? [o.series] : [];
+  const cats = Array.isArray(o.xAxis?.data) ? o.xAxis.data : [];
+  for (const s of series as AnyOpt[]) {
+    if (!s) continue;
+    const name = clip(s.name ?? s.type ?? '数据');
+    const data = Array.isArray(s.data) ? s.data : [];
+    if (data.length) {
+      const points = cats.length
+        ? data.slice(0, 8).map((v: unknown, i: number) => `${clip(cats[i] ?? i)} ${typeof v === 'object' ? clip((v as AnyOpt)?.value) : clip(v)}`)
+        : data.slice(0, 8).map((v: unknown, i: number) => `${i + 1} ${typeof v === 'object' ? clip((v as AnyOpt)?.value) : clip(v)}`);
+      parts.push(`${name}：${points.join('，')}${data.length > 8 ? ' 等' : ''}`);
+    } else {
+      parts.push(name);
+    }
+  }
+  return parts.join('；') || '图表';
 }

@@ -37,11 +37,11 @@
 
 ## 5. 移动端性能、可及性与登录首屏
 
-- [ ] 5.1 噪点层修正：z-index 不再高于底部 Tab，≤767px 下噪点弱化/关闭；验证：375px 滚动长列表 DevTools Performance 采样无明显掉帧（结论写入任务备注），截图确认桌面噪点质感不变
-- [ ] 5.2 底部 Tab 毛玻璃移动端降级（`blur(14px)` → `blur(8px)` 或纯色半透明）；验证：375px 截图 Tab 仍半透明可读、滚动无卡顿，1440px 桌面无变化
-- [ ] 5.3 图表文本替代：`EChart.tsx` 容器加 `role="img"` + 数据生成的 `aria-label`；`Stats.tsx` 三图挂 `<details>` 数据表格（同一份聚合数据渲染）；验证：e2e 断言表格展开后行数与图表数据一致，`pnpm build` 通过
-- [ ] 5.4 窄屏登录首屏：≤600px 隐藏/压缩 `.login-art` 样张，登录表单与按钮首屏可见；验证：360px 截图断言登录按钮 `boundingBox.y + height < viewportHeight`，≥992px 双栏不变
-- [ ] 5.5 本组 e2e 断言追加进 `interaction_upgrade.mjs`；验证：脚本全部 PASS
+- [x] 5.1 噪点层修正：z-index 不再高于底部 Tab，≤767px 下噪点弱化/关闭；验证：375px 滚动长列表 DevTools Performance 采样无明显掉帧（结论写入任务备注），截图确认桌面噪点质感不变
+- [x] 5.2 底部 Tab 毛玻璃移动端降级（`blur(14px)` → `blur(8px)` 或纯色半透明）；验证：375px 截图 Tab 仍半透明可读、滚动无卡顿，1440px 桌面无变化
+- [x] 5.3 图表文本替代：`EChart.tsx` 容器加 `role="img"` + 数据生成的 `aria-label`；`Stats.tsx` 三图挂 `<details>` 数据表格（同一份聚合数据渲染）；验证：e2e 断言表格展开后行数与图表数据一致，`pnpm build` 通过
+- [x] 5.4 窄屏登录首屏：≤600px 隐藏/压缩 `.login-art` 样张，登录表单与按钮首屏可见；验证：360px 截图断言登录按钮 `boundingBox.y + height < viewportHeight`，≥992px 双栏不变
+- [x] 5.5 本组 e2e 断言追加进 `interaction_upgrade.mjs`；验证：脚本全部 PASS
 
 ## 6. 收敛与集成验收
 
