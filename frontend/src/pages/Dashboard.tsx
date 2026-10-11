@@ -11,6 +11,7 @@ import Money, { fmtMoney } from '../components/Money';
 import BudgetProgress from '../components/BudgetProgress';
 import QueryState from '../components/QueryState';
 import TxnFormModal from '../components/TxnFormModal';
+import { lastSearchOf } from '../components/AppShell';
 
 /** 指针柔光：把坐标写进 CSS 变量，只在精确指针设备上出现。 */
 function trackPointer(e: React.PointerEvent<HTMLElement>) {
@@ -213,11 +214,11 @@ export default function Dashboard() {
                   key={t.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => navigate('/records', { state: { locateId: t.id } })}
+                  onClick={() => navigate(`/records${lastSearchOf('/records')}`, { state: { locateId: t.id } })}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      navigate('/records', { state: { locateId: t.id } });
+                      navigate(`/records${lastSearchOf('/records')}`, { state: { locateId: t.id } });
                     }
                   }}
                 >

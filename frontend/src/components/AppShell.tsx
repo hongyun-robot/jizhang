@@ -42,6 +42,23 @@ function activeKey(pathname: string): string {
   return navItems.find((i) => i.path !== '/' && pathname.startsWith(i.path))?.key ?? 'dash';
 }
 
+/**
+ * 各路径最近一次的查询串：切 Tab 返回时带上（specs/transactions 筛选状态跨路由保留）。
+ * URL 仍是唯一事实来源——这里只记住「离开时该路径长什么样」，由 AppShell 在每次导航后回填。
+ */
+const lastSearch = new Map<string, string>();
+
+/** 导航目标 = 路径 + 该路径最近一次查询串；已是当前地址则不重复压栈。 */
+function navTarget(path: string, current: string): string | null {
+  const target = path + (lastSearch.get(path) ?? '');
+  return target === current ? null : target;
+}
+
+/** 路径最近一次的查询串：首页 locateId 跳转等非 Tab 导航复用（specs/transactions 筛选跨路由保留）。 */
+export function lastSearchOf(pathname: string): string {
+  return lastSearch.get(pathname) ?? '';
+}
+
 /** 侧栏「本期」速览：结余 + 预算水位，把导航下方的留白变成可扫读的信息位。 */
 function SiderBrief() {
   const compare = useStatsCompare(null);
@@ -111,7 +128,13 @@ export function DesktopShell({ children }: { children?: React.ReactNode }) {
           mode="inline"
           selectedKeys={[activeKey(location.pathname)]}
           items={navItems.map((i) => ({ key: i.key, icon: i.icon, label: i.label }))}
-          onClick={({ key }) => navigate(navItems.find((i) => i.key === key)!.path)}
+          onClick={({ key }) => {
+            const target = navTarget(
+              navItems.find((i) => i.key === key)!.path,
+              location.pathname + location.search,
+            );
+            if (target) navigate(target);
+          }}
         />
         <SiderBrief />
         <div className="sider-foot">
@@ -155,7 +178,10 @@ export function MobileShell({ children }: { children?: React.ReactNode }) {
             type="button"
             className={current === i.key ? 'tab active' : 'tab'}
             aria-current={current === i.key ? 'page' : undefined}
-            onClick={() => navigate(i.path)}
+            onClick={() => {
+              const target = navTarget(i.path, location.pathname + location.search);
+              if (target) navigate(target);
+            }}
           >
             {i.icon}
             <span>{i.label}</span>
@@ -206,5 +232,9 @@ export default function AppShell() {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
+  // 记住每个路径最近一次的查询串：流水页切走再切回时恢复筛选（specs/transactions 跨路由保留）
+  useEffect(() => {
+    lastSearch.set(location.pathname, location.search);
+  }, [location.pathname, location.search]);
   return isMobile ? <MobileShell /> : <DesktopShell />;
 }

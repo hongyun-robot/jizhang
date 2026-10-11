@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, type ApiBody } from './client';
 import type {
@@ -120,6 +120,26 @@ export function useTxnList(params: TxnListParams) {
   });
 }
 
+/**
+ * 流水列表的无限查询变体（specs/transactions 移动端列表加载）。
+ * key = 扁平筛选 + 起始页：分页控件跳页换起始页即换 key —— 命中既有起始页直接取页缓存，
+ * 未命中请求该页回填；上拉加载在同一 key 下追加页，不打断缓存。
+ * 原 `useTxnList` 保持不动，供统计/首页复用。
+ */
+export function useTxnListInfinite(params: TxnListParams, startPage: number) {
+  const flatUrl = txnQueryUrl({ ...params, page: undefined, page_size: undefined });
+  const pageSize = params.page_size ?? 20;
+  return useInfiniteQuery({
+    queryKey: ['txns-inf', flatUrl, startPage],
+    queryFn: ({ pageParam }) => unwrap<TxnListResp>(txnQueryUrl({ ...params, page: pageParam })),
+    initialPageParam: startPage,
+    // pages[0] 即起始页：下一页 = 起始页 + 已加载页数（key 含起始页，闭包与缓存一致）
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.items.length < pageSize ? undefined : startPage + allPages.length,
+    placeholderData: (prev) => prev,
+  });
+}
+
 export function useStatsCategory(range: DateRange) {
   const url = `/stats/category${qs({ start_date: range.start, end_date: range.end })}`;
   return useQuery({
@@ -179,6 +199,8 @@ function useTxnInvalidate() {
   const qc = useQueryClient();
   return () => {
     void qc.invalidateQueries({ queryKey: ['txns'] });
+    // 流水列表的无限查询变体（key 首段是 'txns-inf'，与 'txns' 无前缀包含关系，须单独失效）
+    void qc.invalidateQueries({ queryKey: ['txns-inf'] });
     void qc.invalidateQueries({ queryKey: ['voucher-platforms'] });
     void qc.invalidateQueries({ queryKey: ['accounts'] });
     void qc.invalidateQueries({ queryKey: ['liabilities'] });

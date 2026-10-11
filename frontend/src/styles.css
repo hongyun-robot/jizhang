@@ -817,6 +817,7 @@ p {
 /* ---------- 13. 流水列表 ---------- */
 
 .txn-list {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--panel);
@@ -824,6 +825,35 @@ p {
   border-radius: var(--radius-panel);
   overflow: hidden;
   box-shadow: var(--shadow-1);
+}
+
+/* 下拉刷新指示器：绝对定位在列表顶，只动 transform；高度与 Records.tsx 的 PTR_H(32px) 一致 */
+.ptr-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--panel);
+  pointer-events: none;
+  transform: translateY(-32px);
+  transition: transform 0.18s ease-out;
+}
+
+/* 上拉加载：进行中指示 + 底部哨兵（IntersectionObserver 的观察目标） */
+.load-more {
+  padding: 10px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.load-sentinel {
+  height: 1px;
 }
 
 .txn-row {
@@ -2555,7 +2585,9 @@ tr.flash > td {
   .txn-row::before,
   .recent-row.clickable::after,
   .row-actions,
-  .txn-actions {
+  .txn-actions,
+  /* 下拉刷新指示器在减弱动效下瞬时到位，不做过渡 */
+  .ptr-indicator {
     transition: none !important;
   }
   .bottom-tabs .tab:active,

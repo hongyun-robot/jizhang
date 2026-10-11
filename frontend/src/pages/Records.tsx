@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type HTMLAttributes } from 'react';
+import { useEffect, useMemo, useRef, useState, type HTMLAttributes } from 'react';
 import dayjs from 'dayjs';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useNavigationType, useSearchParams } from 'react-router-dom';
 import {
   App,
   Button,
@@ -25,9 +25,9 @@ import {
   useAccounts,
   useCategoryForest,
   useDeleteTxn,
-  useTxnList,
+  useTxnListInfinite,
 } from '../api/hooks';
-import type { CategoryTreeNode, DateRange, TxnKind, Transaction } from '../api/types';
+import type { CategoryTreeNode, DateRange, TxnKind, Transaction, TxnListParams } from '../api/types';
 import { useAuth } from '../stores/auth';
 import Money from '../components/Money';
 import PeriodPicker, { presetRange } from '../components/PeriodPicker';
@@ -36,6 +36,9 @@ import TxnFormModal, { type TxnRefill } from '../components/TxnFormModal';
 import { VOUCHER_PURPOSE_LABEL } from '../labels';
 
 const PAGE_SIZE = 20;
+/** 下拉刷新指示器高度与触发阈值（高度与 styles.css 的 .ptr-indicator 一致）。 */
+const PTR_H = 32;
+const PTR_TRIGGER = 56;
 
 interface FilterState {
   range: DateRange;
@@ -81,6 +84,54 @@ function flattenForest(forest?: CategoryTreeNode[] | null) {
   return { info, options: groups };
 }
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const KINDS: TxnKind[] = ['expense', 'income', 'transfer', 'refund'];
+
+/** 筛选状态 → URL 查询串（design D1）：区间用 from/to，其余键与 params 同名；默认值不写入 URL。 */
+function serializeFilters(f: FilterState, page: number, def: DateRange): URLSearchParams {
+  const sp = new URLSearchParams();
+  if (f.range.start !== def.start || f.range.end !== def.end) {
+    sp.set('from', f.range.start);
+    sp.set('to', f.range.end);
+  }
+  if (f.kind) sp.set('kind', f.kind);
+  if (f.account_id) sp.set('account_id', String(f.account_id));
+  if (f.category_id) sp.set('category_id', String(f.category_id));
+  if (f.keyword) sp.set('keyword', f.keyword);
+  if (f.amount_min) sp.set('amount_min', f.amount_min);
+  if (f.amount_max) sp.set('amount_max', f.amount_max);
+  if (f.related_txn_id) sp.set('related_txn_id', String(f.related_txn_id));
+  if (page > 1) sp.set('page', String(page));
+  return sp;
+}
+
+/** URL 查询串 → 筛选状态；缺省/非法值回落默认区间与空条件。 */
+function parseFilters(sp: URLSearchParams, def: DateRange): FilterState {
+  const from = sp.get('from');
+  const to = sp.get('to');
+  const posInt = (v: string | null) => {
+    const n = Number(v);
+    return v && Number.isSafeInteger(n) && n > 0 ? n : undefined;
+  };
+  const kind = sp.get('kind') as TxnKind | null;
+  return {
+    range: from && to && ISO_DATE.test(from) && ISO_DATE.test(to) ? { start: from, end: to } : def,
+    kind: kind && KINDS.includes(kind) ? kind : '',
+    account_id: posInt(sp.get('account_id')),
+    category_id: posInt(sp.get('category_id')),
+    amount_min: sp.get('amount_min') || undefined,
+    amount_max: sp.get('amount_max') || undefined,
+    keyword: sp.get('keyword') ?? '',
+    related_txn_id: posInt(sp.get('related_txn_id')),
+  };
+}
+
+/** 页码同样序列化进 URL；1 页为默认不写入。 */
+function parsePage(sp: URLSearchParams): number {
+  const n = Number(sp.get('page'));
+  return Number.isSafeInteger(n) && n > 1 ? n : 1;
+}
+
 /** 流水列表（4.5）：共享区间选择器 + 组合筛选 + offset 分页 + 记一笔/编辑/删除。 */
 export default function Records() {
   const { message } = App.useApp();
@@ -92,12 +143,17 @@ export default function Records() {
   const forest = useCategoryForest();
   const delTxn = useDeleteTxn();
 
-  const [filters, setFilters] = useState<FilterState>({
-    range: presetRange('thisMonth'),
-    kind: '',
-    keyword: '',
-  });
-  const [page, setPage] = useState(1);
+  // 筛选条件与页码的单一事实来源是 URL searchParams（design D1）：
+  // 切 Tab、前进后退、分享链接均可恢复；router state 只存一次性定位（locateId）。
+  const [searchParams, setSearchParams] = useSearchParams();
+  const defaultRange = useMemo(() => presetRange('thisMonth'), []);
+  const filters = useMemo(
+    () => parseFilters(searchParams, defaultRange),
+    [searchParams, defaultRange],
+  );
+  const page = useMemo(() => parsePage(searchParams), [searchParams]);
+  // 无限查询的起始页：进页/分享链接以 URL 页码起步，分页跳页时切换（进查询 key，见 useTxnListInfinite）
+  const [startPage, setStartPage] = useState(page);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [refill, setRefill] = useState<TxnRefill | null>(null);
@@ -129,7 +185,28 @@ export default function Records() {
     }),
     [filters, page],
   );
-  const list = useTxnList(params);
+  const list = useTxnListInfinite(params, startPage);
+  // 扁平展示：已加载页按序展开；total 取末页（服务端每页都带 total）
+  const items = useMemo(() => list.data?.pages.flatMap((p) => p.items) ?? [], [list.data]);
+  const total = useMemo(() => {
+    const pages = list.data?.pages;
+    if (!pages?.length) return 0;
+    return pages[pages.length - 1].total;
+  }, [list.data]);
+  // 导出走扁平筛选（不含 page/page_size）：URL 页码只服务列表，不改变 CSV 导出语义
+  const exportParams = useMemo<TxnListParams>(() => {
+    const rest: TxnListParams = { ...params };
+    delete rest.page;
+    delete rest.page_size;
+    return rest;
+  }, [params]);
+
+  // 浏览器后退/前进（POP）把起始页同步回 URL 页码；滚动加载的 REPLACE 不触发，避免打断追加缓存
+  const navigationType = useNavigationType();
+  useEffect(() => {
+    if (navigationType !== 'POP') return;
+    setStartPage((sp) => (sp === page ? sp : page));
+  }, [navigationType, page]);
 
   // 首页「最近流水」点击 → 跳转本页并定位高亮该笔（home-dashboard 场景）
   const location = useLocation();
@@ -137,21 +214,97 @@ export default function Records() {
   const locateId = (location.state as { locateId?: number } | null)?.locateId;
   useEffect(() => {
     if (!locateId || !list.data || list.isLoading) return;
+    // 断点未定时首帧按移动形态渲染（isMobile=!screens.md），该列表会随形态切换被卸载；
+    // 等形态稳定再定位，避免闪烁加在即将卸载的节点上（查询缓存命中时最容易踩中）
+    if (screens.md === undefined) return;
     const el = document.querySelector(`[data-txn-id="${locateId}"]`);
     if (el) {
       el.scrollIntoView({ block: 'center' });
       el.classList.add('flash');
       const timer = setTimeout(() => el.classList.remove('flash'), 1800);
-      navigate('/records', { replace: true, state: null });
+      // 清一次性定位 state 时必须带上当前 search，否则会把 URL 里的筛选条件一并清掉（design D1 高风险点）
+      navigate({ pathname: '/records', search: location.search }, { replace: true, state: null });
       return () => clearTimeout(timer);
     }
     // 目标不在当前区间/页内也清掉状态，避免反复触发
-    navigate('/records', { replace: true, state: null });
-  }, [locateId, list.data, list.isLoading, navigate]);
+    navigate({ pathname: '/records', search: location.search }, { replace: true, state: null });
+  }, [locateId, list.data, list.isLoading, navigate, location.search, screens.md]);
 
   const patch = (p: Partial<FilterState>) => {
-    setFilters((f) => ({ ...f, ...p }));
-    setPage(1);
+    // 条件变化回到第 1 页（page=1 默认不写入 URL）；push 历史让「改筛选 → 后退」可恢复
+    setSearchParams(serializeFilters({ ...filters, ...p }, 1, defaultRange), { replace: false });
+    setStartPage(1); // 新条件从首页起步，丢弃旧条件的追加缓存
+  };
+
+  /** 分页控件切页（兜底路径）：换起始页（key 命中直取/未命中回填）、push 历史、加载后回顶。 */
+  const gotoPage = (p: number) => {
+    setStartPage(p);
+    setSearchParams(serializeFilters(filters, p, defaultRange), { replace: false });
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+  };
+
+  /** 上拉加载：追加成功后把 URL 页码同步到已加载到的页（replace，滚动不产生历史条目）。 */
+  const loadNext = async () => {
+    const res = await list.fetchNextPage();
+    const pages = res.data?.pages;
+    if (!res.isSuccess || !pages?.length) return;
+    let idx = pages.length - 1;
+    while (idx > 0 && !pages[idx].items.length) idx--; // 末页可能为空（总数恰为整页时最后一页取不到）
+    const loaded = startPage + idx;
+    if (loaded !== page) {
+      setSearchParams(serializeFilters(filters, loaded, defaultRange), { replace: true });
+    }
+  };
+
+  // 上拉加载哨兵：观察器只随移动形态创建一次，回调经 ref 读取最新状态，
+  // 避免「追加中 isFetchingNextPage 变化 → 重建观察器 → 立刻又触发」的重复加载
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const fetchingNextRef = useRef(false);
+  fetchingNextRef.current = list.isFetchingNextPage;
+  const hasNextRef = useRef(false);
+  hasNextRef.current = list.hasNextPage;
+  const loadNextRef = useRef<() => void>(() => {});
+  loadNextRef.current = () => void loadNext();
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!isMobile || !el) return;
+    const ob = new IntersectionObserver(
+      (entries) => {
+        const e = entries[entries.length - 1];
+        if (!e?.isIntersecting) return;
+        // 未滚动过（如跳页回顶后）不自动续载，避免跳页后立刻又加载相邻页的跳页感（design D2）
+        if (window.scrollY <= 0) return;
+        if (!hasNextRef.current || fetchingNextRef.current) return;
+        loadNextRef.current();
+      },
+      { rootMargin: '240px 0px' },
+    );
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, [isMobile]);
+
+  // 下拉刷新：仅列表顶部（scrollY===0）下拉生效；指示器只动 transform，
+  // prefers-reduced-motion 下无过渡（样式在 styles.css）；失败时 isError 走 QueryState + 重试
+  const [pull, setPull] = useState(0);
+  const pullStartY = useRef(0);
+  const pulling = useRef(false);
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY > 0 || list.isRefetching || list.isError) return;
+    pulling.current = true;
+    pullStartY.current = e.touches[0]?.clientY ?? 0;
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!pulling.current) return;
+    const dy = (e.touches[0]?.clientY ?? 0) - pullStartY.current;
+    setPull(dy <= 0 ? 0 : Math.min(dy * 0.5, PTR_H * 2));
+  };
+  const onTouchEnd = () => {
+    if (!pulling.current) return;
+    pulling.current = false;
+    const triggered = pull >= PTR_TRIGGER;
+    setPull(0);
+    if (triggered) void list.refetch();
   };
 
   const canEdit = (t: Transaction) => {
@@ -207,7 +360,7 @@ export default function Records() {
   const doExport = async () => {
     setExporting(true);
     try {
-      await exportTxns(params);
+      await exportTxns(exportParams);
     } catch (e) {
       message.error(errMsg(e));
     } finally {
@@ -327,7 +480,7 @@ export default function Records() {
         <div>
           <div className="eyebrow">
             {list.data
-              ? `${filters.range.start.replace(/-/g, '.')} – ${filters.range.end.replace(/-/g, '.')} · ${list.data.total.toLocaleString('zh-CN')} 笔`
+              ? `${filters.range.start.replace(/-/g, '.')} – ${filters.range.end.replace(/-/g, '.')} · ${total.toLocaleString('zh-CN')} 笔`
               : '载入中'}
           </div>
           <h2>流水</h2>
@@ -415,7 +568,21 @@ export default function Records() {
       </div>
 
       {isMobile ? (
-        <div className="txn-list">
+        <div
+          className="txn-list"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          {/* 下拉刷新指示器：只动 transform，状态由 pull/isRefetching 驱动 */}
+          <div
+            className="ptr-indicator"
+            style={{
+              transform: `translateY(${list.isRefetching ? 0 : Math.min(pull, PTR_H) - PTR_H}px)`,
+            }}
+          >
+            {list.isRefetching ? '刷新中…' : pull >= PTR_TRIGGER ? '松开刷新' : '下拉刷新'}
+          </div>
           {/* 错误态单列：请求失败不得渲染成「暂无数据」空态（specs/ui-shell 数据加载错误态） */}
           {list.isError ? (
             <QueryState error={list.error} onRetry={() => void list.refetch()} />
@@ -424,7 +591,7 @@ export default function Records() {
               <Skeleton active paragraph={{ rows: 5 }} title={false} />
             </div>
           ) : (
-            (list.data?.items ?? []).map((t) => (
+            items.map((t) => (
               <div className="txn-row" key={t.id} data-txn-id={t.id}>
                 <div className="txn-main">
                   <div className="txn-title">
@@ -470,11 +637,22 @@ export default function Records() {
               </div>
             ))
           )}
-          {!list.isLoading && !list.isError && (list.data?.items ?? []).length === 0 && (
+          {!list.isLoading && !list.isError && items.length === 0 && (
             <div className="list-empty">
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />
             </div>
           )}
+          {/* 上拉加载：进行中指示 + 底部哨兵（IntersectionObserver 触发 fetchNextPage） */}
+          {list.isFetchingNextPage && (
+            <div className="load-more" role="status">
+              加载中…
+            </div>
+          )}
+          <div
+            className="load-sentinel"
+            ref={sentinelRef}
+            style={{ display: list.hasNextPage ? undefined : 'none' }}
+          />
         </div>
       ) : (
         <div className="panel">
@@ -485,7 +663,7 @@ export default function Records() {
               rowKey="id"
               size="small"
               loading={list.isLoading}
-              dataSource={list.data?.items ?? []}
+              dataSource={items}
               columns={columns}
               pagination={false}
               scroll={{ x: 990 }}
@@ -501,8 +679,8 @@ export default function Records() {
         <Pagination
           current={page}
           pageSize={PAGE_SIZE}
-          total={list.data?.total ?? 0}
-          onChange={(p) => setPage(p)}
+          total={total}
+          onChange={gotoPage}
           showSizeChanger={false}
           showTotal={(t) => `共 ${t} 笔`}
           size="small"

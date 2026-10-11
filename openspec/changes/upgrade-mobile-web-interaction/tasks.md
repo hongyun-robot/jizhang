@@ -5,22 +5,22 @@
 
 ## 0. 前置检查
 
-- [ ] 0.1 确认阶段 1+2 已落地：`components/QueryState.tsx` 存在、`AppShell.tsx` 形态切换基于 `lg` 断点、`styles.css` 存在 ≤767px 热区块；验证：三项逐一打开文件确认，任一缺失则先回去完成前一变更，不开工本变更
+- [x] 0.1 确认阶段 1+2 已落地：`components/QueryState.tsx` 存在、`AppShell.tsx` 形态切换基于 `lg` 断点、`styles.css` 存在 ≤767px 热区块；验证：三项逐一打开文件确认，任一缺失则先回去完成前一变更，不开工本变更
 
 ## 1. 流水筛选 URL 持久化
 
-- [ ] 1.1 改造 `Records.tsx`：`useSearchParams` 成为 `FilterState` 与 `page` 的单一事实来源，`patch()` 改 `setSearchParams`（push 历史），默认值（本月区间、`page=1`、空条件）不写入 URL；验证：改筛选后地址栏出现 `?kind=expense&...`，刷新页面条件保持
-- [ ] 1.2 保住 `locateId` 定位链路：`Records.tsx:144/148` 的 `navigate('/records', { replace: true, state: null })` 改为携带当前 `search`；验证：e2e 断言"首页点最近流水 → 定位高亮生效 → URL 筛选条件仍在 → 定位后二次导航不重触发"
-- [ ] 1.3 前进/后退与分享恢复：验证：e2e 断言"设筛选 A → 改为 B → 后退恢复 A 且列表刷新"、"复制 URL 到新页面打开恢复 B"
-- [ ] 1.4 新建 `frontend/e2e/interaction_upgrade.mjs`（沿用 `walkthrough.mjs` 的 `ok/login/shot` 结构），落地 1.1–1.3 断言；验证：`node e2e/interaction_upgrade.mjs` 全部 PASS
+- [x] 1.1 改造 `Records.tsx`：`useSearchParams` 成为 `FilterState` 与 `page` 的单一事实来源，`patch()` 改 `setSearchParams`（push 历史），默认值（本月区间、`page=1`、空条件）不写入 URL；验证：改筛选后地址栏出现 `?kind=expense&...`，刷新页面条件保持
+- [x] 1.2 保住 `locateId` 定位链路：`Records.tsx:144/148` 的 `navigate('/records', { replace: true, state: null })` 改为携带当前 `search`；验证：e2e 断言"首页点最近流水 → 定位高亮生效 → URL 筛选条件仍在 → 定位后二次导航不重触发"
+- [x] 1.3 前进/后退与分享恢复：验证：e2e 断言"设筛选 A → 改为 B → 后退恢复 A 且列表刷新"、"复制 URL 到新页面打开恢复 B"
+- [x] 1.4 新建 `frontend/e2e/interaction_upgrade.mjs`（沿用 `walkthrough.mjs` 的 `ok/login/shot` 结构），落地 1.1–1.3 断言；验证：`node e2e/interaction_upgrade.mjs` 全部 PASS
 
 ## 2. 移动端列表加载
 
-- [ ] 2.1 新增流水列表的无限查询变体（`useInfiniteQuery`），保留原 `useTxnList` 给统计/导出复用；导出继续传扁平筛选（不含 page）；验证：桌面分页与导出行为与改动前一致（`node e2e/export.mjs` PASS）
-- [ ] 2.2 上拉加载：列表底部 sentinel + 原生 `IntersectionObserver` 触发 `fetchNextPage`，`isFetchingNextPage` 期间不重复触发并展示进行中指示；验证：e2e 在 375px 视口滚到底 → 断言新增行出现、请求数 +1，快速连滚 → 仍只 +1
-- [ ] 2.3 分页控件兼容 + 翻页回顶：点击分页切页时缓存命中直取、未命中回填，加载后列表回到顶部；验证：e2e 点第 3 页 → 断言 `scrollY` 归 0 且首条为第 41 条
-- [ ] 2.4 下拉刷新：列表 `scrollTop === 0` 下拉超阈值松手触发 `refetch`（指示器只动 `transform`，`prefers-reduced-motion` 下无过渡）；验证：e2e touch 下拉 → 断言触发一次刷新请求并展示最新数据；刷新失败 → 走 `QueryState` 错误态 + 重试
-- [ ] 2.5 本组 e2e 断言追加进 `interaction_upgrade.mjs`；验证：脚本全部 PASS，桌面 1440px 分页控件仍正常
+- [x] 2.1 新增流水列表的无限查询变体（`useInfiniteQuery`），保留原 `useTxnList` 给统计/导出复用；导出继续传扁平筛选（不含 page）；验证：桌面分页与导出行为与改动前一致（`node e2e/export.mjs` PASS）
+- [x] 2.2 上拉加载：列表底部 sentinel + 原生 `IntersectionObserver` 触发 `fetchNextPage`，`isFetchingNextPage` 期间不重复触发并展示进行中指示；验证：e2e 在 375px 视口滚到底 → 断言新增行出现、请求数 +1，快速连滚 → 仍只 +1
+- [x] 2.3 分页控件兼容 + 翻页回顶：点击分页切页时缓存命中直取、未命中回填，加载后列表回到顶部；验证：e2e 点第 3 页 → 断言 `scrollY` 归 0 且首条为第 41 条
+- [x] 2.4 下拉刷新：列表 `scrollTop === 0` 下拉超阈值松手触发 `refetch`（指示器只动 `transform`，`prefers-reduced-motion` 下无过渡）；验证：e2e touch 下拉 → 断言触发一次刷新请求并展示最新数据；刷新失败 → 走 `QueryState` 错误态 + 重试
+- [x] 2.5 本组 e2e 断言追加进 `interaction_upgrade.mjs`；验证：脚本全部 PASS，桌面 1440px 分页控件仍正常
 
 ## 3. 筛选栏移动端收纳
 

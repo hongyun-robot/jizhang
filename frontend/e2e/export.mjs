@@ -112,10 +112,28 @@ async function main() {
   const total0 = await listTotal(page);
   ok(total0 > 0, '列表有数据', `total=${total0}`);
 
+  // 基线（导出为纯读）：导出前先取本月支出合计，全部导出完成后再对比。
+  // 不硬编码金额/月份——数据演进或跨月运行都不误报，语义仍是「导出不改数据」。
+  const periodKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const monthExpenseSum = async (token) => {
+    const r = await fetch(
+      `${API}/transactions?period_key=${periodKey}&kind=expense&page_size=100`,
+      { headers: { authorization: `Bearer ${token}` } },
+    );
+    const j = await r.json();
+    return j.data.items.reduce((s, t) => s + Number(t.amount), 0);
+  };
+  const sumBefore = await monthExpenseSum(await apiLogin('admin', 'admin123'));
+
   const f0 = await doExport(page, 'default');
   const c0 = parseCsv(f0);
   ok(c0.bom, 'BOM 头三字节 = EF BB BF');
-  ok(c0.header === '日期,类型,分类,账户,转入账户,金额,备注,来源', '表头与列表列一致', c0.header);
+  ok(
+    c0.header ===
+      '日期,类型,分类,账户,转入账户,金额,备注,来源,用途,券编号,余额影响,消费影响,平台 / 商家',
+    'CSV 表头与后端导出契约一致（含券/用途扩展列）',
+    c0.header,
+  );
   ok(c0.dataLines === total0, '默认区间导出行数 = 列表命中数', `${c0.dataLines} vs ${total0}`);
 
   // 中文完整性（Excel 不乱码由 BOM 保证；此处校验 UTF-8 解码后中文完好）
@@ -140,7 +158,7 @@ async function main() {
   ok(!/^\d{4}-\d\d-\d\d,收入,/m.test(c1.text), '筛选导出不含收入行（kind=支出 生效）');
 
   // 再叠加备注关键字（基线里有备注「午饭」的流水）
-  await page.locator('input[placeholder="备注关键字"]').fill('午饭');
+  await page.locator('input[placeholder="备注 / 平台 / 商家"]').fill('午饭');
   await sleep(800);
   const totalKw = await listTotal(page);
   const f2 = await doExport(page, 'keyword');
@@ -170,14 +188,14 @@ async function main() {
   ok(c3.dataLines === totalV, 'viewer 导出行数 = 其列表命中数', `${c3.dataLines} vs ${totalV}`);
   await shot(page, 'export-03-viewer');
 
-  // ================= 4. 基线未被触碰（导出为纯读） =================
+  // ================= 4. 基线未被触碰（导出为纯读，导出前后同参对比） =================
   const tokenA = await apiLogin('admin', 'admin123');
-  const r2 = await fetch(`${API}/transactions?period_key=2026-10&kind=expense&page_size=100`, {
-    headers: { authorization: `Bearer ${tokenA}` },
-  });
-  const j2 = await r2.json();
-  const sum = j2.data.items.reduce((s, t) => s + Number(t.amount), 0);
-  ok(sum.toFixed(2) === '922.66', '基线未变：2026-10 支出仍为 922.66', sum.toFixed(2));
+  const sumAfter = await monthExpenseSum(tokenA);
+  ok(
+    sumAfter === sumBefore,
+    `基线未变：${periodKey} 支出合计导出前后一致`,
+    `${sumBefore} → ${sumAfter}`,
+  );
 
   await ctx.close();
   await browser.close();
