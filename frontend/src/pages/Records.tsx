@@ -3,8 +3,10 @@ import dayjs from 'dayjs';
 import { useLocation, useNavigate, useNavigationType, useSearchParams } from 'react-router-dom';
 import {
   App,
+  Badge,
   Button,
   Cascader,
+  Drawer,
   Empty,
   Grid,
   Input,
@@ -17,7 +19,7 @@ import {
   Table,
   Tag,
 } from 'antd';
-import { DownloadOutlined, PlusOutlined } from '@ant-design/icons';
+import { DownloadOutlined, FilterOutlined, PlusOutlined } from '@ant-design/icons';
 
 import { errMsg } from '../api/client';
 import {
@@ -52,6 +54,17 @@ interface FilterState {
   related_txn_id?: number;
 }
 
+/** 「清除」重置的条件部分（range 由调用方补默认区间）。 */
+const EMPTY_FILTERS = {
+  kind: '' as const,
+  account_id: undefined,
+  category_id: undefined,
+  amount_min: undefined,
+  amount_max: undefined,
+  keyword: '',
+  related_txn_id: undefined,
+};
+
 /** 扁平化分类树 → id 显示信息（含一级名，用于「餐饮/午餐」展示与 Cascader 选项）。 */
 function flattenForest(forest?: CategoryTreeNode[] | null) {
   const info = new Map<number, { name: string; full: string; kind: string; parent?: number }>();
@@ -82,6 +95,114 @@ function flattenForest(forest?: CategoryTreeNode[] | null) {
     }
   }
   return { info, options: groups };
+}
+
+const KIND_LABEL: Record<TxnKind, string> = {
+  expense: '支出',
+  income: '收入',
+  transfer: '转账',
+  refund: '退款',
+};
+
+/** 分类级联路径（叶子 id → [分组, 叶子]），供 Cascader 受控回显。 */
+function catPathOf(
+  options: { value: number; label: string; children?: { value: number; label: string }[] }[],
+  id?: number,
+) {
+  if (!id) return undefined;
+  for (const g of options) {
+    if (g.value === id) return [g.value];
+    if (g.children?.some((c) => c.value === id)) return [g.value, id];
+  }
+  return undefined;
+}
+
+interface FilterControlsProps {
+  filters: FilterState;
+  patch: (p: Partial<FilterState>) => void;
+  accountOptions: { value: number; label: string }[];
+  catOptions: { value: number; label: string; children?: { value: number; label: string }[] }[];
+  /** 传入即渲染「清除」按钮（移动端抽屉用；桌面 filter-bar 保持既有布局不加按钮）。 */
+  onClear?: () => void;
+}
+
+/**
+ * 组合筛选控件组（区间/类型/账户/分类/关键字/金额/清除）：
+ * 桌面 filter-bar 与移动底部抽屉共用同一份实现，仅容器不同（specs/transactions 筛选栏收纳）。
+ */
+function FilterControls({ filters, patch, accountOptions, catOptions, onClear }: FilterControlsProps) {
+  return (
+    <>
+      <PeriodPicker value={filters.range} onChange={(range) => patch({ range })} />
+      <Segmented
+        size="small"
+        value={filters.kind}
+        options={[
+          { value: '', label: '全部' },
+          { value: 'expense', label: '支出' },
+          { value: 'income', label: '收入' },
+          { value: 'transfer', label: '转账' },
+          { value: 'refund', label: '退款' },
+        ]}
+        onChange={(v) => patch({ kind: v as TxnKind | '' })}
+      />
+      {filters.related_txn_id ? (
+        <Tag color="green" onClose={() => patch({ related_txn_id: undefined })} closable>
+          关联退款 #{filters.related_txn_id}
+        </Tag>
+      ) : null}
+      <Select
+        size="small"
+        allowClear
+        placeholder="账户"
+        style={{ minWidth: 110 }}
+        value={filters.account_id}
+        options={accountOptions}
+        onChange={(v) => patch({ account_id: v })}
+      />
+      <Cascader
+        size="small"
+        allowClear
+        placeholder="分类"
+        style={{ minWidth: 130 }}
+        value={catPathOf(catOptions, filters.category_id)}
+        options={catOptions}
+        onChange={(v) => patch({ category_id: v.length ? (v[v.length - 1] as number) : undefined })}
+      />
+      <Input
+        size="small"
+        allowClear
+        placeholder="备注 / 平台 / 商家"
+        style={{ width: 130 }}
+        value={filters.keyword}
+        onChange={(e) => patch({ keyword: e.target.value })}
+      />
+      <span className="amount-range">
+        <InputNumber
+          size="small"
+          placeholder="金额≥"
+          style={{ width: 96 }}
+          min={0}
+          value={filters.amount_min ? Number(filters.amount_min) : null}
+          onChange={(v) => patch({ amount_min: v !== null && v !== undefined ? String(v) : undefined })}
+        />
+        <span className="sep">–</span>
+        <InputNumber
+          size="small"
+          placeholder="金额≤"
+          style={{ width: 96 }}
+          min={0}
+          value={filters.amount_max ? Number(filters.amount_max) : null}
+          onChange={(v) => patch({ amount_max: v !== null && v !== undefined ? String(v) : undefined })}
+        />
+      </span>
+      {onClear ? (
+        <Button size="small" onClick={onClear}>
+          清除
+        </Button>
+      ) : null}
+    </>
+  );
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -235,6 +356,46 @@ export default function Records() {
     setSearchParams(serializeFilters({ ...filters, ...p }, 1, defaultRange), { replace: false });
     setStartPage(1); // 新条件从首页起步，丢弃旧条件的追加缓存
   };
+
+  // 移动端筛选收纳（specs/transactions 筛选栏收纳）：底部抽屉 + 单行条件摘要
+  const [filterOpen, setFilterOpen] = useState(false);
+  const clearFilters = () => patch({ ...EMPTY_FILTERS, range: defaultRange });
+  /** 生效条件摘要（区间恒显；其余仅显非默认项）与条件数（角标）。 */
+  const { summary: filterSummary, count: activeCondCount } = useMemo(() => {
+    const parts: string[] = [
+      `${filters.range.start.replace(/-/g, '.')} – ${filters.range.end.replace(/-/g, '.')}`,
+    ];
+    let count = filters.range.start !== defaultRange.start || filters.range.end !== defaultRange.end ? 1 : 0;
+    if (filters.kind) {
+      parts.push(KIND_LABEL[filters.kind]);
+      count++;
+    }
+    if (filters.account_id) {
+      parts.push(acctName.get(filters.account_id) ?? `账户#${filters.account_id}`);
+      count++;
+    }
+    if (filters.category_id) {
+      parts.push(catInfo.get(filters.category_id)?.full ?? `分类#${filters.category_id}`);
+      count++;
+    }
+    if (filters.keyword) {
+      parts.push(filters.keyword);
+      count++;
+    }
+    if (filters.amount_min) {
+      parts.push(`≥${filters.amount_min}`);
+      count++;
+    }
+    if (filters.amount_max) {
+      parts.push(`≤${filters.amount_max}`);
+      count++;
+    }
+    if (filters.related_txn_id) {
+      parts.push(`退款#${filters.related_txn_id}`);
+      count++;
+    }
+    return { summary: parts.join(' · '), count };
+  }, [filters, defaultRange, acctName, catInfo]);
 
   /** 分页控件切页（兜底路径）：换起始页（key 命中直取/未命中回填）、push 历史、加载后回顶。 */
   const gotoPage = (p: number) => {
@@ -500,72 +661,43 @@ export default function Records() {
         </div>
       </div>
 
-      {/* 组合筛选：区间与统计页共用同一选择器（specs/transactions） */}
-      <div className="filter-bar">
-        <PeriodPicker value={filters.range} onChange={(range) => patch({ range })} />
-        <Segmented
-          size="small"
-          value={filters.kind}
-          options={[
-            { value: '', label: '全部' },
-            { value: 'expense', label: '支出' },
-            { value: 'income', label: '收入' },
-            { value: 'transfer', label: '转账' },
-            { value: 'refund', label: '退款' },
-          ]}
-          onChange={(v) => patch({ kind: v as TxnKind | '' })}
-        />
-        {filters.related_txn_id ? (
-          <Tag
-            closable
-            color="green"
-            onClose={() => patch({ related_txn_id: undefined })}
-          >
-            关联退款 #{filters.related_txn_id}
-          </Tag>
-        ) : null}
-        <Select
-          size="small"
-          allowClear
-          placeholder="账户"
-          style={{ minWidth: 110 }}
-          options={accountOptions}
-          onChange={(v) => patch({ account_id: v })}
-        />
-        <Cascader
-          size="small"
-          allowClear
-          placeholder="分类"
-          style={{ minWidth: 130 }}
-          options={catOptions}
-          onChange={(v) => patch({ category_id: v.length ? (v[v.length - 1] as number) : undefined })}
-        />
-        <Input
-          size="small"
-          allowClear
-          placeholder="备注 / 平台 / 商家"
-          style={{ width: 130 }}
-          value={filters.keyword}
-          onChange={(e) => patch({ keyword: e.target.value })}
-        />
-        <span className="amount-range">
-          <InputNumber
-            size="small"
-            placeholder="金额≥"
-            style={{ width: 96 }}
-            min={0}
-            onChange={(v) => patch({ amount_min: v !== null && v !== undefined ? String(v) : undefined })}
+      {/* 组合筛选：桌面渲染既有 filter-bar；移动端收纳为「筛选入口 + 条件摘要」单行 + 底部抽屉 */}
+      {isMobile ? (
+        <div className="filter-entry">
+          <Badge count={activeCondCount} size="small">
+            <Button size="small" icon={<FilterOutlined />} onClick={() => setFilterOpen(true)}>
+              筛选
+            </Button>
+          </Badge>
+          <span className="filter-entry-summary">{filterSummary}</span>
+        </div>
+      ) : (
+        <div className="filter-bar">
+          <FilterControls
+            filters={filters}
+            patch={patch}
+            accountOptions={accountOptions}
+            catOptions={catOptions}
           />
-          <span className="sep">–</span>
-          <InputNumber
-            size="small"
-            placeholder="金额≤"
-            style={{ width: 96 }}
-            min={0}
-            onChange={(v) => patch({ amount_max: v !== null && v !== undefined ? String(v) : undefined })}
+        </div>
+      )}
+      <Drawer
+        title="筛选"
+        placement="bottom"
+        height="60vh"
+        open={isMobile && filterOpen}
+        onClose={() => setFilterOpen(false)}
+      >
+        <div className="filter-drawer-controls">
+          <FilterControls
+            filters={filters}
+            patch={patch}
+            accountOptions={accountOptions}
+            catOptions={catOptions}
+            onClear={clearFilters}
           />
-        </span>
-      </div>
+        </div>
+      </Drawer>
 
       {isMobile ? (
         <div

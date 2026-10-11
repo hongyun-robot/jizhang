@@ -345,8 +345,9 @@ async function main() {
     seedIds = await seedTxns(30, SEED_TAG);
     const seededTotal = (await api('/transactions?page=1&page_size=1')).json?.data?.total ?? 0;
     const TOTAL = seededTotal; // 造数后总笔数（≥41 才有第 3 页）
-    const P3ROWS = TOTAL - 40; // 第 3 页（末页）行数
-    if (TOTAL < 41) throw new Error(`seed: total ${TOTAL} < 41, insufficient for 3 pages`);
+    // 第 3 页行数按 API 实际返回取（基线笔数会随使用增长，总页数可能 >3，不能用 TOTAL-40 推算）
+    const P3ROWS = (await api('/transactions?page=3&page_size=20')).json?.data?.items?.length ?? 0;
+    if (TOTAL < 41 || P3ROWS === 0) throw new Error(`seed: total ${TOTAL}, page3 rows ${P3ROWS}, insufficient`);
 
     const ctx = await browser.newContext({
       viewport: { width: 375, height: 667 },
@@ -395,17 +396,19 @@ async function main() {
       await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }));
       await sleep(60);
     }
-    await until(async () => (await page.locator('.txn-row').count()) >= TOTAL, 15000);
+    // 基线笔数随使用增长，总页数可能 >3：等前 3 页（60 行）到位即证明 +1 页完成
+    const CUM3 = Math.min(TOTAL, 60);
+    await until(async () => (await page.locator('.txn-row').count()) >= CUM3, 15000);
     const p3 = listReqs.filter((p) => p === 3).length;
-    ok((await page.locator('.txn-row').count()) === TOTAL && p3 === 1, '2.2 加载中快速连滚仍只 +1（page=3 请求恰好 1 次）', `page3×${p3}`);
+    ok((await page.locator('.txn-row').count()) >= CUM3 && p3 === 1, '2.2 加载中快速连滚仍只 +1（page=3 请求恰好 1 次）', `page3×${p3}`);
     await shot(page, 'upgrade-04-mobile-infinite');
 
     // ---- 2.3 分页跳页：缓存命中直取 / 未命中回填、回顶、首条 = 第 41 条 ----
     await clickPager(page, 1);
     await until(() => !new URL(page.url()).searchParams.get('page'));
-    // startPage=1 的三页都已缓存 → 直取全部行（缓存命中路径）
-    await until(async () => (await page.locator('.txn-row').count()) === TOTAL);
-    ok((await page.locator('.txn-row').count()) === TOTAL, '2.3 回第 1 页缓存命中直取（全量行）', `${TOTAL} 行`);
+    // startPage=1 的前三页都已缓存 → 直取（缓存命中路径）；总页数可能 >3，只要求缓存页全量在位
+    await until(async () => (await page.locator('.txn-row').count()) >= CUM3);
+    ok((await page.locator('.txn-row').count()) >= CUM3, '2.3 回第 1 页缓存命中直取（全量行）', `>=${CUM3} 行`);
     // html 是 scroll-behavior: smooth，测试里的滚动必须显式 instant，否则读到动画中间态
     await page.evaluate(() => window.scrollTo({ top: 600, behavior: 'instant' }));
     const scrollBefore = await page.evaluate(() => window.scrollY);
@@ -481,14 +484,92 @@ async function main() {
     const totalTxt = await page.locator('.ant-pagination-total-text').innerText().catch(() => '');
     ok(new RegExp(`共\\s*${TOTAL}\\s*笔`).test(totalTxt), '2.5 桌面分页总数含造数', `${totalTxt} / 期望 ${TOTAL}`);
     await clickPager(page, 1);
-    await until(async () => (await page.locator('.ant-table-tbody tr.ant-table-row').count()) === 20);
-    ok(await page.locator('.ant-pagination-item-1').evaluate((el) => el.classList.contains('ant-pagination-item-active')), '2.5 桌面点第 1 页正常回切');
+    // 行数在 page3 也是满页时无法区分切页，等第 1 页 active 翻转（URL push 后渲染完成）
+    await until(() => page.locator('.ant-pagination-item-1.ant-pagination-item-active').count() === 1, 10000);
+    ok(
+      await page.locator('.ant-pagination-item-1').evaluate((el) => el.classList.contains('ant-pagination-item-active')),
+      '2.5 桌面点第 1 页正常回切',
+    );
     await ctx.close();
   }
   } finally {
     // 清理：无论成败都删除组 2 造数（否则残留数据会污染后续基线）
     for (const id of seedIds) await api(`/transactions/${id}`, { method: 'DELETE' });
     if (seedIds.length) console.log(`      组 2 造数已清理（${seedIds.length} 笔 ${SEED_TAG}）`);
+  }
+
+  // ================= 组 3：筛选栏移动端收纳（3.1–3.2，375px） =================
+  {
+    const ctx = await browser.newContext({
+      viewport: { width: 375, height: 667 },
+      isMobile: true,
+      hasTouch: true,
+    });
+    const page = await ctx.newPage();
+    await login(page, 'admin', 'admin123');
+    await page.goto(BASE + '/records');
+    await until(() => page.locator('.txn-row').count() > 0, 15000);
+
+    // 3.1 移动端单行「筛选入口 + 摘要」，不再渲染多行 filter-bar；首屏可见列表首行
+    ok((await page.locator('.filter-entry').count()) === 1, '3.1 移动端渲染单行筛选入口');
+    ok((await page.locator('.filter-bar').count()) === 0, '3.1 移动端不再渲染多行 filter-bar');
+    const head = await page.locator('.txn-row').first().boundingBox();
+    ok(
+      !!head && head.y + head.height <= 667,
+      '3.1 首屏可见列表首行（筛选栏不抢首屏）',
+      head ? `rowBottom=${Math.round(head.y + head.height)}` : '(no row)',
+    );
+    await shot(page, 'upgrade-07-mobile-filter-entry');
+
+    // 3.2 开抽屉改条件 → URL/列表刷新，收起后摘要同步
+    await page.locator('.filter-entry .ant-btn').click();
+    await until(() => page.locator('.ant-drawer-open').count() === 1, 8000);
+    ok((await page.locator('.ant-drawer-open').count()) === 1, '3.2 点筛选打开底部抽屉');
+    const totalBefore = await eyebrowTotal(page);
+    await clickSeg(page, '.ant-drawer-open', '支出');
+    await until(() => searchOf(page).includes('kind=expense'));
+    ok(searchOf(page) === '?kind=expense', '3.2 抽屉内改条件写入 URL', searchOf(page));
+    await until(async () => {
+      const t = await eyebrowTotal(page);
+      return t !== '' && t !== totalBefore;
+    }, 8000);
+    ok((await eyebrowTotal(page)) !== totalBefore, '3.2 抽屉内改条件列表刷新', `${totalBefore} → ${await eyebrowTotal(page)}`);
+    // 抽屉内应有「清除」按钮（antd 两字中文插空格）
+    ok(
+      await page.locator('.ant-drawer-open').getByRole('button', { name: /清\s*除/ }).isVisible().catch(() => false),
+      '3.2 抽屉内提供「清除」',
+    );
+    await shot(page, 'upgrade-08-mobile-filter-drawer');
+    // 收起抽屉 → 摘要同步显示「支出」
+    await page.locator('.ant-drawer-close').click();
+    await until(() => page.locator('.ant-drawer-open').count() === 0, 8000);
+    const summary = await page.locator('.filter-entry-summary').innerText();
+    ok(summary.includes('支出'), '3.2 收起后摘要与条件同步', summary);
+    ok((await page.locator('.filter-entry .ant-badge-count').innerText()) === '1', '3.2 摘要入口显示条件数角标');
+
+    // 3.2 清除 → 条件重置（URL 回默认、摘要只剩区间、角标消失）
+    await page.locator('.filter-entry .ant-btn').click();
+    await until(() => page.locator('.ant-drawer-open').count() === 1, 8000);
+    await page.locator('.ant-drawer-open').getByRole('button', { name: /清\s*除/ }).click();
+    await until(() => searchOf(page) === '');
+    ok(searchOf(page) === '', '3.2 清除后 URL 条件重置', searchOf(page) || '(empty)');
+    await page.locator('.ant-drawer-close').click();
+    await until(() => page.locator('.ant-drawer-open').count() === 0, 8000);
+    const summaryCleared = await page.locator('.filter-entry-summary').innerText();
+    ok(!summaryCleared.includes('支出') && /–/.test(summaryCleared), '3.2 清除后摘要只剩区间', summaryCleared);
+    await ctx.close();
+  }
+
+  // ---- 3.2 桌面筛选形态无回归（1440px 仍是 filter-bar，无收纳入口/抽屉） ----
+  {
+    const ctx = await browser.newContext(desktop);
+    const page = await ctx.newPage();
+    await login(page, 'admin', 'admin123');
+    await page.goto(BASE + '/records');
+    await page.locator('.ant-table-tbody tr.ant-table-row').first().waitFor({ timeout: 15000 });
+    ok((await page.locator('.filter-bar').count()) === 1, '3.2 桌面仍渲染 filter-bar');
+    ok((await page.locator('.filter-entry').count()) === 0, '3.2 桌面无移动端收纳入口');
+    await ctx.close();
   }
 
   await browser.close();
