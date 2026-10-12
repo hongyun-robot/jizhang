@@ -90,12 +90,14 @@ try {
   const mobileRow = page.locator('.txn-row').filter({ hasText: prefix });
   await mobileRow.getByText(/美团/).waitFor();
   await mobileRow.getByRole('button', { name: /编\s*辑/ }).click();
-  assert.equal(await field(true).inputValue(), '美团');
+  assert.equal(await field(true).innerText(), '美团');
   await field(true).click();
-  await option('美团').waitFor();
+  const sheet = page.getByRole('dialog', { name: '选择平台 / 商家', exact: true });
+  await sheet.getByRole('button', { name: '美团', exact: true }).waitFor();
   await settle();
   await page.screenshot({ path: path.join(shots, 'transaction-platform-mobile.png') });
-  await dialog(true).locator('.voucher-platform-input .ant-input-clear-icon').click();
+  await sheet.getByRole('button', { name: '清空平台 / 商家', exact: true }).click();
+  await sheet.waitFor({ state: 'hidden' });
   await dialog(true).getByRole('button', { name: /保\s*存/, exact: true }).click();
   await dialog(true).waitFor({ state: 'hidden' });
   assert.equal((await api('GET', `/transactions?keyword=${encodeURIComponent(prefix)}`)).items[0].platform, '');

@@ -156,25 +156,32 @@ try {
   await save('编辑券');
   assert.equal((await api('GET', `/vouchers/${voucher.id}`)).platform, edited);
   await page.locator('.voucher-actions').getByRole('button', { name: /编\s*辑\s*券/ }).click();
+  await settleModal();
   await modal('编辑券').locator('.voucher-platform-input .ant-input-clear-icon').click();
+  assert.equal(await field('编辑券').inputValue(), '');
+  const clearedRequest = page.waitForRequest((request) => request.method() === 'PUT' && request.url().endsWith(`/vouchers/${voucher.id}`));
   await save('编辑券');
+  assert.equal((await clearedRequest).postDataJSON().platform, '', 'cleared platform must be explicit in update');
   assert.equal((await api('GET', `/vouchers/${voucher.id}`)).platform, '');
   console.log('PASS desktop: keyboard creation, cancel persistence, selection, clearing, direct save, editing');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await open();
-  await field().fill(standalone);
-  await option(standalone).waitFor();
-  await settleModal();
-  await wait(async () => {
-    const box = await page.locator('.voucher-platform-dropdown:visible').boundingBox();
-    return box && box.x >= 0 && box.x + box.width <= 390;
-  }, 'mobile dropdown placement');
+  await field().click();
+  const sheet = page.getByRole('dialog', { name: '选择平台 / 商家', exact: true });
+  await sheet.getByPlaceholder('搜索，或输入新名称创建').fill(standalone);
+  await sheet.getByRole('button', { name: standalone, exact: true }).waitFor();
+  const box = await sheet.boundingBox();
+  assert(box && box.x >= 0 && box.x + box.width <= 390);
   await page.screenshot({ path: path.join(shots, 'voucher-platform-mobile.png') });
-  await option(standalone).click();
-  await create(prefix + '-手机创建');
+  await sheet.getByRole('button', { name: standalone, exact: true }).click();
+  await field().click();
+  const mobileName = prefix + '-手机创建';
+  await sheet.getByPlaceholder('搜索，或输入新名称创建').fill(mobileName);
+  await sheet.getByRole('button', { name: '创建「' + mobileName + '」', exact: true }).click();
+  await sheet.waitFor({ state: 'hidden' });
   await cancel();
-  console.log('PASS mobile: shared options, selection, creation, dropdown placement');
+  console.log('PASS mobile: shared options, selection, creation, bottom sheet placement');
   await page.setViewportSize({ width: 1139, height: 884 });
 
   // 读取失败保留输入，仍能直接提交券。

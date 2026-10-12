@@ -23,7 +23,7 @@
 ```powershell
 # 在 backend
 $env:LIABILITY_BROWSER_SERVER='1'
-go test ./internal/router -run '^TestLiabilityBrowserServer$' -v -timeout 25m
+go test ./internal/router -run '^TestLiabilityBrowserServer$' -count=1 -v -timeout 25m
 
 # 在 frontend
 $env:VITE_API_PROXY='http://127.0.0.1:18085'
@@ -72,7 +72,7 @@ node e2e/liabilities.mjs
 ```powershell
 # 终端一，在 backend
 $env:VOUCHER_BROWSER_SERVER='1'
-go test ./internal/router -run TestVoucherBrowserServer -v -timeout 25m
+go test ./internal/router -run TestVoucherBrowserServer -count=1 -v -timeout 25m
 
 # 终端二，在 frontend
 $env:VITE_API_PROXY='http://127.0.0.1:18084'
@@ -90,6 +90,40 @@ node e2e/transaction_platforms.mjs
 平台 / 商家脚本通过普通成员表单验证选择、键盘创建、取消保留、直接保存、编辑、清空及手机弹层；同时验证四个角色目录接口、未登录拒绝、读取失败后提交、创建响应丢失后重试和迟到响应保护。MySQL 集成测试覆盖 000006 历史回填、精确名称去重、并发创建与财务事务回滚。
 
 验收结束后调用 `Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:18084/__test__/stop'` 关闭测试后端，并停止测试 Vite 进程。
+
+## 前端基础重构验证
+
+在 `frontend` 运行 `npm run test:unit`、`npm run typecheck` 和 `npm run build`。`typecheck` 同时检查业务与测试源码。
+
+完整浏览器套件较长时，启动 fixture 前设置 `$env:BROWSER_FIXTURE_TTL='3h'`，Go 的 `-timeout` 设为 `4h`；未设置时仍为 20 分钟，允许范围为 1 分钟至 4 小时。`-count=1` 防止 Go 返回已完成的测试缓存而没有启动服务器。
+
+生产分包验收可在 `frontend` 用以下预览代替测试 Vite。预览只代理本机 fixture，测试辅助再次校验独立账本标识。
+
+```powershell
+node e2e/support/preview.mjs --dist=dist --port=5601 --api=http://127.0.0.1:18084
+```
+
+在另一个 `frontend` 终端顺序运行；资金、退出或换号测试共用账本，不并行执行。
+
+```powershell
+$scripts = @(
+  'refactor_foundations', 'refactor_navigation', 'refactor_errors',
+  'refactor_drafts', 'refactor_filters', 'refactor_cache',
+  'vouchers', 'voucher_retry', 'voucher_platforms', 'transaction_platforms',
+  'refactor_interactions', 'refactor_loading', 'refactor_background', 'refactor_keyboard',
+  'refactor_repairs'
+)
+foreach ($script in $scripts) {
+  node "e2e/$script.mjs"
+  if ($LASTEXITCODE -ne 0) { throw "浏览器验收失败：$script" }
+}
+```
+
+`refactor_loading` 需要生产构建，检查实际 JS/modulepreload 合计 gzip、资源失败恢复、主题和六档宽度。对子路径使用 `npx vite build --base=/jizhang/ --outDir=dist-subpath`，预览改为 `--dist=dist-subpath --port=5604 --base=/jizhang`，测试终端设置 `REFACTOR_E2E_BASE=http://127.0.0.1:5604/jizhang` 和 `REFACTOR_DIST=dist-subpath`。重建独立输出目录前应清理其旧构建产物，避免将过期文件算入总产物。
+
+负债 fixture 使用 18085/5602，在 `liabilities.mjs` 后运行 `refactor_settlement.mjs`，验证改字段后的预览失效、失败草稿、防重和重试标识。后者在 finally 关闭整个 18085 临时账本，不与其他负债脚本并行；重新运行会改变时钟的负债原始验收时应重新启动 fixture。`refactor_plan_retry.mjs` 使用新启动的负债 fixture，覆盖调整与退款核对的已提交响应丢失、后台更新后的完整请求重放，以及改值 409；也会在 finally 销毁账本，可用 `LIABILITY_FIXTURE_API` 指定对应本机 fixture 地址。`refactor_repairs.mjs` 验证记账/周期新草稿不被旧成功或旧失败关闭，以及侧栏首次/后台错误与重试。`refactor_keyboard` 模拟 visualViewport 收缩，实体手机键盘可另作人工复核。
+
+旧 SQL/开发脚本依赖历史种子账号，部分硬编码客户端路径和 `jizhang` 开发库并直接删除数据。应先按其文档建立临时 MySQL 账本，不能仅修改 BASE 就对真实库运行。本次结果、明确跳过的旧检查、截图和回滚说明见 `openspec/changes/archive/2026-10-12-refactor-frontend-foundations/acceptance.md`。
 
 ## 目录结构
 
