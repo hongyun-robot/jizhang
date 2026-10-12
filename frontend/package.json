@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test:unit": "vitest run",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },
@@ -17,18 +19,19 @@
     "axios": "^1.20.0",
     "dayjs": "^1.11.23",
     "echarts": "^6.1.0",
-    "echarts-for-react": "^3.0.6",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "playwright-core": "^1.63.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.2"
+    "vite": "^8.3.2",
+    "vitest": "~4.1.0"
   }
 }

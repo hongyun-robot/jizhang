@@ -159,10 +159,18 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 		}
 	}()
 	t.Log("BROWSER_READY http://" + address)
+	lifetime := 20 * time.Minute
+	if raw := os.Getenv("BROWSER_FIXTURE_TTL"); raw != "" {
+		configured, e := time.ParseDuration(raw)
+		if e != nil || configured < time.Minute || configured > 4*time.Hour {
+			t.Fatal("BROWSER_FIXTURE_TTL must be between 1m and 4h")
+		}
+		lifetime = configured
+	}
 	select {
 	case <-stop:
-	case <-time.After(20 * time.Minute):
-		t.Log("browser fixture auto-stopped after 20 minutes")
+	case <-time.After(lifetime):
+		t.Logf("browser fixture auto-stopped after %s", lifetime)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
