@@ -80,7 +80,7 @@ export function recordColumns({
       width: 120,
       render: (_: unknown, t: Transaction) =>
         t.kind === 'transfer'
-          ? `${acctName.get(t.account_id) ?? t.account_id} → ${acctName.get(t.transfer_account_id ?? 0) ?? ''}`
+          ? `${t.account_name_override ?? acctName.get(t.account_id) ?? t.account_id} → ${t.transfer_name_override ?? acctName.get(t.transfer_account_id ?? 0) ?? ''}`
           : (acctName.get(t.account_id) ?? t.account_id),
     },
     {
@@ -170,7 +170,7 @@ export function RecordRows({
             <div className="txn-sub">
               {dayjs(t.entry_date).format('MM-DD')} ·{' '}
               {t.kind === 'transfer'
-                ? `${acctName.get(t.account_id) ?? ''} → ${acctName.get(t.transfer_account_id ?? 0) ?? ''}`
+                ? `${t.account_name_override ?? acctName.get(t.account_id) ?? ''} → ${t.transfer_name_override ?? acctName.get(t.transfer_account_id ?? 0) ?? ''}`
                 : (acctName.get(t.account_id) ?? '')}
               {t.platform ? ` · ${t.platform}` : ''}
               {t.note ? ` · ${t.note}` : ''}

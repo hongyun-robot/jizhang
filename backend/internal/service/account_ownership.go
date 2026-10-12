@@ -9,8 +9,11 @@ import (
 func ownsLiability(actor *model.User, a model.Account) bool {
 	return actor != nil && a.Type == model.AccountLiability && a.OwnerID != nil && *a.OwnerID == actor.ID
 }
+func ownsAccount(actor *model.User, a model.Account) bool {
+	return CanView(actor) && a.OwnerID != nil && *a.OwnerID == actor.ID
+}
 func checkAccountOwnership(db *gorm.DB, actor *model.User, ids ...int64) error {
-	if actor == nil {
+	if !CanView(actor) {
 		return ErrTxnForbidden
 	}
 	for _, id := range ids {
@@ -21,7 +24,7 @@ func checkAccountOwnership(db *gorm.DB, actor *model.User, ids ...int64) error {
 		if err := db.First(&a, id).Error; err != nil {
 			return err
 		}
-		if a.Type == model.AccountLiability && !ownsLiability(actor, a) {
+		if !ownsAccount(actor, a) {
 			return ErrTxnForbidden
 		}
 	}
@@ -94,23 +97,26 @@ func (s *AccountService) EnsurePersonalLiabilities(actor *model.User) error {
 	return err
 }
 func (s *AccountService) ListFor(actor *model.User) ([]model.Account, error) {
+	if err := initializeCatalog(s.repo.DB(), actor, true); err != nil {
+		return nil, err
+	}
 	if err := s.EnsurePersonalLiabilities(actor); err != nil {
 		return nil, err
 	}
-	rows, err := s.repo.List()
+	rows, err := s.repo.ForOwner(actor.ID).List()
 	if err != nil {
 		return nil, err
 	}
 	out := []model.Account{}
 	for _, a := range rows {
-		if a.Type == model.AccountAsset || ownsLiability(actor, a) {
+		if ownsAccount(actor, a) {
 			out = append(out, a)
 		}
 	}
 	return out, nil
 }
 func (s *AccountService) CreateFor(actor *model.User, in CreateAccountInput) (*model.Account, error) {
-	if !CanView(actor) || (in.Type != model.AccountLiability && !CanManageSettings(actor)) {
+	if !CanView(actor) {
 		return nil, ErrTxnForbidden
 	}
 	if in.Type == model.AccountLiability {
@@ -129,11 +135,7 @@ func (s *AccountService) UpdateFor(actor *model.User, id int64, in CreateAccount
 	if a == nil {
 		return nil, ErrAccountNotFound
 	}
-	if a.Type == model.AccountLiability {
-		if !ownsLiability(actor, *a) || (in.Type != model.AccountLiability && !CanManageSettings(actor)) {
-			return nil, ErrTxnForbidden
-		}
-	} else if !CanManageSettings(actor) {
+	if !ownsAccount(actor, *a) {
 		return nil, ErrTxnForbidden
 	}
 	in.ActorID = actor.ID
@@ -147,16 +149,15 @@ func (s *AccountService) DeleteFor(actor *model.User, id int64) error {
 	if a == nil {
 		return ErrAccountNotFound
 	}
-	if a.Type == model.AccountLiability {
-		if !ownsLiability(actor, *a) {
-			return ErrTxnForbidden
-		}
-	} else if !CanManageSettings(actor) {
+	if !ownsAccount(actor, *a) {
 		return ErrTxnForbidden
 	}
 	return s.Delete(id)
 }
 func (s *TransactionService) checkInputOwnership(actor *model.User, in TxnInput) error {
+	if e := checkCategoryOwnership(s.deps.Accounts.DB(), actor, in.CategoryID); e != nil {
+		return e
+	}
 	if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, in.AccountID, in.TransferAccountID); e != nil {
 		return e
 	}
@@ -200,6 +201,7 @@ func (s *TransactionService) personalFilter(actor *model.User, f repository.TxnF
 	f.PersonalOwnerID = actor.ID
 	if p, ok := s.deps.Txns.(interface{ DB() *gorm.DB }); ok {
 		f.IncludeLiabilityLinks = p.DB().Migrator().HasTable(&model.LiabilityOperation{})
+		f.LegacyTransfers = p.DB().Migrator().HasTable("catalog_before_transactions")
 	}
 	return f
 }

@@ -70,7 +70,7 @@ func newBudgetEnv(t *testing.T) *budgetEnv {
 func (e *budgetEnv) seedCats(t *testing.T) (mealRoot, lunch, dinner, transitRoot, metro, salary int64) {
 	t.Helper()
 	mk := func(kind model.CategoryKind, name string, parent *int64) int64 {
-		c := model.Category{Kind: kind, Name: name, ParentID: parent}
+		c := model.Category{OwnerID: testOwner(1), Kind: kind, Name: name, ParentID: parent}
 		mustOK(t, e.catRepo.Create(&c))
 		return c.ID
 	}
@@ -86,8 +86,8 @@ func (e *budgetEnv) seedCats(t *testing.T) (mealRoot, lunch, dinner, transitRoot
 
 func (e *budgetEnv) seedAccounts(t *testing.T) (model.Account, model.Account) {
 	t.Helper()
-	a1 := model.Account{Name: "现金", Type: model.AccountAsset, Status: model.StatusActive}
-	a2 := model.Account{Name: "银行卡", Type: model.AccountAsset, Status: model.StatusActive}
+	a1 := model.Account{OwnerID: testOwner(1), Name: "现金", Type: model.AccountAsset, Status: model.StatusActive}
+	a2 := model.Account{OwnerID: testOwner(1), Name: "银行卡", Type: model.AccountAsset, Status: model.StatusActive}
 	mustOK(t, e.accRepo.Create(&a1))
 	mustOK(t, e.accRepo.Create(&a2))
 	return a1, a2

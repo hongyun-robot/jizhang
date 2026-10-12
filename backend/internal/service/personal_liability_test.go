@@ -58,8 +58,8 @@ func TestPersonalLiabilityAccountsAndIndependentRules(t *testing.T) {
 	if !errors.Is(err, ErrTxnForbidden) {
 		t.Fatal(err)
 	}
-	_, err = svc.CreateFor(member, CreateAccountInput{Name: "不能建共享资产", Type: model.AccountAsset})
-	if !errors.Is(err, ErrTxnForbidden) {
+	asset, assetErr := svc.CreateFor(member, CreateAccountInput{Name: "我的资产", Type: model.AccountAsset})
+	if assetErr != nil || asset.OwnerID == nil || *asset.OwnerID != member.ID {
 		t.Fatal(err)
 	}
 }
@@ -71,6 +71,9 @@ func TestPrivateLiabilityCannotBeAccessedThroughMoneyOrNotifications(t *testing.
 	day, due, offset := 31, 10, 1
 	own, err := svc.CreateFor(member, CreateAccountInput{Name: "私人负债", Type: model.AccountLiability, LiabilityType: "huabei", StatementDay: &day, RepaymentDay: &due, RepaymentMonthOffset: &offset})
 	mustOK(t, err)
+	category := model.Category{Name: "我的支出", Kind: model.KindExpense, OwnerID: &member.ID}
+	mustOK(t, e.db.Create(&category).Error)
+	e.category = category.ID
 	source, err := e.txn.Create(member, TxnInput{Kind: model.TxnExpense, Amount: dec("500"), AccountID: own.ID, CategoryID: e.category, EntryDate: e.now})
 	mustOK(t, err)
 	_, err = e.txn.Create(adminUser(), TxnInput{Kind: model.TxnTransfer, Amount: dec("100"), AccountID: e.account, TransferAccountID: own.ID, EntryDate: e.now})

@@ -28,6 +28,8 @@ type User struct {
 	Role                         Role       `json:"role"`
 	Status                       UserStatus `json:"status"`
 	LiabilityAccountsInitialized bool       `json:"-"`
+	AssetAccountsInitialized     bool       `json:"-"`
+	CategoriesInitialized        bool       `json:"-"`
 	CreatedAt                    time.Time  `json:"created_at"`
 	UpdatedAt                    time.Time  `json:"updated_at"`
 }

@@ -41,16 +41,19 @@ type TxnFilter struct {
 	PageSize              int
 	PersonalOwnerID       int64
 	IncludeLiabilityLinks bool
+	LegacyTransfers       bool
 }
 
 // applyFilter 组装筛选条件（List / ListAll 共用，导出与列表同一套筛选语义）。
 func applyFilter(q *gorm.DB, f TxnFilter) *gorm.DB {
 	if f.PersonalOwnerID > 0 {
-		link := "a.id = transactions.account_id OR a.id = transactions.transfer_account_id OR a.id IN (SELECT original.account_id FROM transactions original WHERE original.id = transactions.related_txn_id)"
-		if f.IncludeLiabilityLinks {
-			link += " OR a.id IN (SELECT account_id FROM liability_operations WHERE id = transactions.liability_operation_id) OR a.id IN (SELECT p.account_id FROM installment_terms term JOIN installment_plans p ON p.id = term.plan_id WHERE term.id = transactions.liability_term_id)"
+		visible := "EXISTS (SELECT 1 FROM accounts a WHERE a.id=transactions.account_id AND a.owner_id = ?)"
+		args := []any{f.PersonalOwnerID}
+		if f.LegacyTransfers {
+			visible += " OR (transactions.kind='transfer' AND transactions.id IN (SELECT id FROM catalog_before_transactions) AND EXISTS (SELECT 1 FROM accounts a WHERE a.id=transactions.transfer_account_id AND a.owner_id = ?))"
+			args = append(args, f.PersonalOwnerID)
 		}
-		q = q.Where("NOT EXISTS (SELECT 1 FROM accounts a WHERE a.type = 'liability' AND (a.owner_id IS NULL OR a.owner_id <> ?) AND ("+link+"))", f.PersonalOwnerID)
+		q = q.Where("("+visible+")", args...)
 	}
 	if f.PeriodKey != "" {
 		q = q.Where("period_key = ?", f.PeriodKey)

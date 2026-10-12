@@ -91,7 +91,14 @@ func (s *LiabilityService) Detail(actor *model.User, id int64) (*liability.Detai
 	if e := checkAccountOwnership(s.db, actor, id); e != nil {
 		return nil, e
 	}
-	return detailAt(s.db, id, s.Now())
+	detail, e := detailAt(s.db, id, s.Now())
+	if e != nil {
+		return nil, e
+	}
+	if e = s.txns.redactHistory(actor, detail.Transactions); e != nil {
+		return nil, e
+	}
+	return detail, nil
 }
 func (s *LiabilityService) Plan(actor *model.User, id int64) (model.InstallmentPlan, error) {
 	var p model.InstallmentPlan
@@ -339,6 +346,9 @@ func (s *LiabilityService) Allocate(actor *model.User, txnID int64, in Liability
 		}
 		if !CanModifyTransaction(actor, source.CreatedBy) {
 			return LiabilityResult{}, ErrTxnForbidden
+		}
+		if e := s.txns.bound(tx).checkPostingOwnership(actor, &source); e != nil {
+			return LiabilityResult{}, e
 		}
 		if source.LiabilityOperationID != nil {
 			return LiabilityResult{}, liability.ErrManaged

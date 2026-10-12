@@ -75,7 +75,7 @@ func TestLiabilityOrdinaryMutationAndAllFundDirections(t *testing.T) {
 	if !e.state(t).Summary.TotalDebt.IsZero() {
 		t.Fatal("delete left debt")
 	}
-	cat := model.Category{Name: "credit-income", Kind: model.KindIncome}
+	cat := model.Category{OwnerID: testOwner(1), Name: "credit-income", Kind: model.KindIncome}
 	mustOK(t, e.db.Create(&cat).Error)
 	_, err = e.txn.Create(adminUser(), TxnInput{Kind: model.TxnIncome, Amount: dec("50"), AccountID: e.card, CategoryID: cat.ID, EntryDate: vdate(t, "2026-11-02")})
 	mustOK(t, err)
@@ -85,7 +85,7 @@ func TestLiabilityOrdinaryMutationAndAllFundDirections(t *testing.T) {
 	if !d.Summary.Balance.Equal(dec("20")) {
 		t.Fatal(d.Summary)
 	}
-	cat2 := model.Category{Name: "actual asset expense", Kind: model.KindExpense}
+	cat2 := model.Category{OwnerID: testOwner(1), Name: "actual asset expense", Kind: model.KindExpense}
 	mustOK(t, e.db.Create(&cat2).Error)
 	_, err = e.txn.Create(adminUser(), TxnInput{Kind: model.TxnExpense, Amount: dec("5"), AccountID: e.account, CategoryID: cat2.ID, EntryDate: e.now})
 	mustOK(t, err)

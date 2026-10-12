@@ -34,8 +34,9 @@ func TestVoucherHTTPContract(t *testing.T) {
 	if err := db.AutoMigrate(&model.Setting{}, &model.Account{}, &model.Category{}, &model.Transaction{}, &model.PeriodClosing{}, &model.Voucher{}, &model.VoucherEvent{}, &model.VoucherPlatform{}); err != nil {
 		t.Fatal(err)
 	}
-	acc := model.Account{Name: "现金", Type: model.AccountAsset, Status: model.StatusActive}
-	cat := model.Category{Name: "餐饮", Kind: model.KindExpense}
+	owner := int64(1)
+	acc := model.Account{OwnerID: &owner, Name: "现金", Type: model.AccountAsset, Status: model.StatusActive}
+	cat := model.Category{OwnerID: &owner, Name: "餐饮", Kind: model.KindExpense}
 	if err := db.Create(&acc).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -154,6 +155,16 @@ func TestVoucherHTTPContract(t *testing.T) {
 	request("POST", "/transactions", "admin", plain, 400)
 	delete(plain, "purpose")
 	plain["platform"] = "  流水商家  "
+	memberOwner := int64(2)
+	memberAccount := model.Account{OwnerID: &memberOwner, Name: "成员资产", Type: model.AccountAsset, Status: model.StatusActive}
+	memberCategory := model.Category{OwnerID: &memberOwner, Name: "成员支出", Kind: model.KindExpense}
+	if err := db.Create(&memberAccount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&memberCategory).Error; err != nil {
+		t.Fatal(err)
+	}
+	plain["account_id"], plain["category_id"] = memberAccount.ID, memberCategory.ID
 	var regular model.Transaction
 	if err := json.Unmarshal(request("POST", "/transactions", "member", plain, 200), &regular); err != nil || regular.Platform != "流水商家" {
 		t.Fatal("HTTP did not preserve platform", regular, err)
@@ -161,6 +172,7 @@ func TestVoucherHTTPContract(t *testing.T) {
 	plain["platform"] = strings.Repeat("商", 129)
 	request("POST", "/transactions", "member", plain, 400)
 	delete(plain, "platform")
+	plain["account_id"], plain["category_id"] = acc.ID, cat.ID
 	request("PUT", fmt.Sprintf("/transactions/%d", purchase.ID), "admin", plain, 409)
 	today := time.Now().In(time.FixedZone("Beijing", 8*3600))
 	input["purchase_date"] = today.AddDate(0, 0, -2).Format("2006-01-02")

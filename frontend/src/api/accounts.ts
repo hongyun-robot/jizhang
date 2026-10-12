@@ -18,6 +18,7 @@ export function useAccounts() {
 // ---------- 账户 / 分类写操作（管理员） ----------
 
 export interface AccountInput {
+  request_key?: string;
   name: string;
   type: 'asset' | 'liability';
   opening_balance?: string;

@@ -1,4 +1,5 @@
 import ResponsiveSelect from '../../../components/ResponsiveSelect';
+import AccountSelect from '../../../components/AccountSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
 import { Button, DatePicker, Form, Input, Space } from 'antd';
@@ -34,8 +35,10 @@ export default function SettlementFields({
         label="本金还款账户"
         rules={[{ required: true }]}
       >
-        <ResponsiveSelect
-          sheetTitle="本金还款账户"
+        <AccountSelect
+          assetOnly
+            onCreatingChange={context.setCreatingAccount}
+            sheetTitle="本金还款账户"
           options={assets}
           getPopupContainer={popupInParent}
         />
@@ -53,7 +56,9 @@ export default function SettlementFields({
           label="结清费支付账户"
           rules={[{ required: true }]}
         >
-          <ResponsiveSelect
+          <AccountSelect
+            assetOnly
+            onCreatingChange={context.setCreatingAccount}
             sheetTitle="结清费支付账户"
             options={feeAccounts}
             style={{ minWidth: 190 }}

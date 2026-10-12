@@ -142,6 +142,7 @@ export default function Recurring() {
                     {catInfo.get(r.category_id) ?? '分类已删除'} ·{' '}
                     {acctName.get(r.account_id) ?? '账户已删除'}
                     {r.note ? ` · ${r.note}` : ''}
+                    {r.blocked_reason && <div role="status">{r.blocked_reason}</div>}
                   </div>
                   <div className="rule-meta">
                     {dayjs(r.start_date).format('YYYY-MM-DD')} 起 · 下次生成{' '}
@@ -159,6 +160,7 @@ export default function Recurring() {
                           )
                         }
                         loading={setStatus.isPending}
+                        disabled={!!r.blocked_reason}
                         onClick={() => toggle(r)}
                       >
                         {r.status === 'enabled' ? '暂停' : '启用'}
@@ -183,8 +185,8 @@ export default function Recurring() {
           )}
           <div className="muted small" style={{ marginTop: 12 }}>
             {isAdmin
-              ? '显示全部模板（含各成员创建的，前缀为创建人）；'
-              : '仅显示你自己创建的模板，他人代建的由管理员维护；'}
+              ? '显示本人资源范围内的模板，前缀为创建人；'
+              : '仅显示你自己创建的模板；'}
             到期流水由服务端每 5
             分钟生成，打开应用也会自动补齐；生成的流水在「流水」页带「自动」
             标记，可单独修改或删除，不影响模板。暂停期间到期的期次会在重新启用后补齐。

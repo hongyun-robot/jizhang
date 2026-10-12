@@ -30,7 +30,21 @@ type BudgetDeps struct {
 
 // BudgetService 预算配置、消耗进度与超支提醒（specs/budgets）。
 type BudgetService struct {
-	deps BudgetDeps
+	deps    BudgetDeps
+	ownerID int64
+}
+
+func (s *BudgetService) ForUser(actor *model.User) *BudgetService {
+	copy := *s
+	copy.ownerID = -1
+	if CanView(actor) {
+		copy.ownerID = actor.ID
+	}
+	copy.deps.Stats = s.deps.Stats.ForOwner(copy.ownerID)
+	copy.deps.Cats = s.deps.Cats.ForOwner(copy.ownerID)
+	copy.deps.Budgets = s.deps.Budgets.ForOwner(copy.ownerID)
+	copy.deps.Notifs = s.deps.Notifs.ForOwner(copy.ownerID)
+	return &copy
 }
 
 func NewBudgetService(d BudgetDeps) *BudgetService { return &BudgetService{deps: d} }
@@ -99,6 +113,9 @@ func (s *BudgetService) CurrentKey() string {
 // Get 某账期预算视图（全部角色可读）：
 // 总预算进度 + 每个一级支出分类一行（配置回填与进度展示同一个数据源）。
 func (s *BudgetService) Get(periodKey string) (*BudgetView, error) {
+	if s.ownerID < 0 {
+		return nil, ErrTxnForbidden
+	}
 	if _, _, ok := s.deps.Periods.Range(periodKey); !ok {
 		return nil, ErrBudgetInvalidPeriod
 	}
@@ -180,6 +197,9 @@ func parseAmount(s *string) (decimal.Decimal, bool, error) {
 // Set 保存预算配置（仅管理员，路由门禁）：整期重建，随后立即评估超支——
 // 把预算改到低于既有消耗时当场提醒（spec「首次超支」不限于记账触发）。
 func (s *BudgetService) Set(periodKey string, in BudgetSetInput) error {
+	if s.ownerID < 0 {
+		return ErrTxnForbidden
+	}
 	if _, _, ok := s.deps.Periods.Range(periodKey); !ok {
 		return ErrBudgetInvalidPeriod
 	}
@@ -199,7 +219,7 @@ func (s *BudgetService) Set(periodKey string, in BudgetSetInput) error {
 		if err != nil {
 			return err
 		}
-		if c == nil || c.Kind != model.KindExpense || c.ParentID != nil {
+		if c == nil || c.Kind != model.KindExpense || c.ParentID != nil || (s.ownerID > 0 && (c.OwnerID == nil || *c.OwnerID != s.ownerID)) {
 			return ErrBudgetCategoryInvalid
 		}
 		v, keep, err := parseAmount(it.Amount)
@@ -233,6 +253,18 @@ type BudgetNotifyPayload struct {
 // Evaluate 评估某账期预算，对「首次超支且本账期内未曾提醒过」的预算生成一条站内提醒。
 // 同账期同预算用 payload.dedup_key 去重（任务 8.2）。
 func (s *BudgetService) Evaluate(periodKey string) error {
+	if s.ownerID == 0 {
+		var owners []int64
+		if e := s.deps.Cats.DB().Table("accounts").Distinct("owner_id").Where("owner_id IS NOT NULL").Pluck("owner_id", &owners).Error; e != nil {
+			return e
+		}
+		for _, owner := range owners {
+			if e := s.ForUser(&model.User{ID: owner}).Evaluate(periodKey); e != nil {
+				return e
+			}
+		}
+		return nil
+	}
 	bs, err := s.deps.Budgets.List(periodKey)
 	if err != nil {
 		return err
@@ -300,9 +332,12 @@ func (s *BudgetService) Evaluate(periodKey string) error {
 		if err != nil {
 			return err
 		}
-		if err := s.deps.Notifs.Create(&model.Notification{
-			Kind:    model.NotifBudgetOverdue,
-			Payload: string(payload),
+		uniqueKey := fmt.Sprintf("budget:user:%d:%s", s.ownerID, dedupKey)
+		if err := s.deps.Notifs.CreateUnique(&model.Notification{
+			DedupKey: &uniqueKey,
+			OwnerID:  &s.ownerID,
+			Kind:     model.NotifBudgetOverdue,
+			Payload:  string(payload),
 		}); err != nil {
 			return err
 		}

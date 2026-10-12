@@ -29,6 +29,9 @@ const (
 // Transaction 一条流水（金额恒正，资金与消费方向由 kind 和 purpose 共同表达）。
 type Transaction struct {
 	ID                   int64           `gorm:"primaryKey" json:"id"`
+	HistoricalReadonly   bool            `gorm:"-" json:"historical_readonly,omitempty"`
+	AccountNameOverride  string          `gorm:"-" json:"account_name_override,omitempty"`
+	TransferNameOverride string          `gorm:"-" json:"transfer_name_override,omitempty"`
 	Kind                 TxnKind         `json:"kind"`
 	Amount               decimal.Decimal `gorm:"type:decimal(12,2)" json:"amount"`
 	AccountID            int64           `json:"account_id"`

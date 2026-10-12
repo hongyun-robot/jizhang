@@ -10,15 +10,25 @@ import (
 
 // CategoryRepo categories 表数据访问。
 type CategoryRepo struct {
-	db *gorm.DB
+	db      *gorm.DB
+	ownerID int64
 }
 
 func NewCategoryRepo(db *gorm.DB) *CategoryRepo { return &CategoryRepo{db: db} }
 
+func (r *CategoryRepo) DB() *gorm.DB                    { return r.db }
+func (r *CategoryRepo) ForOwner(id int64) *CategoryRepo { return &CategoryRepo{db: r.db, ownerID: id} }
+func (r *CategoryRepo) visible() *gorm.DB {
+	if r.ownerID > 0 {
+		return r.db.Where("owner_id = ?", r.ownerID)
+	}
+	return r.db
+}
+
 // List 全部分类（收支两套树由 service 组装）。
 func (r *CategoryRepo) List() ([]model.Category, error) {
 	var list []model.Category
-	err := r.db.Order("kind, sort, id").Find(&list).Error
+	err := r.visible().Order("kind, sort, id").Find(&list).Error
 	return list, err
 }
 

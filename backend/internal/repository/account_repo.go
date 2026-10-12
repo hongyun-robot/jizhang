@@ -11,12 +11,14 @@ import (
 
 // AccountRepo accounts 表数据访问。
 type AccountRepo struct {
-	db *gorm.DB
+	db      *gorm.DB
+	ownerID int64
 }
 
 func NewAccountRepo(db *gorm.DB) *AccountRepo { return &AccountRepo{db: db} }
 
-func (r *AccountRepo) DB() *gorm.DB { return r.db }
+func (r *AccountRepo) DB() *gorm.DB                   { return r.db }
+func (r *AccountRepo) ForOwner(id int64) *AccountRepo { return &AccountRepo{db: r.db, ownerID: id} }
 
 // netRow 中间聚合结果。
 type netRow struct {
@@ -27,7 +29,11 @@ type netRow struct {
 // List 返回全部账户并附余额：opening + 收入 + 退款 − 支出 − 转出 + 转入。
 func (r *AccountRepo) List() ([]model.Account, error) {
 	var accounts []model.Account
-	if err := r.db.Order("sort, id").Find(&accounts).Error; err != nil {
+	q := r.db
+	if r.ownerID > 0 {
+		q = q.Where("owner_id = ?", r.ownerID)
+	}
+	if err := q.Order("sort, id").Find(&accounts).Error; err != nil {
 		return nil, err
 	}
 

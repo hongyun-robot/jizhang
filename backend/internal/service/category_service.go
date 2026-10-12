@@ -13,6 +13,7 @@ var (
 	ErrCategoryNotFound        = errors.New("分类不存在")
 	ErrCategoryHasChildren     = errors.New("该分类还有子分类，不能删除")
 	ErrCategoryHasTransactions = errors.New("该分类仍被流水引用，不能删除")
+	ErrCategoryHasReferences   = errors.New("该分类仍被业务配置引用，不能删除")
 	ErrInvalidCategory         = errors.New("分类参数无效")
 	ErrCategoryParentInvalid   = errors.New("父分类无效（只能挂在一级分类下）")
 )
@@ -92,6 +93,7 @@ func (s *CategoryService) Tree() ([]*model.CategoryTreeNode, error) {
 
 // CreateInput 建分类入参：ParentID 为空 = 一级。
 type CreateCategoryInput struct {
+	OwnerID  int64
 	Kind     model.CategoryKind
 	Name     string
 	ParentID *int64
@@ -107,6 +109,9 @@ func (s *CategoryService) Create(in CreateCategoryInput) (*model.Category, error
 		return nil, ErrInvalidCategory
 	}
 	if in.ParentID != nil {
+		if *in.ParentID <= 0 {
+			return nil, ErrCategoryParentInvalid
+		}
 		parent, err := s.repo.GetByID(*in.ParentID)
 		if err != nil {
 			return nil, err
@@ -120,6 +125,9 @@ func (s *CategoryService) Create(in CreateCategoryInput) (*model.Category, error
 		Kind:     in.Kind,
 		Name:     in.Name,
 		Sort:     in.Sort,
+	}
+	if in.OwnerID > 0 {
+		c.OwnerID = &in.OwnerID
 	}
 	if err := s.repo.Create(c); err != nil {
 		return nil, err

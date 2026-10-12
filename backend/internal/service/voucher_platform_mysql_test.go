@@ -56,6 +56,7 @@ func TestVoucherPlatformMySQL(t *testing.T) {
 	migration("000008_liability_billing.up.sql")
 	mustOK(t, db.Exec("ALTER TABLE accounts ADD COLUMN owner_id BIGINT NULL").Error)
 	mustOK(t, db.Exec("INSERT INTO users (id,username,password_hash,role,status) VALUES (1,'platform-test','test','admin','active')").Error)
+	mustOK(t, db.AutoMigrate(&model.Category{}))
 	e := seedVoucherEnv(t, db)
 	for _, platform := range []string{"美团", "美团", "JD", "jd", ""} {
 		row := model.Voucher{Name: "历史券", Platform: platform, PaidAmount: dec("10"), PurchaseDate: vdate(t, "2026-10-01"), AccountID: e.account, CategoryID: e.category, TotalUnits: 1, ScheduleVersion: 1, Revision: 1, CreatedBy: 1, CreateRequestKey: uuid.NewString()}

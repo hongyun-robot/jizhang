@@ -3,28 +3,37 @@ package repository
 import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+	"strings"
 
 	"jizhang/internal/model"
 )
 
 // BudgetRepo budgets 表数据访问。
 type BudgetRepo struct {
-	db *gorm.DB
+	db      *gorm.DB
+	ownerID int64
 }
 
-func NewBudgetRepo(db *gorm.DB) *BudgetRepo { return &BudgetRepo{db: db} }
+func NewBudgetRepo(db *gorm.DB) *BudgetRepo         { return &BudgetRepo{db: db} }
+func (r *BudgetRepo) ForOwner(id int64) *BudgetRepo { return &BudgetRepo{db: r.db, ownerID: id} }
+func (r *BudgetRepo) scoped(q *gorm.DB) *gorm.DB {
+	if r.ownerID > 0 {
+		return q.Where("category_id IS NULL OR category_id IN (SELECT id FROM categories WHERE owner_id = ?)", r.ownerID)
+	}
+	return q
+}
 
 // List 某账期全部预算（总预算 category_id 为 NULL）。
 func (r *BudgetRepo) List(periodKey string) ([]model.Budget, error) {
 	var list []model.Budget
-	err := r.db.Where("period_key = ?", periodKey).Order("id").Find(&list).Error
+	err := r.scoped(r.db.Where("period_key = ?", periodKey)).Order("id").Find(&list).Error
 	return list, err
 }
 
 // Replace 整期重建配置（配置页整单提交）：事务内删旧插新。
 func (r *BudgetRepo) Replace(periodKey string, bs []model.Budget) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("period_key = ?", periodKey).Delete(&model.Budget{}).Error; err != nil {
+		if err := r.scoped(tx.Where("period_key = ?", periodKey)).Delete(&model.Budget{}).Error; err != nil {
 			return err
 		}
 		for i := range bs {
@@ -57,7 +66,12 @@ func (r *BudgetRepo) ConsumptionByRoot(periodKey string) (map[int64]decimal.Deci
 		  AND COALESCE(p.id, c.id) IS NOT NULL
 		GROUP BY COALESCE(p.id, c.id)`
 	var rows []rootConsumeRow
-	if err := r.db.Raw(sql, periodKey).Scan(&rows).Error; err != nil {
+	args := []any{periodKey}
+	if r.ownerID > 0 {
+		sql = strings.Replace(sql, "GROUP BY", "AND t.account_id IN (SELECT id FROM accounts WHERE owner_id = ?) GROUP BY", 1)
+		args = append(args, r.ownerID)
+	}
+	if err := r.db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make(map[int64]decimal.Decimal, len(rows))

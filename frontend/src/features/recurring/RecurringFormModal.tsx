@@ -1,5 +1,5 @@
 import SelectionScope from '../../components/SelectionScope';
-import ResponsiveSelect from '../../components/ResponsiveSelect';
+import AccountSelect from '../../components/AccountSelect';
 import { submissionGate } from '../../lib/submission';
 import { useEditorSession } from '../../hooks/useEditorSession';
 import { useRef as submissionRef } from 'react';
@@ -81,6 +81,7 @@ export default function RecurringFormModal({
   onClose: () => void;
 }) {
   const submitGate = submissionRef(submissionGate());
+  const [creatingAccount, setCreatingAccount] = useState(false);
   const editor = useEditorSession(open, editing?.id ?? 'new');
   const close = () => {
     editor.close();
@@ -124,6 +125,7 @@ export default function RecurringFormModal({
   };
   const submit = () =>
     submitGate.current(async () => {
+      if (creatingAccount) return;
       const isCurrent = editor.capture();
       if (!isCurrent()) return;
       const err = validate();
@@ -180,7 +182,7 @@ export default function RecurringFormModal({
             kind: selected?.kind ?? 'expense',
             amount: editing.amount,
             freq: editing.freq,
-            accountId: editing.account_id,
+            accountId: editing.account_id || undefined,
             categoryId: editing.category_id,
             note: editing.note,
             start: dayjs(editing.start_date),
@@ -206,6 +208,7 @@ export default function RecurringFormModal({
           <Button
             key="ok"
             type="primary"
+            disabled={creatingAccount}
             loading={create.isPending || update.isPending}
             onClick={submit}
           >
@@ -262,7 +265,8 @@ export default function RecurringFormModal({
           />
 
           {/* 账户 */}
-          <ResponsiveSelect
+          <AccountSelect
+            onCreatingChange={setCreatingAccount}
             sheetTitle="账户"
             active={open}
             placeholder="账户"

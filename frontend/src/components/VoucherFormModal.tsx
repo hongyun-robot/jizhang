@@ -1,5 +1,5 @@
 import SelectionScope from './SelectionScope';
-import ResponsiveSelect from './ResponsiveSelect';
+import AccountSelect from './AccountSelect';
 import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 import { submissionGate } from '../lib/submission';
 import { useRef as submissionRef } from 'react';
@@ -80,6 +80,7 @@ export default function VoucherFormModal({
 }) {
   useVisualViewportKeyboard(open);
   const submitGate = submissionRef(submissionGate());
+  const [creatingAccount, setCreatingAccount] = useState(false);
 
   const { message } = App.useApp();
   const user = useAuth((state) => state.user);
@@ -142,7 +143,7 @@ export default function VoucherFormModal({
 
   const submit = () =>
     submitGate.current(async () => {
-      if (creatingPlatform) return;
+      if (creatingPlatform || creatingAccount) return;
       let values: Fields;
       try {
         values = await form.validateFields();
@@ -198,7 +199,7 @@ export default function VoucherFormModal({
         }}
         onOk={submit}
         confirmLoading={saving}
-        okButtonProps={{ disabled: creatingPlatform }}
+        okButtonProps={{ disabled: creatingPlatform || creatingAccount }}
         okText={editing ? '保存' : '登记购券'}
         cancelText="取消"
         forceRender
@@ -312,8 +313,9 @@ export default function VoucherFormModal({
               label="支付账户"
               rules={[{ required: true, message: '请选择支付账户' }]}
             >
-              <ResponsiveSelect
-                sheetTitle="支付账户"
+              <AccountSelect
+                onCreatingChange={setCreatingAccount}
+            sheetTitle="支付账户"
                 active={open}
                 options={accountOptions}
                 placeholder="选择账户"

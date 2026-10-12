@@ -159,6 +159,9 @@ func (s *VoucherService) Create(actor *model.User, in VoucherInput) (*model.Vouc
 		if e := checkAccountOwnership(tx, actor, in.AccountID); e != nil {
 			return e
 		}
+		if e := checkCategoryOwnership(tx, actor, in.CategoryID); e != nil {
+			return e
+		}
 		r := repository.NewVoucherRepo(tx)
 		existing, e := r.ByCreateKey(actor.ID, key)
 		if e != nil {
@@ -482,6 +485,9 @@ func (s *VoucherService) Update(actor *model.User, id int64, in VoucherInput) (*
 		return nil, ErrVoucherNotFound
 	}
 	if e := checkAccountOwnership(s.db, actor, v.AccountID, in.AccountID); e != nil {
+		return nil, e
+	}
+	if e := checkCategoryOwnership(s.db, actor, in.CategoryID); e != nil {
 		return nil, e
 	}
 	var out *model.Voucher

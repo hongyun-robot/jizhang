@@ -131,15 +131,8 @@ export default function Mine() {
         </Card>
       )}
 
-      {user?.role === 'admin' && (
-        <Card size="small" className="panel panel--measure" title="管理">
-          <div className="mine-menu">
-            <Tile
-              icon={<TeamOutlined />}
-              label="用户管理"
-              active={userMgmt}
-              onClick={() => setUserMgmt((v) => !v)}
-            />
+      <Card size="small" className="panel panel--measure" title="我的记账选项">
+        <div className="mine-menu">
             <Tile
               icon={<AppstoreOutlined />}
               label="账户管理"
@@ -149,6 +142,17 @@ export default function Mine() {
               icon={<TagsOutlined />}
               label="分类管理"
               onClick={() => navigate('/categories')}
+            />
+        </div>
+      </Card>
+      {user?.role === 'admin' && (
+        <Card size="small" className="panel panel--measure" title="管理">
+          <div className="mine-menu">
+            <Tile
+              icon={<TeamOutlined />}
+              label="用户管理"
+              active={userMgmt}
+              onClick={() => setUserMgmt((v) => !v)}
             />
             <Tile
               icon={<CalendarOutlined />}

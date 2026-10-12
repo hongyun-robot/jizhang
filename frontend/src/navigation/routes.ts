@@ -6,7 +6,7 @@ export const navItems = [
   { key: 'stats', path: '/stats', label: '统计' },
   { key: 'mine', path: '/mine', label: '我的' },
 ] as const;
-const adminPaths = ['/accounts', '/categories', '/settings', '/audit'];
+const adminPaths = ['/settings', '/audit'];
 export function canVisit(pathname: string, role?: Role): boolean {
   if (
     adminPaths.some(
@@ -18,7 +18,7 @@ export function canVisit(pathname: string, role?: Role): boolean {
   return true;
 }
 export function activeKey(pathname: string): string {
-  if (pathname.startsWith('/vouchers') || pathname.startsWith('/liabilities'))
+  if (['/vouchers', '/liabilities', '/accounts', '/categories'].some((path) => pathname.startsWith(path)))
     return 'mine';
   if (pathname === '/') return 'dash';
   return (

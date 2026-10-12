@@ -101,9 +101,9 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 		categories := v1.Group("/categories", middleware.Auth(d.AuthSvc))
 		{
 			categories.GET("", cath.Tree)
-			categories.POST("", middleware.RequireRoles(model.RoleAdmin), cath.Create)
-			categories.PUT("/:id", middleware.RequireRoles(model.RoleAdmin), cath.Update)
-			categories.DELETE("/:id", middleware.RequireRoles(model.RoleAdmin), cath.Delete)
+			categories.POST("", cath.Create)
+			categories.PUT("/:id", cath.Update)
+			categories.DELETE("/:id", cath.Delete)
 		}
 
 		// 流水：读全部角色；建改删按授权矩阵在 service 内细判

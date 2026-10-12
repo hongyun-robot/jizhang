@@ -256,7 +256,7 @@ func (s *TransactionService) create(actor *model.User, in TxnInput) (*model.Tran
 // 复用同一套账务校验、归期物化与写钩子，标记 source=recurring + rule_id，
 // created_by 取模板创建者；封账目标期返回 ErrTxnClosedPeriod 由生成器跳过。
 func (s *TransactionService) createFromRule(rule *model.RecurringRule, date time.Time) (*model.Transaction, error) {
-	if e := s.checkInputOwnership(&model.User{ID: rule.CreatedBy}, TxnInput{AccountID: rule.AccountID}); e != nil {
+	if e := s.checkInputOwnership(&model.User{ID: rule.CreatedBy}, TxnInput{AccountID: rule.AccountID, CategoryID: rule.CategoryID}); e != nil {
 		return nil, e
 	}
 	cat, err := s.deps.Cats.GetByID(rule.CategoryID)
@@ -439,6 +439,9 @@ func (s *TransactionService) List(actor *model.User, f repository.TxnFilter) ([]
 	}
 	s.fillRefunded(list)
 	s.fillEffects(list)
+	if e := s.redactHistory(actor, list); e != nil {
+		return nil, 0, e
+	}
 	return list, total, nil
 }
 
@@ -478,6 +481,7 @@ func (s *TransactionService) ExportRows(actor *model.User, f repository.TxnFilte
 	rows, err := s.deps.Txns.ListAll(f)
 	if err == nil {
 		s.fillEffects(rows)
+		err = s.redactHistory(actor, rows)
 	}
 	return rows, err
 }

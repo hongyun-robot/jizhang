@@ -29,11 +29,11 @@ const ROLE_OPTIONS: {
   desc: string;
   color?: string;
 }[] = [
-  { value: 'admin', label: '管理员', desc: '全部权限', color: 'geekblue' },
+  { value: 'admin', label: '管理员', desc: '管理账本设置与本人账务', color: 'geekblue' },
   {
     value: 'recorder',
     label: '记账员',
-    desc: '记账并可改删全部流水',
+    desc: '记账并可改删本人账户内流水',
     color: 'cyan',
   },
   {
@@ -45,7 +45,7 @@ const ROLE_OPTIONS: {
   {
     value: 'viewer',
     label: '只读成员',
-    desc: '仅查看与统计',
+    desc: '只读账务，可管理本人分类和账户',
     color: 'default',
   },
 ];

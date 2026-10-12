@@ -1,5 +1,5 @@
 import SelectionScope from './SelectionScope';
-import ResponsiveSelect from './ResponsiveSelect';
+import AccountSelect from './AccountSelect';
 import { submissionGate } from '../lib/submission';
 import { useEditorSession } from '../hooks/useEditorSession';
 import { useRef as submissionRef } from 'react';
@@ -83,6 +83,7 @@ export default function TxnFormModal({
   refill,
 }: Props) {
   const submitGate = submissionRef(submissionGate());
+  const [creatingAccount, setCreatingAccount] = useState(false);
   const editor = useEditorSession(
     open,
     editing
@@ -239,7 +240,7 @@ export default function TxnFormModal({
       const isCurrent = editor.capture();
       if (!isCurrent()) return;
       if (!canRecord(user?.role)) return;
-      if (creatingPlatform || createTxn.isPending || updateTxn.isPending)
+      if (creatingPlatform || creatingAccount || createTxn.isPending || updateTxn.isPending)
         return;
       if (managed) return;
       const err = validate();
@@ -350,7 +351,7 @@ export default function TxnFormModal({
               key="ok"
               type="primary"
               loading={saving}
-              disabled={creatingPlatform || managed}
+              disabled={creatingPlatform || creatingAccount || managed}
               onClick={submit}
             >
               {editing ? '保存' : '记账'}
@@ -514,8 +515,9 @@ export default function TxnFormModal({
             {/* 账户 */}
             {kind === 'transfer' ? (
               <div className="transfer-row">
-                <ResponsiveSelect
-                  sheetTitle="转出账户"
+                <AccountSelect
+                  onCreatingChange={setCreatingAccount}
+            sheetTitle="转出账户"
                   active={open}
                   showSearch
                   optionFilterProp="label"
@@ -528,8 +530,9 @@ export default function TxnFormModal({
                   getPopupContainer={popupInParent}
                 />
                 <span className="transfer-arrow">→</span>
-                <ResponsiveSelect
-                  sheetTitle="转入账户"
+                <AccountSelect
+                  onCreatingChange={setCreatingAccount}
+            sheetTitle="转入账户"
                   active={open}
                   showSearch
                   optionFilterProp="label"
@@ -543,8 +546,9 @@ export default function TxnFormModal({
                 />
               </div>
             ) : (
-              <ResponsiveSelect
-                sheetTitle="账户"
+              <AccountSelect
+                onCreatingChange={setCreatingAccount}
+            sheetTitle="账户"
                 active={open}
                 showSearch
                 optionFilterProp="label"

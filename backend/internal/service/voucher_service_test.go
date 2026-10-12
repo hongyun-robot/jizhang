@@ -36,9 +36,9 @@ func newVoucherEnv(t *testing.T) *voucherEnv {
 func seedVoucherEnv(t *testing.T, db *gorm.DB) *voucherEnv {
 	t.Helper()
 	periods := NewPeriodService(repository.NewSettingRepo(db))
-	acc := model.Account{Name: "券测试账户", Type: model.AccountAsset, Status: model.StatusActive, OpeningBalance: dec("1000")}
+	acc := model.Account{OwnerID: testOwner(1), Name: "券测试账户", Type: model.AccountAsset, Status: model.StatusActive, OpeningBalance: dec("1000")}
 	mustOK(t, db.Create(&acc).Error)
-	cat := model.Category{Name: "券测试餐饮", Kind: model.KindExpense}
+	cat := model.Category{OwnerID: testOwner(1), Name: "券测试餐饮", Kind: model.KindExpense}
 	mustOK(t, db.Create(&cat).Error)
 	txn := NewTransactionService(TxnDeps{Txns: repository.NewTransactionRepo(db), Accounts: repository.NewAccountRepo(db), Cats: repository.NewCategoryRepo(db), Closings: repository.NewClosingRepo(db), Periods: periods})
 	svc := NewVoucherService(db, txn)
@@ -330,7 +330,7 @@ func TestVoucherIdempotencyProtectionAndPermissions(t *testing.T) {
 	if _, err := e.svc.Create(viewer, e.input(t, "89", 1, "")); !errors.Is(err, ErrTxnForbidden) {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.Detail(viewer, v.ID); err != nil {
+	if _, err := e.svc.Detail(viewer, v.ID); !errors.Is(err, ErrTxnForbidden) {
 		t.Fatal(err)
 	}
 	rows, _, err := e.txn.List(adminUser(), repository.TxnFilter{})

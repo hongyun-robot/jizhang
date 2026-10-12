@@ -44,8 +44,15 @@ type StatsService struct {
 
 func (s *StatsService) ForUser(actor *model.User) *StatsService {
 	copy := *s
+	if !CanView(actor) {
+		copy.ownerID = -1
+		return &copy
+	}
 	if actor != nil {
 		copy.ownerID = actor.ID
+		copy.repo = s.repo.ForOwner(actor.ID)
+		copy.accts = s.accts.ForOwner(actor.ID)
+		copy.cats = s.cats.ForOwner(actor.ID)
 	}
 	return &copy
 }
@@ -93,6 +100,9 @@ func (s *StatsService) resolveRange(start, end string) (time.Time, time.Time, er
 
 // cached 30 秒缓存读穿：命中返回原始 JSON，未命中构建后写缓存。
 func (s *StatsService) cached(key string, build func() (any, error)) (json.RawMessage, bool, error) {
+	if s.ownerID < 0 {
+		return nil, false, ErrTxnForbidden
+	}
 	if s.ownerID > 0 {
 		key = fmt.Sprintf("stats:user:%d:%s", s.ownerID, key)
 	}
@@ -498,7 +508,7 @@ func (s *StatsService) Assets(start, end string) (json.RawMessage, bool, error) 
 		if s.ownerID > 0 {
 			visible := []model.Account{}
 			for _, a := range accounts {
-				if a.Type == model.AccountAsset || (a.OwnerID != nil && *a.OwnerID == s.ownerID) {
+				if a.OwnerID != nil && *a.OwnerID == s.ownerID {
 					visible = append(visible, a)
 				}
 			}

@@ -89,7 +89,7 @@ func (s *VoucherService) List(actor *model.User, keyword, status string, page, s
 		}
 		visible := map[int64]bool{}
 		for _, a := range accounts {
-			visible[a.ID] = a.Type == model.AccountAsset || ownsLiability(actor, a)
+			visible[a.ID] = ownsAccount(actor, a)
 		}
 		selected := []model.Voucher{}
 		for _, v := range rows {

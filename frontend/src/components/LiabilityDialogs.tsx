@@ -77,6 +77,7 @@ export default function LiabilityDialogs({
 }) {
   useVisualViewportKeyboard(true);
   const submitGate = submissionRef(submissionGate());
+  const [creatingAccount, setCreatingAccount] = useState(false);
   // This component is keyed by requestKey. Refreshes replace query data but must
   // not change this editor's diff baseline, operation mode or registered fields.
   const editingBaseline = useRef(d).current;
@@ -207,6 +208,10 @@ export default function LiabilityDialogs({
         cents(d.summary.overdue) > 0n
           ? d.summary.overdue
           : d.summary.current_due;
+    if (dialog.mode === 'edit_plan' && plan) {
+      initial.fee_account_id = plan.fee_account_id;
+      initial.fee_category_id = plan.fee_category_id;
+    }
     if (dialog.mode === 'allocation') {
       const credit = d.credits.find((c) => c.source_id === dialog.txnId);
       if (credit) {
@@ -280,6 +285,7 @@ export default function LiabilityDialogs({
   };
   const submit = () =>
     submitGate.current(async () => {
+      if (creatingAccount) return;
       if (!dialog || write.isPending) return;
       try {
         const v = await form.validateFields();
@@ -451,6 +457,7 @@ export default function LiabilityDialogs({
     </>
   );
   const context: FieldContext = {
+    setCreatingAccount,
     d,
     dialog,
     plan,
@@ -484,6 +491,7 @@ export default function LiabilityDialogs({
       onCancel={onClose}
       onOk={submit}
       confirmLoading={write.isPending}
+      okButtonProps={{ disabled: creatingAccount }}
       width={
         dialog.mode === 'create_plan' || dialog.mode === 'edit_plan' ? 820 : 620
       }

@@ -73,9 +73,9 @@ func mustClose(t *testing.T, s *ClosingService, u *model.User, key string) {
 // seedAB 一个资产账户 + 一个末级支出分类，返回入参模板。
 func (e *closingEnv) seedAB(t *testing.T) (TxnInput, model.Account) {
 	t.Helper()
-	acc := model.Account{Name: "现金", Type: model.AccountAsset, Status: model.StatusActive}
+	acc := model.Account{OwnerID: testOwner(1), Name: "现金", Type: model.AccountAsset, Status: model.StatusActive}
 	mustOK(t, e.accRepo.Create(&acc))
-	cat := model.Category{Kind: model.KindExpense, Name: "餐饮"}
+	cat := model.Category{OwnerID: testOwner(1), Kind: model.KindExpense, Name: "餐饮"}
 	mustOK(t, e.catRepo.Create(&cat))
 	return TxnInput{
 		Kind: model.TxnExpense, Amount: dec("100"), AccountID: acc.ID,
@@ -92,7 +92,6 @@ func TestClosedPeriodBlocksWrites(t *testing.T) {
 
 	admin := &model.User{ID: 1, Username: "admin", Role: model.RoleAdmin, Status: model.StatusActive}
 	member := &model.User{ID: 3, Username: "dazhi", Role: model.RoleMember, Status: model.StatusActive}
-	recorder := &model.User{ID: 4, Username: "xiaoli", Role: model.RoleRecorder, Status: model.StatusActive}
 
 	// 进行中的 2026-11 不可封
 	if _, err := env.closing.Close(admin, "2026-11"); !errors.Is(err, ErrClosingNotEnded) {
@@ -118,7 +117,7 @@ func TestClosedPeriodBlocksWrites(t *testing.T) {
 	if _, err := env.txn.Create(admin, in); !errors.Is(err, ErrTxnClosedPeriod) {
 		t.Errorf("管理员封账期新建 = %v, want ErrTxnClosedPeriod", err)
 	}
-	if _, err := env.txn.Create(member, in); !errors.Is(err, ErrTxnClosedPeriod) {
+	if _, err := env.txn.Create(member, in); !errors.Is(err, ErrTxnForbidden) {
 		t.Errorf("普通成员封账期新建 = %v, want ErrTxnClosedPeriod", err)
 	}
 	amt := in
@@ -126,7 +125,7 @@ func TestClosedPeriodBlocksWrites(t *testing.T) {
 	if _, err := env.txn.Update(admin, tx.ID, amt); !errors.Is(err, ErrTxnClosedPeriod) {
 		t.Errorf("封账期修改 = %v, want ErrTxnClosedPeriod", err)
 	}
-	if _, err := env.txn.Update(recorder, tx.ID, amt); !errors.Is(err, ErrTxnClosedPeriod) {
+	if _, err := env.txn.Update(&model.User{ID: 4, Role: model.RoleRecorder}, tx.ID, amt); !errors.Is(err, ErrTxnForbidden) {
 		t.Errorf("记账员封账期修改 = %v, want ErrTxnClosedPeriod", err)
 	}
 	if err := env.txn.Delete(admin, tx.ID); !errors.Is(err, ErrTxnClosedPeriod) {
@@ -151,7 +150,6 @@ func TestClosingAuditTrail(t *testing.T) {
 	in, _ := env.seedAB(t)
 
 	admin := &model.User{ID: 1, Username: "admin", Role: model.RoleAdmin, Status: model.StatusActive}
-	recorder := &model.User{ID: 4, Username: "xiaoli", Role: model.RoleRecorder, Status: model.StatusActive}
 
 	tx, err := env.txn.Create(admin, in)
 	mustOK(t, err)
@@ -159,7 +157,7 @@ func TestClosingAuditTrail(t *testing.T) {
 	mustOK(t, env.closing.Reopen(admin, "2026-10")) // 解封
 	amt := in
 	amt.Amount = dec("88")
-	if _, err := env.txn.Update(recorder, tx.ID, amt); err != nil { // 修改流水
+	if _, err := env.txn.Update(admin, tx.ID, amt); err != nil { // 修改流水
 		t.Fatalf("解封后修改 = %v", err)
 	}
 	mustClose(t, env.closing, admin, "2026-10") // 重新封账

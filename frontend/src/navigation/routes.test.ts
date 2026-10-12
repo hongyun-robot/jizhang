@@ -20,10 +20,14 @@ describe('session navigation', () => {
       '//example.com',
       '/\\example.com',
       '/login',
-      '/accounts',
+      '/settings',
     ])
       expect(returnTarget(url, 'viewer')).toBe('/');
     expect(returnTarget('/accounts', 'admin')).toBe('/accounts');
+    expect(returnTarget('/accounts', 'viewer')).toBe('/accounts');
+    expect(returnTarget('/categories', 'member')).toBe('/categories');
+    expect(activeKey('/accounts')).toBe('mine');
+    expect(activeKey('/categories')).toBe('mine');
     expect(activeKey('/liabilities/1')).toBe('mine');
   });
   it('clears remembered filters and avoids adding a duplicate history item', () => {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"jizhang/internal/middleware"
 	"jizhang/internal/model"
 	"jizhang/internal/response"
 	"jizhang/internal/service"
@@ -21,9 +22,12 @@ func NewCategory(svc *service.CategoryService) *categoryHandler {
 
 func mapCategoryErr(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, service.ErrTxnForbidden):
+		response.Forbidden(c, "只能管理自己的分类")
 	case errors.Is(err, service.ErrCategoryNotFound):
 		response.NotFound(c, err.Error())
 	case errors.Is(err, service.ErrCategoryHasChildren),
+		errors.Is(err,service.ErrCategoryHasReferences),
 		errors.Is(err, service.ErrCategoryHasTransactions):
 		response.Conflict(c, err.Error())
 	case errors.Is(err, service.ErrInvalidCategory),
@@ -36,7 +40,7 @@ func mapCategoryErr(c *gin.Context, err error) {
 
 // Tree GET /api/v1/categories（全部角色可读，两级树）
 func (h *categoryHandler) Tree(c *gin.Context) {
-	tree, err := h.svc.Tree()
+	tree, err := h.svc.TreeFor(middleware.CurrentUser(c))
 	if err != nil {
 		response.Internal(c, "查询失败")
 		return
@@ -66,7 +70,7 @@ func (h *categoryHandler) Create(c *gin.Context) {
 	if req.Sort != nil {
 		in.Sort = *req.Sort
 	}
-	cat, err := h.svc.Create(in)
+	cat, err := h.svc.CreateFor(middleware.CurrentUser(c), in)
 	if err != nil {
 		mapCategoryErr(c, err)
 		return
@@ -94,7 +98,7 @@ func (h *categoryHandler) Update(c *gin.Context) {
 	if req.Sort != nil {
 		sort = *req.Sort
 	}
-	cat, err := h.svc.Update(id, req.Name, sort)
+	cat, err := h.svc.UpdateFor(middleware.CurrentUser(c), id, req.Name, sort)
 	if err != nil {
 		mapCategoryErr(c, err)
 		return
@@ -108,7 +112,7 @@ func (h *categoryHandler) Delete(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.svc.Delete(id); err != nil {
+	if err := h.svc.DeleteFor(middleware.CurrentUser(c), id); err != nil {
 		mapCategoryErr(c, err)
 		return
 	}

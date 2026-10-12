@@ -68,12 +68,17 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 			t.Fatal(err)
 		}
 	}
-	account := model.Account{Name: "测试现金", Type: model.AccountAsset, Status: model.StatusActive, OpeningBalance: decimal.NewFromInt(1000)}
-	category := model.Category{Name: "测试餐饮", Kind: model.KindExpense}
-	if err := db.Create(&account).Error; err != nil {
-		t.Fatal(err)
+	for owner := int64(1); owner <= 4; owner++ {
+		account := model.Account{OwnerID: &owner, Name: "测试现金", Type: model.AccountAsset, Status: model.StatusActive, OpeningBalance: decimal.NewFromInt(1000)}
+		category := model.Category{OwnerID: &owner, Name: "测试餐饮", Kind: model.KindExpense}
+		if err := db.Create(&account).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Create(&category).Error; err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := db.Create(&category).Error; err != nil {
+	if err := db.AutoMigrate(&model.AccountCreateRequest{}, &model.AccountTemplate{}, &model.CategoryTemplate{}); err != nil {
 		t.Fatal(err)
 	}
 	rds := miniredis.RunT(t)

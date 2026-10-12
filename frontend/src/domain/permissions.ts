@@ -12,6 +12,9 @@ export function canRecord(role?: Role | null): boolean {
 export function canManageSettings(user?: SessionUser | null): boolean {
   return user?.role === 'admin';
 }
+export function canManageAccount(user: SessionUser | null, account?: Account): boolean {
+  return !!user && (!account || account.owner_id === user.id);
+}
 export function canManagePersonalAccount(
   user: SessionUser | null,
   account?: Account
@@ -26,6 +29,7 @@ export function canModifyTransaction(
   transaction: Transaction
 ): boolean {
   if (!user || !canRecord(user.role)) return false;
+  if (transaction.historical_readonly) return false;
   if (
     transaction.installment_plan_id ||
     transaction.liability_term_id ||

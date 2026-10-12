@@ -60,6 +60,8 @@ export interface TermChange {
   fee_txn_id?: number;
 }
 export interface InstallmentUpdate extends OperationInput {
+  fee_account_id?: number;
+  fee_category_id?: number;
   version: number;
   refund_txn_id?: number;
   terms: TermChange[];

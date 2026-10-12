@@ -111,6 +111,12 @@ func (s *LiabilityService) CreatePlan(actor *model.User, in InstallmentInput) (L
 		if feeCategory == 0 && source.CategoryID != nil {
 			feeCategory = *source.CategoryID
 		}
+		if e := checkAccountOwnership(tx, actor, feeAccount); e != nil {
+			return result, e
+		}
+		if e := checkCategoryOwnership(tx, actor, feeCategory); e != nil {
+			return result, e
+		}
 		var fa model.Account
 		var fc model.Category
 		if e := tx.First(&fa, feeAccount).Error; e != nil {
@@ -244,6 +250,13 @@ func (s *LiabilityService) postFee(tx *gorm.DB, p *model.InstallmentPlan, term *
 	if e := tx.First(&cat, p.FeeCategoryID).Error; e != nil {
 		return 0, e
 	}
+	var principalAccount model.Account
+	if e := tx.First(&principalAccount, p.AccountID).Error; e != nil {
+		return 0, e
+	}
+	if principalAccount.OwnerID == nil || a.OwnerID == nil || cat.OwnerID == nil || *a.OwnerID != *principalAccount.OwnerID || *cat.OwnerID != *principalAccount.OwnerID {
+		return 0, ErrTxnAccountInvalid
+	}
 	var count int64
 	if e := tx.Model(&model.Category{}).Where("parent_id = ?", cat.ID).Count(&count).Error; e != nil {
 		return 0, e
@@ -353,11 +366,13 @@ type TermChange struct {
 	FeeTxnID           *int64           `json:"fee_txn_id"`
 }
 type InstallmentUpdate struct {
-	RequestKey  string       `json:"request_key"`
-	Reason      string       `json:"reason"`
-	Version     int          `json:"version"`
-	RefundTxnID int64        `json:"refund_txn_id"`
-	Terms       []TermChange `json:"terms"`
+	FeeAccountID  *int64       `json:"fee_account_id,omitempty"`
+	FeeCategoryID *int64       `json:"fee_category_id,omitempty"`
+	RequestKey    string       `json:"request_key"`
+	Reason        string       `json:"reason"`
+	Version       int          `json:"version"`
+	RefundTxnID   int64        `json:"refund_txn_id"`
+	Terms         []TermChange `json:"terms"`
 }
 
 func (s *LiabilityService) UpdatePlan(actor *model.User, id int64, in InstallmentUpdate, refund bool) (LiabilityResult, error) {
@@ -379,6 +394,41 @@ func (s *LiabilityService) UpdatePlan(actor *model.User, id int64, in Installmen
 		}
 		if p.Version != in.Version || p.Status == "settled" || strings.TrimSpace(in.Reason) == "" {
 			return result, liability.ErrConflict
+		}
+		if in.FeeAccountID != nil || in.FeeCategoryID != nil {
+			if in.FeeAccountID != nil {
+				p.FeeAccountID = *in.FeeAccountID
+			}
+			if in.FeeCategoryID != nil {
+				p.FeeCategoryID = *in.FeeCategoryID
+			}
+			if e := checkAccountOwnership(tx, actor, p.FeeAccountID); e != nil {
+				return result, e
+			}
+			if e := checkCategoryOwnership(tx, actor, p.FeeCategoryID); e != nil {
+				return result, e
+			}
+			var account model.Account
+			var category model.Category
+			var children int64
+			if e := tx.First(&account, p.FeeAccountID).Error; e != nil {
+				return result, e
+			}
+			if account.Status != model.StatusActive || (account.Type != model.AccountAsset && account.ID != p.AccountID) {
+				return result, ErrTxnAccountInvalid
+			}
+			if e := tx.First(&category, p.FeeCategoryID).Error; e != nil {
+				return result, e
+			}
+			if e := tx.Model(&model.Category{}).Where("parent_id = ?", category.ID).Count(&children).Error; e != nil {
+				return result, e
+			}
+			if category.Kind != model.KindExpense || children > 0 {
+				return result, ErrTxnCategoryInvalid
+			}
+			if e := tx.Model(&p).Updates(map[string]any{"fee_account_id": p.FeeAccountID, "fee_category_id": p.FeeCategoryID}).Error; e != nil {
+				return result, e
+			}
 		}
 		if refund {
 			var r model.Transaction

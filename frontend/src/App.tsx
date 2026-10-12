@@ -51,17 +51,13 @@ export default function App() {
             <Route
               path="/accounts"
               element={
-                <RequireRole role="admin">
-                  <Accounts />
-                </RequireRole>
+                <Accounts />
               }
             />
             <Route
               path="/categories"
               element={
-                <RequireRole role="admin">
-                  <Categories />
-                </RequireRole>
+                <Categories />
               }
             />
             <Route

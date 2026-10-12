@@ -1,7 +1,12 @@
 package service
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/shopspring/decimal"
 
@@ -15,10 +20,12 @@ import (
 // 账户业务错误。
 var (
 	ErrAccountNotFound        = errors.New("账户不存在")
-	ErrAccountHasTransactions = errors.New("该账户仍有关联流水，只能停用不能删除")
+	ErrAccountHasTransactions = errors.New("该账户仍有关联流水或财务配置，只能停用不能删除")
 	ErrInvalidAccountType     = errors.New("无效的账户类型")
 	ErrInvalidRepaymentDay    = errors.New("还款日须为 1-31")
 	ErrInvalidAmount          = errors.New("金额格式无效")
+	ErrAccountCreateConflict  = errors.New("账户创建请求已使用，或创建的账户已删除，请核对结果")
+	ErrAccountNameInvalid     = errors.New("账户名称须为 1–64 字")
 )
 
 var validAccountTypes = map[model.AccountType]bool{
@@ -80,11 +87,53 @@ type CreateAccountInput struct {
 	StatementDay         *int
 	RepaymentMonthOffset *int
 	ActorID              int64
+	RequestKey           string
 }
 
 // Create 新建账户（管理员）。
 func (s *AccountService) Create(in CreateAccountInput) (out *model.Account, err error) {
-	err = s.accountWrite(func(tx *gorm.DB) error { var e error; out, e = s.createAt(tx, in); return e })
+	in.Name = strings.TrimSpace(in.Name)
+	err = s.accountWrite(func(tx *gorm.DB) error {
+		if in.RequestKey == "" {
+			var e error
+			out, e = s.createAt(tx, in)
+			return e
+		}
+		if in.ActorID <= 0 || len(in.RequestKey) > 128 || strings.TrimSpace(in.RequestKey) != in.RequestKey {
+			return ErrAccountCreateConflict
+		}
+		payload := in
+		payload.RequestKey = ""
+		raw, e := json.Marshal(payload)
+		if e != nil {
+			return e
+		}
+		hash := sha256.Sum256(raw)
+		digest := hex.EncodeToString(hash[:])
+		var request model.AccountCreateRequest
+		e = tx.Where("owner_id = ? AND request_key = ?", in.ActorID, in.RequestKey).First(&request).Error
+		if e == nil {
+			if request.Digest != digest || request.AccountID == nil {
+				return ErrAccountCreateConflict
+			}
+			out, e = repository.NewAccountRepo(tx).GetByID(*request.AccountID)
+			if e != nil {
+				return e
+			}
+			if out == nil {
+				return ErrAccountCreateConflict
+			}
+			return nil
+		}
+		if !errors.Is(e, gorm.ErrRecordNotFound) {
+			return e
+		}
+		out, e = s.createAt(tx, in)
+		if e != nil {
+			return e
+		}
+		return tx.Create(&model.AccountCreateRequest{OwnerID: in.ActorID, RequestKey: in.RequestKey, Digest: digest, AccountID: &out.ID}).Error
+	})
 	if err == nil {
 		s.fireWrite()
 	}
@@ -100,6 +149,9 @@ func (s *AccountService) accountWrite(fn func(*gorm.DB) error) error {
 }
 
 func validateAccountInput(in CreateAccountInput) error {
+	if n := utf8.RuneCountInString(strings.TrimSpace(in.Name)); n < 1 || n > 64 {
+		return ErrAccountNameInvalid
+	}
 	if !liability.ValidAmount(in.OpeningBalance.Abs(), true) {
 		return ErrInvalidAmount
 	}
@@ -142,7 +194,7 @@ func (s *AccountService) createAt(tx *gorm.DB, in CreateAccountInput) (*model.Ac
 		Sort:           in.Sort,
 		LiabilityType:  in.LiabilityType,
 	}
-	if in.Type == model.AccountLiability && in.ActorID > 0 {
+	if in.ActorID > 0 {
 		owner := in.ActorID
 		a.OwnerID = &owner
 	}
@@ -170,6 +222,7 @@ func (s *AccountService) createAt(tx *gorm.DB, in CreateAccountInput) (*model.Ac
 
 // Update 修改账户（不影响余额，余额由流水推导）。
 func (s *AccountService) Update(id int64, in CreateAccountInput, status model.UserStatus) (out *model.Account, err error) {
+	in.Name = strings.TrimSpace(in.Name)
 	err = s.accountWrite(func(tx *gorm.DB) error { var e error; out, e = s.updateAt(tx, id, in, status); return e })
 	if err == nil {
 		s.fireWrite()
@@ -216,9 +269,7 @@ func (s *AccountService) updateAt(tx *gorm.DB, id int64, in CreateAccountInput, 
 	}
 	a.Name = in.Name
 	a.Type = in.Type
-	if in.Type == model.AccountAsset {
-		a.OwnerID = nil
-	} else if a.OwnerID == nil && in.ActorID > 0 {
+	if a.OwnerID == nil && in.ActorID > 0 {
 		owner := in.ActorID
 		a.OwnerID = &owner
 	}
@@ -301,6 +352,17 @@ func (s *AccountService) deleteAt(tx *gorm.DB, id int64) error {
 	if has {
 		return ErrAccountHasTransactions
 	}
+	for _, ref := range []struct{ table, condition string }{{"vouchers", "account_id = ?"}, {"recurring_rules", "account_id = ?"}, {"installment_plans", "fee_account_id = ?"}} {
+		if tx.Migrator().HasTable(ref.table) {
+			var n int64
+			if e := tx.Table(ref.table).Where(ref.condition, id).Count(&n).Error; e != nil {
+				return e
+			}
+			if n > 0 {
+				return ErrAccountHasTransactions
+			}
+		}
+	}
 	if tx.Migrator().HasTable(&model.LiabilityOperation{}) {
 		var n int64
 		if e := tx.Model(&model.LiabilityOperation{}).Where("account_id = ? AND kind <> ?", id, "settings").Count(&n).Error; e != nil {
@@ -319,6 +381,11 @@ func (s *AccountService) deleteAt(tx *gorm.DB, id int64) error {
 			return e
 		}
 		if e := tx.Where("account_id = ?", id).Delete(&model.LiabilityBillRule{}).Error; e != nil {
+			return e
+		}
+	}
+	if tx.Migrator().HasTable(&model.AccountCreateRequest{}) {
+		if e := tx.Model(&model.AccountCreateRequest{}).Where("account_id = ?", id).Update("account_id", nil).Error; e != nil {
 			return e
 		}
 	}

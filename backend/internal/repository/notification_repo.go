@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"jizhang/internal/model"
 )
@@ -20,7 +21,7 @@ func (r *NotificationRepo) ForOwner(id int64) *NotificationRepo {
 }
 func (r *NotificationRepo) visible(q *gorm.DB) *gorm.DB {
 	if r.ownerID > 0 {
-		return q.Where("kind <> ? OR owner_id = ?", model.NotifRepaymentDue, r.ownerID)
+		return q.Where("owner_id = ?", r.ownerID)
 	}
 	return q
 }
@@ -42,6 +43,9 @@ func (r *NotificationRepo) List(kind string) ([]model.Notification, error) {
 // Create 写入提醒。
 func (r *NotificationRepo) Create(n *model.Notification) error {
 	return r.db.Create(n).Error
+}
+func (r *NotificationRepo) CreateUnique(n *model.Notification) error {
+	return r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(n).Error
 }
 
 // GetByID 按 ID 查询（不存在返回 nil, nil）。

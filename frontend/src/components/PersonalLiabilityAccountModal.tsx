@@ -30,6 +30,7 @@ export default function PersonalLiabilityAccountModal({
 }) {
   useVisualViewportKeyboard(true);
   const submitGate = submissionRef(submissionGate());
+  const createRequestKey = useRef(crypto.randomUUID());
   const [form] = Form.useForm<Values>();
   const values = Form.useWatch([], form) as Values | undefined;
   const types = useLiabilityTypes();
@@ -112,6 +113,7 @@ export default function PersonalLiabilityAccountModal({
           return;
         }
         const input = {
+          request_key: detail ? undefined : createRequestKey.current,
           name: v.name,
           type: 'liability' as const,
           opening_balance: '0',
@@ -158,7 +160,7 @@ export default function PersonalLiabilityAccountModal({
       onCancel={onClose}
       onOk={submit}
       okText="保存"
-      confirmLoading={create.isPending || update.isPending}
+      okButtonProps={{ loading: create.isPending || update.isPending, disabled: create.isPending || update.isPending }}
       styles={{ body: { maxHeight: '65dvh', overflowY: 'auto' } }}
     >
       <p className="small muted">

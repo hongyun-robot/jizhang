@@ -85,7 +85,7 @@ await withFixture(base, async (browser, cleanup) => {
     );
     await sheet.getByLabel('搜索选项').fill('不存在的账户');
     await sheet.getByText('无匹配选项', { exact: true }).waitFor();
-    assert.equal(await sheet.getByRole('button', { name: /创建/ }).count(), 0);
+    assert.equal(await sheet.getByRole('button', { name: /创建/ }).count(), 1);
     await closeSheet(sheet);
     assert.equal(await account.innerText(), '账户');
     sheet = await openSheet(account, '账户');

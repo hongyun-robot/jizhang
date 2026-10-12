@@ -1,4 +1,4 @@
-import ResponsiveSelect from '../../../components/ResponsiveSelect';
+import AccountSelect from '../../../components/AccountSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
 import { DatePicker, Form, Input } from 'antd';
@@ -17,8 +17,10 @@ export default function RepaymentFields({
         label="还款资金账户"
         rules={[{ required: true }]}
       >
-        <ResponsiveSelect
-          sheetTitle="还款资金账户"
+        <AccountSelect
+          assetOnly
+            onCreatingChange={context.setCreatingAccount}
+            sheetTitle="还款资金账户"
           options={assets}
           getPopupContainer={popupInParent}
         />

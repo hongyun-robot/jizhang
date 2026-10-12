@@ -192,6 +192,8 @@ export function liabilityCommand(
           ...base,
           version: value.version ?? dialog.version,
           refund_txn_id: value.refund_txn_id,
+          fee_account_id: value.fee_account_id !== plan.fee_account_id ? value.fee_account_id : undefined,
+          fee_category_id: value.fee_category_id !== plan.fee_category_id ? value.fee_category_id : undefined,
           terms,
         },
       };

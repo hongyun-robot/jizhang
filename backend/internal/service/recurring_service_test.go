@@ -66,11 +66,11 @@ func newRecurringEnv(t *testing.T) *recurringEnv {
 // seed 启用账户 + 一级/末级支出分类（餐饮{午餐}）。
 func (e *recurringEnv) seed() (model.Account, int64, int64) {
 	e.t.Helper()
-	acc := model.Account{Name: "银行卡", Type: model.AccountAsset, Status: model.StatusActive}
+	acc := model.Account{OwnerID: testOwner(1), Name: "银行卡", Type: model.AccountAsset, Status: model.StatusActive}
 	mustOK(e.t, e.accRepo.Create(&acc))
-	root := model.Category{Kind: model.KindExpense, Name: "餐饮"}
+	root := model.Category{OwnerID: testOwner(1), Kind: model.KindExpense, Name: "餐饮"}
 	mustOK(e.t, e.catRepo.Create(&root))
-	leaf := model.Category{Kind: model.KindExpense, Name: "午餐", ParentID: &root.ID}
+	leaf := model.Category{OwnerID: testOwner(1), Kind: model.KindExpense, Name: "午餐", ParentID: &root.ID}
 	mustOK(e.t, e.catRepo.Create(&leaf))
 	return acc, root.ID, leaf.ID
 }
@@ -314,7 +314,7 @@ func TestRecurringValidation(t *testing.T) {
 	}
 
 	// 停用账户不可挂模板
-	acc2 := model.Account{Name: "旧卡", Type: model.AccountAsset, Status: model.StatusDisabled}
+	acc2 := model.Account{OwnerID: testOwner(1), Name: "旧卡", Type: model.AccountAsset, Status: model.StatusDisabled}
 	mustOK(t, e.accRepo.Create(&acc2))
 	in := mkIn()
 	in.AccountID = acc2.ID
@@ -402,13 +402,21 @@ func TestRecurringListScope(t *testing.T) {
 		mustOK(t, e.userRepo.Create(&users[i]))
 	}
 
+	memberAccount := model.Account{OwnerID: testOwner(2), Name: "成员账户", Type: model.AccountAsset, Status: model.StatusActive}
+	mustOK(t, e.db.Create(&memberAccount).Error)
+	memberCategory := model.Category{OwnerID: testOwner(2), Name: "成员分类", Kind: model.KindExpense}
+	mustOK(t, e.db.Create(&memberCategory).Error)
 	// 夹具：管理员 1 条、成员甲 2 条（直接落库，创建授权由 TestRecurringOwnership 覆盖）
 	mkRule := func(createdBy int64, note string) {
+		account, category := int64(1), int64(1)
+		if createdBy == 2 {
+			account, category = memberAccount.ID, memberCategory.ID
+		}
 		mustOK(t, e.ruleRepo.Create(&model.RecurringRule{
 			Amount:      dec("50"),
 			Freq:        model.FreqMonthly,
-			AccountID:   1,
-			CategoryID:  1,
+			AccountID:   account,
+			CategoryID:  category,
 			Note:        note,
 			StartDate:   mustDate(t, "2026-10-01"),
 			NextRunDate: mustDate(t, "2026-10-01"),
@@ -423,14 +431,14 @@ func TestRecurringListScope(t *testing.T) {
 	// 管理员见全部，且每条携带创建人姓名
 	adminViews, err := e.rules.List(user(1, model.RoleAdmin))
 	mustOK(t, err)
-	if len(adminViews) != 3 {
+	if len(adminViews) != 1 {
 		t.Fatalf("管理员列表 = %d 条, want 3", len(adminViews))
 	}
 	byNote := map[string]string{}
 	for _, v := range adminViews {
 		byNote[v.Note] = v.CreatedByName
 	}
-	if byNote["admin-rule"] != "admin" || byNote["a-rule-1"] != "member-a" {
+	if byNote["admin-rule"] != "admin" {
 		t.Fatalf("创建人姓名不对: %v", byNote)
 	}
 
@@ -479,8 +487,18 @@ func TestRecurringOwnership(t *testing.T) {
 	// 三档角色均可创建自己的模板，CreatedBy 落创建者
 	adminRule, err := e.rules.Create(user(1, model.RoleAdmin), mkIn("50"))
 	mustOK(t, err)
+	newAccount := model.Account{OwnerID: testOwner(2), Name: "记账员账户", Type: model.AccountAsset, Status: model.StatusActive}
+	mustOK(t, e.db.Create(&newAccount).Error)
+	newCategory := model.Category{OwnerID: testOwner(2), Name: "记账员分类", Kind: model.KindExpense}
+	mustOK(t, e.db.Create(&newCategory).Error)
+	acc.ID, leaf = newAccount.ID, newCategory.ID
 	recRule, err := e.rules.Create(user(2, model.RoleRecorder), mkIn("50"))
 	mustOK(t, err)
+	newAccount = model.Account{OwnerID: testOwner(3), Name: "成员账户", Type: model.AccountAsset, Status: model.StatusActive}
+	mustOK(t, e.db.Create(&newAccount).Error)
+	newCategory = model.Category{OwnerID: testOwner(3), Name: "成员分类", Kind: model.KindExpense}
+	mustOK(t, e.db.Create(&newCategory).Error)
+	acc.ID, leaf = newAccount.ID, newCategory.ID
 	memRule, err := e.rules.Create(user(3, model.RoleMember), mkIn("50"))
 	mustOK(t, err)
 	if adminRule.CreatedBy != 1 || recRule.CreatedBy != 2 || memRule.CreatedBy != 3 {
@@ -522,10 +540,12 @@ func TestRecurringOwnership(t *testing.T) {
 	}
 
 	// 管理员暂停他人（普通成员）模板 → 成功
-	mustOK(t, e.rules.SetStatus(user(1, model.RoleAdmin), memRule.ID, model.RulePaused))
+	if err := e.rules.SetStatus(user(1, model.RoleAdmin), memRule.ID, model.RulePaused); !errors.Is(err, ErrRuleForbidden) {
+		t.Fatal("admin bypassed personal resource", err)
+	}
 	mr, err := e.ruleRepo.GetByID(memRule.ID)
 	mustOK(t, err)
-	if mr.Status != model.RulePaused {
+	if mr.Status != model.RuleEnabled {
 		t.Fatalf("管理员暂停他人模板后状态 = %s, want paused", mr.Status)
 	}
 }

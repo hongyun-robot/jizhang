@@ -144,6 +144,9 @@ func (s *LiabilityService) Settle(actor *model.User, id int64, in SettlementInpu
 			return result, e
 		}
 		var from model.Account
+		if e := checkAccountOwnership(tx, actor, in.FromAccountID); e != nil {
+			return result, e
+		}
 		if e := tx.First(&from, in.FromAccountID).Error; e != nil {
 			return result, e
 		}
@@ -162,6 +165,12 @@ func (s *LiabilityService) Settle(actor *model.User, id int64, in SettlementInpu
 			feeCategory := in.FeeCategoryID
 			if feeCategory == 0 {
 				feeCategory = p.FeeCategoryID
+			}
+			if e := checkAccountOwnership(tx, actor, feeAccount); e != nil {
+				return result, e
+			}
+			if e := checkCategoryOwnership(tx, actor, feeCategory); e != nil {
+				return result, e
 			}
 			var a model.Account
 			var cat model.Category
@@ -364,6 +373,9 @@ func (s *LiabilityService) Reverse(actor *model.User, id int64, in ReverseInput)
 		for _, txnID := range original.TransactionIDs {
 			var t model.Transaction
 			if e := tx.First(&t, txnID).Error; e != nil {
+				return result, e
+			}
+			if e := inner.checkPostingOwnership(actor, &t); e != nil {
 				return result, e
 			}
 			if !CanModifyTransaction(actor, t.CreatedBy) {

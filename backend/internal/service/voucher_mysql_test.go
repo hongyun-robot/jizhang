@@ -79,6 +79,7 @@ func TestVoucherMySQL(t *testing.T) {
 	mustOK(t, db.Exec("ALTER TABLE accounts ADD COLUMN owner_id BIGINT NULL").Error)
 
 	t.Run("double-instance-auto-refund", func(t *testing.T) {
+		mustOK(t, db.AutoMigrate(&model.Category{}))
 		e := seedVoucherEnv(t, db)
 		v := e.buy(t, "100", 5, "2026-10-31")
 		other := NewVoucherService(db, e.txn)
@@ -110,6 +111,7 @@ func TestVoucherMySQL(t *testing.T) {
 		}
 	})
 	t.Run("redeem-refund-race", func(t *testing.T) {
+		mustOK(t, db.AutoMigrate(&model.Category{}))
 		e := seedVoucherEnv(t, db)
 		v := e.buy(t, "100", 5, "2026-10-31")
 		start := make(chan struct{})
@@ -144,6 +146,7 @@ func TestVoucherMySQL(t *testing.T) {
 		}
 	})
 	t.Run("closing-write-race", func(t *testing.T) {
+		mustOK(t, db.AutoMigrate(&model.Category{}))
 		e := seedVoucherEnv(t, db)
 		v := e.buy(t, "100", 5, "")
 		start := make(chan struct{})

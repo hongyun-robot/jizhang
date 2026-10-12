@@ -23,6 +23,7 @@ export interface ScheduleRow {
 type Option = { value: number; label: string };
 /** Private presentation context; callers use the four-input dialog interface. */
 export interface FieldContext {
+  setCreatingAccount: (creating: boolean) => void;
   d: LiabilityDetail;
   dialog: LiabilityDialog;
   plan?: InstallmentPlan;

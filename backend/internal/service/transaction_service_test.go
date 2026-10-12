@@ -51,14 +51,14 @@ func newRefundEnv(t *testing.T) *refundEnv {
 // seedAccount / seedCat 建一个活跃账户与一个末级分类。
 func (e *refundEnv) seedAccount(t *testing.T, name string) int64 {
 	t.Helper()
-	a := model.Account{Name: name, Type: model.AccountAsset, Status: model.StatusActive}
+	a := model.Account{OwnerID: testOwner(1), Name: name, Type: model.AccountAsset, Status: model.StatusActive}
 	mustOK(t, e.accRepo.Create(&a))
 	return a.ID
 }
 
 func (e *refundEnv) seedCat(t *testing.T, kind model.CategoryKind, name string) int64 {
 	t.Helper()
-	c := model.Category{Kind: kind, Name: name}
+	c := model.Category{OwnerID: testOwner(1), Kind: kind, Name: name}
 	mustOK(t, e.catRepo.Create(&c))
 	return c.ID
 }

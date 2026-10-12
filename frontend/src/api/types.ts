@@ -51,6 +51,9 @@ export interface CategoryTreeNode extends Category {
 export type CategoryForest = CategoryTreeNode[];
 
 export interface Transaction {
+  historical_readonly?: boolean;
+  account_name_override?: string;
+  transfer_name_override?: string;
   id: number;
   kind: TxnKind;
   amount: string;
@@ -271,6 +274,7 @@ export type RuleFreq = 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type RuleStatus = 'enabled' | 'paused';
 
 export interface RecurringRule {
+  blocked_reason?: string;
   id: number;
   amount: string;
   freq: RuleFreq;

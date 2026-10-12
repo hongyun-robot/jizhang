@@ -162,10 +162,14 @@ func (s *TransactionService) ExportCSV(actor *model.User, f repository.TxnFilter
 		return nil, err
 	}
 	for _, a := range accs {
-		acctNames[a.ID] = a.Name
+		if ownsAccount(actor, a) {
+			acctNames[a.ID] = a.Name
+		} else {
+			acctNames[a.ID] = "历史关联账户"
+		}
 	}
 
-	cats, err := s.deps.Cats.List()
+	cats, err := s.deps.Cats.ForOwner(actor.ID).List()
 	if err != nil {
 		return nil, err
 	}

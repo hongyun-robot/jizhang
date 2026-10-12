@@ -1,4 +1,5 @@
 import ResponsiveSelect from '../../../components/ResponsiveSelect';
+import AccountSelect from '../../../components/AccountSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
 import { Alert, DatePicker, Form, Input, InputNumber, Space } from 'antd';
@@ -16,6 +17,12 @@ export default function AdjustmentFields({
   if (!plan) return null;
   return (
     <>
+      <Form.Item name="fee_account_id" label="后续费用支付账户" rules={[{ required: true }]}>
+        <AccountSelect sheetTitle="后续费用支付账户" assetOnly options={context.feeAccounts} onCreatingChange={context.setCreatingAccount} getPopupContainer={popupInParent} />
+      </Form.Item>
+      <Form.Item name="fee_category_id" label="后续手续费分类" rules={[{ required: true }]}>
+        <ResponsiveSelect sheetTitle="后续手续费分类" options={context.categories} getPopupContainer={popupInParent} />
+      </Form.Item>
       {plan.status === 'needs_reconcile' && (
         <Form.Item
           name="refund_txn_id"

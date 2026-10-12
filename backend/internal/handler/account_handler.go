@@ -24,6 +24,7 @@ func NewAccount(svc *service.AccountService) *accountHandler {
 
 type accountReq struct {
 	Name                 string            `json:"name" binding:"required,max=64"`
+	RequestKey           string            `json:"request_key"`
 	Type                 model.AccountType `json:"type" binding:"required"`
 	OpeningBalance       *string           `json:"opening_balance"`
 	RepaymentDay         *int              `json:"repayment_day"`
@@ -37,6 +38,7 @@ type accountReq struct {
 func (r *accountReq) parse() (service.CreateAccountInput, bool) {
 	in := service.CreateAccountInput{
 		Name:          r.Name,
+		RequestKey:    r.RequestKey,
 		Type:          r.Type,
 		RepaymentDay:  r.RepaymentDay,
 		LiabilityType: r.LiabilityType, StatementDay: r.StatementDay, RepaymentMonthOffset: r.RepaymentMonthOffset,
@@ -57,7 +59,11 @@ func (r *accountReq) parse() (service.CreateAccountInput, bool) {
 func mapAccountErr(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, service.ErrTxnForbidden):
-		response.Forbidden(c, "只能管理自己的负债账户")
+		response.Forbidden(c, "只能管理自己的账户")
+	case errors.Is(err, service.ErrAccountCreateConflict):
+		response.Conflict(c, err.Error())
+	case errors.Is(err, service.ErrAccountNameInvalid):
+		response.Invalid(c, err.Error())
 	case errors.Is(err, liability.ErrSetup), errors.Is(err, liability.ErrConflict), errors.Is(err, liability.ErrManaged):
 		response.Conflict(c, err.Error())
 	case errors.Is(err, liability.ErrInvalid):

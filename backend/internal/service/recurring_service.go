@@ -164,6 +164,13 @@ func (s *RecurringService) List(actor *model.User) ([]RuleView, error) {
 	}
 	for _, r := range rules {
 		if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, r.AccountID); e != nil {
+			if r.CreatedBy == actor.ID && r.BlockedReason != "" {
+				r.AccountID = 0
+				views = append(views, RuleView{RecurringRule: r, CreatedByName: names[r.CreatedBy]})
+			}
+			continue
+		}
+		if e := checkCategoryOwnership(s.deps.Accounts.DB(), actor, r.CategoryID); e != nil {
 			continue
 		}
 		views = append(views, RuleView{RecurringRule: r, CreatedByName: names[r.CreatedBy]})
@@ -181,6 +188,9 @@ func (s *RecurringService) Create(actor *model.User, in RuleInput) (*model.Recur
 		return nil, err
 	}
 	if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, in.AccountID); e != nil {
+		return nil, ErrRuleForbidden
+	}
+	if e := checkCategoryOwnership(s.deps.Accounts.DB(), actor, in.CategoryID); e != nil {
 		return nil, ErrRuleForbidden
 	}
 	r := &model.RecurringRule{
@@ -215,7 +225,18 @@ func (s *RecurringService) Update(actor *model.User, id int64, in RuleInput) (*m
 	if !CanManageRule(actor, r) {
 		return nil, ErrRuleForbidden
 	}
-	if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, r.AccountID, in.AccountID); e != nil {
+	if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, in.AccountID); e != nil {
+		return nil, ErrRuleForbidden
+	}
+	if r.BlockedReason == "" || r.CreatedBy != actor.ID {
+		if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, r.AccountID); e != nil {
+			return nil, ErrRuleForbidden
+		}
+		if e := checkCategoryOwnership(s.deps.Accounts.DB(), actor, r.CategoryID); e != nil {
+			return nil, ErrRuleForbidden
+		}
+	}
+	if e := checkCategoryOwnership(s.deps.Accounts.DB(), actor, in.CategoryID); e != nil {
 		return nil, ErrRuleForbidden
 	}
 	if err := s.validate(&in); err != nil {
@@ -227,6 +248,7 @@ func (s *RecurringService) Update(actor *model.User, id int64, in RuleInput) (*m
 	r.AccountID = in.AccountID
 	r.CategoryID = in.CategoryID
 	r.Note = in.Note
+	r.BlockedReason = ""
 	r.StartDate = in.StartDate
 	if scheduleChanged {
 		r.NextRunDate = in.StartDate
@@ -256,6 +278,9 @@ func (s *RecurringService) SetStatus(actor *model.User, id int64, status model.R
 	if status != model.RuleEnabled && status != model.RulePaused {
 		return ErrRuleStatusInvalid
 	}
+	if e := checkCategoryOwnership(s.deps.Accounts.DB(), actor, r.CategoryID); e != nil {
+		return ErrRuleForbidden
+	}
 	r.Status = status
 	return s.deps.Rules.Update(r)
 }
@@ -272,8 +297,13 @@ func (s *RecurringService) Delete(actor *model.User, id int64) error {
 	if !CanManageRule(actor, r) {
 		return ErrRuleForbidden
 	}
-	if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, r.AccountID); e != nil {
-		return ErrRuleForbidden
+	if r.BlockedReason == "" || r.CreatedBy != actor.ID {
+		if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, r.AccountID); e != nil {
+			return ErrRuleForbidden
+		}
+		if e := checkCategoryOwnership(s.deps.Accounts.DB(), actor, r.CategoryID); e != nil {
+			return ErrRuleForbidden
+		}
 	}
 	return s.deps.Rules.Delete(id)
 }
@@ -281,6 +311,9 @@ func (s *RecurringService) Delete(actor *model.User, id int64) error {
 // EnsureDue 生成所有到期未生成的期次（cron 与前端懒补齐共用；幂等可重复调用）。
 // 返回本轮新生成笔数。同一时刻只有一处在跑（mu），重复触发由唯一约束兜底。
 func (s *RecurringService) EnsureDue(now time.Time) (int, error) {
+	return s.ensureDue(now, false)
+}
+func (s *RecurringService) ensureDue(now time.Time, notify bool) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -290,13 +323,29 @@ func (s *RecurringService) EnsureDue(now time.Time) (int, error) {
 		return 0, err
 	}
 	total := 0
+	generatedByOwner := map[int64]int{}
 	var firstErr error
 	for i := range rules {
 		n, err := s.runRule(&rules[i], now)
 		total += n
+		generatedByOwner[rules[i].CreatedBy] += n
 		if err != nil && firstErr == nil {
 			// 一个模板的硬错误（如账户被停用）不阻塞其余模板；它的进度停在断点下轮重试
 			firstErr = err
+		}
+	}
+	if notify && s.deps.Notifs != nil {
+		for owner, n := range generatedByOwner {
+			if n == 0 {
+				continue
+			}
+			payload, e := json.Marshal(RecurringPatchPayload{Generated: n})
+			if e == nil {
+				id := owner
+				if e = s.deps.Notifs.Create(&model.Notification{OwnerID: &id, Kind: model.NotifRecurringPatched, Payload: string(payload)}); e != nil {
+					logger.L().Warn("recurring patch notify failed", zap.Error(e))
+				}
+			}
 		}
 	}
 	return total, firstErr
@@ -312,19 +361,7 @@ type RecurringPatchPayload struct {
 // 正常到期由 cron 生成不提醒（非异常），只有懒补齐触发才提示核对。
 // 提醒是旁路副作用：落库失败只记日志，不把已成功的生成报成失败。
 func (s *RecurringService) EnsureDueLazy(now time.Time) (int, error) {
-	n, err := s.EnsureDue(now)
-	if n > 0 && s.deps.Notifs != nil {
-		payload, mErr := json.Marshal(RecurringPatchPayload{Generated: n})
-		if mErr == nil {
-			if cErr := s.deps.Notifs.Create(&model.Notification{
-				Kind:    model.NotifRecurringPatched,
-				Payload: string(payload),
-			}); cErr != nil {
-				logger.L().Warn("recurring patch notify failed", zap.Error(cErr))
-			}
-		}
-	}
-	return n, err
+	return s.ensureDue(now, true)
 }
 
 // runRule 逐期推进一个模板直到下一期晚于今天；无论中途成败都把推进量落库（断点续跑）。
@@ -344,6 +381,9 @@ func (s *RecurringService) runRule(r *model.RecurringRule, now time.Time) (gener
 			return generated, ErrRuleCatchUpTooLong
 		}
 		done, oErr := s.runOccurrence(r)
+		if r.Status == model.RulePaused {
+			return generated, oErr
+		}
 		if done {
 			generated++
 		}
@@ -356,6 +396,17 @@ func (s *RecurringService) runRule(r *model.RecurringRule, now time.Time) (gener
 
 // runOccurrence 处理一期：已存在（重复触发）幂等跳过，否则生成；成功与否都推进节奏。
 func (s *RecurringService) runOccurrence(r *model.RecurringRule) (bool, error) {
+	actor := &model.User{ID: r.CreatedBy}
+	if e := checkAccountOwnership(s.deps.Accounts.DB(), actor, r.AccountID); e != nil {
+		r.Status = model.RulePaused
+		r.BlockedReason = "账户归属不匹配，请选择自己的账户"
+		return false, s.deps.Rules.Update(r)
+	}
+	if e := checkCategoryOwnership(s.deps.Accounts.DB(), actor, r.CategoryID); e != nil {
+		r.Status = model.RulePaused
+		r.BlockedReason = "分类归属不匹配，请选择自己的分类"
+		return false, s.deps.Rules.Update(r)
+	}
 	date := r.NextRunDate
 	next := NextRunAfter(date, r.StartDate, r.Freq)
 

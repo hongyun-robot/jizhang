@@ -6,7 +6,7 @@ import SelectionSheet, {
 } from './SelectionSheet';
 import { useSelectionActive } from './SelectionScope';
 
-type Props<Value extends string | number> = Omit<
+export type ResponsiveSelectProps<Value extends string | number> = Omit<
   SelectProps<Value>,
   'options' | 'value' | 'onChange' | 'onSelect' | 'allowClear'
 > & {
@@ -17,6 +17,9 @@ type Props<Value extends string | number> = Omit<
   active?: boolean;
   errorMessage?: ReactNode;
   onRetry?: () => void;
+  onCreate?: (name: string) => void;
+  suspended?: boolean;
+  closeSignal?: number;
   ref?: Ref<HTMLButtonElement>;
 } & (
     | {
@@ -38,10 +41,13 @@ export default function ResponsiveSelect<Value extends string | number>({
   active: requestedActive = true,
   errorMessage,
   onRetry,
+  onCreate,
+  suspended = false,
+  closeSignal = 0,
   ref,
   options = [],
   ...props
-}: Props<Value>) {
+}: ResponsiveSelectProps<Value>) {
   const active = useSelectionActive(requestedActive);
   const desktop = !!Grid.useBreakpoint().md;
   const { componentDisabled } = ConfigProvider.useConfig();
@@ -64,16 +70,27 @@ export default function ResponsiveSelect<Value extends string | number>({
     setOpen(false);
     setQuery('');
   };
+  const createName = query.trim();
+  const createAction = onCreate && !disabled ? (
+    <button type="button" className="selection-sheet-item is-create" onClick={() => onCreate(createName)}>
+      {createName && Array.from(createName).length <= 64 ? `创建「${createName}」` : '新建账户'}
+    </button>
+  ) : undefined;
   useEffect(() => {
     if (!active || desktop || disabled) close();
   }, [active, desktop, disabled]);
+  useEffect(close, [closeSignal]);
   if (desktop)
     return (
       <Select
         {...props}
         options={options}
+        open={open && active && !suspended}
+        onOpenChange={setOpen}
+        onSearch={(search) => { setQuery(search); props.onSearch?.(search); }}
+        popupRender={createAction ? (menu) => <>{menu}{createAction}</> : props.popupRender}
         onChange={(value, option) =>
-          props.onChange?.(value, Array.isArray(option) ? option[0] : option)
+          { props.onChange?.(value, Array.isArray(option) ? option[0] : option); close(); }
         }
       />
     );
@@ -112,7 +129,7 @@ export default function ResponsiveSelect<Value extends string | number>({
         }}
       />
       <SelectionSheet<Value>
-        open={open && active && !disabled}
+        open={open && active && !disabled && !suspended}
         title={`选择${sheetTitle}`}
         value={props.value ?? undefined}
         currentLabel={label}
@@ -123,6 +140,7 @@ export default function ResponsiveSelect<Value extends string | number>({
         loading={props.loading}
         error={errorMessage}
         onRetry={onRetry}
+        actions={createAction}
         onClose={close}
         allowClear={!!props.allowClear}
         onClear={() => {

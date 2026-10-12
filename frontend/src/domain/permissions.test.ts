@@ -3,6 +3,7 @@ import type { Role, SessionUser } from './identity';
 import type { Account, Transaction } from '../api/types';
 import {
   canManagePersonalAccount,
+  canManageAccount,
   canManageRule,
   canModifyTransaction,
   canRecord,
@@ -47,6 +48,8 @@ describe('resource permissions', () => {
       ).toBe(role === 'admin' || role === 'recorder');
       expect(canManageRule(user, { created_by: 2 })).toBe(role === 'admin');
       expect(canManagePersonalAccount(user, account)).toBe(true);
+      expect(canManageAccount(user, { ...account, type: 'asset' })).toBe(true);
+      expect(canManageAccount(user, { ...account, owner_id: 2, type: 'asset' })).toBe(false);
       expect(canManagePersonalAccount(user, { ...account, owner_id: 2 })).toBe(
         false
       );

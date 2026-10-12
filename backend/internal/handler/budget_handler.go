@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"jizhang/internal/middleware"
 	"jizhang/internal/response"
 	"jizhang/internal/service"
 )
@@ -35,7 +36,7 @@ func (h *budgetHandler) Get(c *gin.Context) {
 	if key == "" {
 		key = h.svc.CurrentKey()
 	}
-	view, err := h.svc.Get(key)
+	view, err := h.svc.ForUser(middleware.CurrentUser(c)).Get(key)
 	if err != nil {
 		mapBudgetErr(c, err)
 		return
@@ -58,7 +59,7 @@ func (h *budgetHandler) Set(c *gin.Context) {
 		return
 	}
 	in := service.BudgetSetInput{Total: req.Total, Items: req.Items}
-	if err := h.svc.Set(key, in); err != nil {
+	if err := h.svc.ForUser(middleware.CurrentUser(c)).Set(key, in); err != nil {
 		mapBudgetErr(c, err)
 		return
 	}

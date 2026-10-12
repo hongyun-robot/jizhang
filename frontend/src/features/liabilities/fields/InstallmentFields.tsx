@@ -1,4 +1,5 @@
 import ResponsiveSelect from '../../../components/ResponsiveSelect';
+import AccountSelect from '../../../components/AccountSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
 import {
@@ -148,7 +149,9 @@ export default function InstallmentFields({
           label="费用支付账户"
           rules={[{ required: true }]}
         >
-          <ResponsiveSelect
+          <AccountSelect
+            assetOnly
+            onCreatingChange={context.setCreatingAccount}
             sheetTitle="费用支付账户"
             options={feeAccounts}
             style={{ minWidth: 190 }}

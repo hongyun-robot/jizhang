@@ -5,7 +5,7 @@ import "jizhang/internal/model"
 // 授权矩阵（specs/identity/access-control 的可执行版本）。
 // 路由中间件做粗粒度门禁，写操作前必须调用这里的细粒度判断。
 
-// CanManageSettings 设置类操作（账期/封账/分类/账户/预算/用户）仅管理员。
+// CanManageSettings 账期、封账、预算、用户管理仅管理员；个人目录按归属授权。
 // 周期模板管理不在此列，见 CanManageRule（specs/recurring-entries 按创建者归属隔离）。
 func CanManageSettings(u *model.User) bool {
 	return u != nil && u.Role == model.RoleAdmin
@@ -33,7 +33,7 @@ func CanManageRule(u *model.User, rule *model.RecurringRule) bool {
 
 // CanView 四档角色均可查看全部数据。
 func CanView(u *model.User) bool {
-	return u != nil
+	return u != nil && u.ID > 0
 }
 
 // CanCreateTransaction 记账权限：管理员/记账员/普通成员可记，只读不可。

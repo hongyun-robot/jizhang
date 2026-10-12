@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -12,10 +13,28 @@ import (
 
 // StatsRepo 统计查询专用数据访问（只读）。
 type StatsRepo struct {
-	db *gorm.DB
+	db      *gorm.DB
+	ownerID int64
 }
 
-func NewStatsRepo(db *gorm.DB) *StatsRepo { return &StatsRepo{db: db} }
+func NewStatsRepo(db *gorm.DB) *StatsRepo         { return &StatsRepo{db: db} }
+func (r *StatsRepo) ForOwner(id int64) *StatsRepo { return &StatsRepo{db: r.db, ownerID: id} }
+func (r *StatsRepo) query(sql string, args ...any) *gorm.DB {
+	if r.ownerID != 0 {
+		if strings.Contains(sql, "WHERE aid IS NOT NULL") {
+			sql = strings.Replace(sql, "WHERE aid IS NOT NULL", "WHERE aid IS NOT NULL AND aid IN (SELECT id FROM accounts WHERE owner_id = ?)", 1)
+			args = append(args, r.ownerID)
+		} else {
+			alias := ""
+			if strings.Contains(sql, "WHERE t.kind") {
+				alias = "t."
+			}
+			sql = strings.Replace(sql, "WHERE "+alias+"kind", "WHERE "+alias+"account_id IN (SELECT id FROM accounts WHERE owner_id = ?) AND "+alias+"kind", 1)
+			args = append([]any{r.ownerID}, args...)
+		}
+	}
+	return r.db.Raw(sql, args...)
+}
 
 // DailyRow 逐日收支聚合（不含转账）。
 type DailyRow struct {
@@ -36,7 +55,7 @@ func (r *StatsRepo) DailyTotals(start, end time.Time) ([]DailyRow, error) {
 		GROUP BY entry_date
 		ORDER BY entry_date`
 	var rows []DailyRow
-	err := r.db.Raw(sql, start, end).Scan(&rows).Error
+	err := r.query(sql, start, end).Scan(&rows).Error
 	return rows, err
 }
 
@@ -62,7 +81,7 @@ func (r *StatsRepo) CategoryTotals(start, end time.Time) ([]CategoryRow, error) 
 		  AND t.entry_date >= ? AND t.entry_date <= ?
 		GROUP BY COALESCE(p.id, c.id), CASE WHEN t.kind = 'refund' THEN 'expense' ELSE t.kind END`
 	var rows []CategoryRow
-	err := r.db.Raw(sql, start, end).Scan(&rows).Error
+	err := r.query(sql, start, end).Scan(&rows).Error
 	return rows, err
 }
 
@@ -83,7 +102,7 @@ func (r *StatsRepo) PeriodTotals(year int) ([]PeriodRow, error) {
 		WHERE kind IN ('income', 'expense', 'refund') AND period_key LIKE ?
 		GROUP BY period_key`
 	var rows []PeriodRow
-	err := r.db.Raw(sql, fmt.Sprintf("%04d-%%", year)).Scan(&rows).Error
+	err := r.query(sql, fmt.Sprintf("%04d-%%", year)).Scan(&rows).Error
 	return rows, err
 }
 
@@ -96,7 +115,7 @@ func (r *StatsRepo) SumByPeriod(periodKey string) (PeriodRow, error) {
 		FROM transactions
 		WHERE kind IN ('income', 'expense', 'refund') AND period_key = ?`
 	var row PeriodRow
-	err := r.db.Raw(sql, periodKey).Scan(&row).Error
+	err := r.query(sql, periodKey).Scan(&row).Error
 	row.PeriodKey = periodKey
 	return row, err
 }
@@ -129,6 +148,6 @@ func (r *StatsRepo) DailyAccountNets(end time.Time) ([]AssetNetRow, error) {
 		GROUP BY aid, d
 		ORDER BY d`
 	var rows []AssetNetRow
-	err := r.db.Raw(sql, end, end, end).Scan(&rows).Error
+	err := r.query(sql, end, end, end).Scan(&rows).Error
 	return rows, err
 }
