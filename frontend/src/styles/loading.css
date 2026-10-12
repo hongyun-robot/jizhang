@@ -1,0 +1,18 @@
+/* ---------- 21. 骨架与空态 ---------- */
+
+.txn-skeleton,
+.list-skeleton {
+  padding: 4px 0;
+}
+
+.list-empty {
+  padding: 16px 0 6px;
+}
+
+.stat-card .ant-skeleton-paragraph {
+  margin: 0;
+}
+.stat-card .ant-skeleton-paragraph > li {
+  height: 24px;
+  border-radius: 6px;
+}

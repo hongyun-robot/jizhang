@@ -1,0 +1,52 @@
+/* ---------- 2. 设计变量（浅色为基准，暗色整组覆盖） ---------- */
+
+/* @theme-light */
+
+/* @theme-dark */
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-synthesis-weight: none;
+}
+
+/* 纸面颗粒：极淡噪点，破掉数字平面的塑料感。
+   z-index 低于弹层（Modal/Drawer=1000+），避免噪点盖住弹窗；
+   ≤767px 关闭：移动设备 GPU 合成开销敏感，噪点层是每帧全屏合成（specs/transactions 移动端性能） */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-grain);
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+[data-theme='dark'] body::after {
+  opacity: 0.05;
+}
+@media (max-width: 767px) {
+  body::after {
+    display: none;
+  }
+}
+
+::selection {
+  background: var(--sel-bg);
+  color: var(--text);
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color 0.18s ease;
+}
+a:hover {
+  color: var(--primary-hover);
+}

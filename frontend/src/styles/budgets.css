@@ -1,0 +1,62 @@
+/* ---------- 18. 预算进度 ---------- */
+
+.budget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.budget-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.budget-name {
+  width: 60px;
+  flex: none;
+  font-size: 13px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-input {
+  width: 116px;
+  flex: none;
+}
+
+.budget-bar {
+  flex: 1;
+  min-width: 0;
+}
+
+.budget-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-over {
+  color: var(--expense);
+  font-weight: 600;
+}
+
+/* 净消耗为负：以「本月已退回」文案替代进度条 */
+.budget-refund {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--income, #0f7a52);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 0;
+}
+
+.budget-empty {
+  padding: 2px 0;
+}

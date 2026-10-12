@@ -1,0 +1,18 @@
+/* ---------- 5. 内容区骨架 ---------- */
+
+.app-content {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 26px 32px 56px;
+}
+
+.mobile-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.mobile-shell .app-content {
+  flex: 1;
+  padding: 16px 14px calc(84px + env(safe-area-inset-bottom));
+}

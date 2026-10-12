@@ -1,0 +1,97 @@
+/* ---------- 25. 微交互：悬停 / 按压 / 焦点 ---------- */
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  margin: -4px -8px;
+}
+
+.recent-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.recent-row:last-child {
+  border-bottom: 0;
+}
+.recent-row.clickable {
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    transform 0.24s var(--ease-out);
+}
+.recent-row .money {
+  font-weight: 550;
+}
+.recent-row.clickable:hover {
+  background: var(--hover-soft);
+}
+.recent-row.clickable:active {
+  background: var(--hover-tint);
+  transform: scale(0.995);
+}
+.recent-row.clickable::after {
+  content: '›';
+  position: absolute;
+  right: -2px;
+  opacity: 0;
+  transform: translateX(-6px);
+  color: var(--primary);
+  transition:
+    opacity 0.2s ease,
+    transform 0.28s var(--ease-out);
+}
+.recent-row.clickable:hover::after {
+  opacity: 1;
+  transform: translateX(0);
+}
+.recent-row:hover .recent-note {
+  color: var(--text-2);
+}
+
+.recent-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  transition: color 0.18s ease;
+}
+
+.txn-row {
+  transition: background-color 0.16s ease;
+}
+.txn-row:active {
+  background: var(--hover-soft);
+}
+.txn-row.flash,
+tr.flash > td {
+  animation: row-flash 1.8s ease-out;
+}
+
+/* 主操作按下反馈 */
+.page-head .ant-btn:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+/* 可交互自绘元素的键盘焦点环（antd 控件自带焦点样式，不在此重复） */
+.recent-row.clickable:focus-visible,
+.bottom-tabs .tab:focus-visible,
+.notif-bell:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+/* 通配兜底：新出现的 role=button / 自绘可聚焦元素（账户行、已退标签、子分类标签等）
+   键盘聚焦时同样有可见焦点环，无需逐个登记 */
+[role='button']:focus-visible,
+[tabindex]:not([class*='ant-']):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}

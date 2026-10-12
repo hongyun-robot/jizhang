@@ -1,0 +1,67 @@
+/* ---------- 19. 周期记账 ---------- */
+
+.rule-list {
+  display: grid;
+  /* 同 .cat-section：窄视口单列且不被面板裁切 */
+  grid-template-columns: repeat(auto-fit, minmax(min(470px, 100%), 1fr));
+  gap: 10px;
+}
+
+.rule-row {
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.25s var(--ease-out);
+}
+.rule-row:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-2);
+}
+.rule-row:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.rule-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rule-amount {
+  font-family: var(--font-num);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rule-status {
+  margin-left: auto;
+}
+
+.rule-meta {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rule-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.rule-form-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.src-tag {
+  margin-left: 6px;
+}

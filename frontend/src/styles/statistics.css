@@ -1,0 +1,123 @@
+/* ---------- 22. 统计页 ---------- */
+
+.stats-grid {
+  display: grid;
+  gap: 16px;
+}
+.stats-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.stats-grid .stats-wide {
+  grid-column: 1 / -1;
+}
+
+.share-total {
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+.share-total .money {
+  font-weight: 600;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cmp-meta {
+  margin-bottom: 6px;
+  word-break: break-all;
+  font-variant-numeric: tabular-nums;
+}
+
+.cmp-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  padding-top: 5px;
+}
+
+.pct-up {
+  color: var(--income);
+}
+.pct-down {
+  color: var(--expense);
+}
+.pct-flat {
+  color: var(--muted);
+}
+
+.cmp-values {
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+/* 图表数据表（可及性）：<details> 默认收起,展开后全宽细表 */
+.chart-data {
+  margin-top: 8px;
+}
+.chart-data summary {
+  cursor: pointer;
+  user-select: none;
+  list-style-position: outside;
+}
+.chart-data table {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.chart-data th,
+.chart-data td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  font-weight: 400;
+}
+.chart-data th:first-child,
+.chart-data td:first-child {
+  text-align: left;
+}
+.chart-data thead th {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.period-table {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.period-head,
+.period-line {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr 1fr;
+  gap: 6px;
+  padding: 7px 2px;
+  align-items: center;
+  text-align: right;
+}
+.period-head {
+  color: var(--muted);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line-strong);
+}
+.period-head span:first-child,
+.period-line span:first-child {
+  text-align: left;
+}
+.period-line {
+  border-bottom: 1px solid var(--line);
+}
+.period-line:last-child {
+  border-bottom: 0;
+}
+.period-line:hover {
+  background: var(--hover-soft);
+}
+
+.hi {
+  text-align: center;
+}

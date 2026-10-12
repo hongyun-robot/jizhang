@@ -1,0 +1,282 @@
+/* ---------- 27. AntD 组件的统一换装 ---------- */
+
+/* 按钮 */
+.ant-btn {
+  border-radius: var(--radius-ctl);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  box-shadow: none;
+  transition:
+    transform 0.2s var(--ease-out),
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
+}
+.ant-btn:not(:disabled):active {
+  transform: scale(0.97);
+}
+.ant-btn-primary {
+  background: var(--primary-fill);
+  color: var(--primary-fg);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--primary-fill) 34%, transparent);
+}
+.ant-btn-primary:not(:disabled):hover {
+  background: var(--primary-fill-hover);
+  color: var(--primary-fg);
+  box-shadow: 0 4px 14px -6px
+    color-mix(in srgb, var(--primary-fill) 65%, transparent);
+}
+.ant-btn-default {
+  background: var(--panel);
+  border-color: var(--line-strong);
+}
+.ant-btn-default:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--primary) 50%, transparent);
+  color: var(--primary);
+  background: var(--hover-soft);
+}
+.ant-btn-link {
+  font-weight: 500;
+}
+
+/* 分段控件 */
+.ant-segmented {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  border-radius: 10px;
+  padding: 3px;
+}
+.ant-segmented .ant-segmented-item {
+  border-radius: 8px;
+  font-size: 13px;
+  transition: color 0.2s ease;
+}
+.ant-segmented .ant-segmented-item-selected {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: var(--shadow-1);
+}
+
+/* 进度条：统一墨绿，超支转语义红（antd v6 的轨道是 .ant-progress-track） */
+.ant-progress .ant-progress-rail {
+  background: color-mix(in srgb, var(--text) 9%, transparent) !important;
+}
+.ant-progress .ant-progress-track {
+  background: var(--primary) !important;
+}
+.ant-progress-status-exception .ant-progress-track {
+  background: var(--expense) !important;
+}
+.ant-progress-status-exception .ant-progress-indicator {
+  color: var(--expense);
+}
+.ant-progress-indicator {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* 表格：发丝线 + 表头弱化 + 数字对齐 */
+.ant-table {
+  font-variant-numeric: tabular-nums;
+}
+.ant-table thead > tr > th {
+  background: transparent !important;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  border-bottom-color: var(--line-strong) !important;
+}
+.ant-table tbody > tr > td {
+  border-bottom-color: var(--line) !important;
+  transition: background 0.16s ease;
+}
+.ant-table-tbody > tr > td {
+  background: var(--panel);
+}
+.ant-table-cell {
+  font-size: 13.5px;
+}
+.ant-table-tbody > tr.ant-table-row:hover > td {
+  background: var(--hover-soft) !important;
+}
+
+/* 表单控件 */
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select-selector,
+.ant-picker {
+  border-radius: var(--radius-ctl) !important;
+  background: var(--panel) !important;
+}
+.ant-input:hover,
+.ant-select-selector:hover,
+.ant-picker:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent) !important;
+}
+.ant-input:focus,
+.ant-input-focused,
+.ant-select-focused .ant-select-selector,
+.ant-picker-focused {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent) !important;
+}
+
+/* 弹层 */
+.ant-modal-content,
+.ant-dropdown-menu,
+.ant-picker-dropdown .ant-picker-panel-container,
+.ant-popover-inner {
+  border-radius: 14px;
+  box-shadow: var(--shadow-pop);
+}
+.ant-dropdown-menu-item,
+.ant-select-item {
+  border-radius: 8px;
+}
+
+/* 软键盘避让（specs/transactions 软键盘避让）：
+   --kb-inset 由 useVisualViewportKeyboard 写入键盘遮挡高度（无键盘/布局已自收缩时为 0）。
+   仅 ≤767px 生效：.ant-modal 限高为「可视高度 - 遮挡高度」、body 内部滚动，
+   提交按钮始终落在可视区内；kb-inset=0 时即 100vh 限高（移动端弹窗本就 ≤1 屏高，形态不变）；桌面不受影响。 */
+@media (max-width: 767px) {
+  :root {
+    --kb-inset: 0px;
+  }
+  .ant-modal {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - var(--kb-inset) - 16px);
+  }
+  .ant-modal-container {
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+    overflow: hidden;
+  }
+  .ant-modal-body {
+    flex: 1 1 auto;
+    overflow: auto;
+  }
+  html[data-keyboard-open='true'] .ant-modal {
+    top: 8px !important;
+    padding-bottom: 0;
+  }
+
+  /* 平台/商家等下拉：高度封顶到「可视高度 - 键盘遮挡」，列表内部滚动。
+     弹层挂载在触发器父级（popupInParent），随触发器定位；rc-trigger 移动端不做
+     useAlign 重排、也不会因 --kb-inset 收缩弹窗而重新测量，故选项一多就会顶出
+     可视区、与输入框脱节（登记券字段靠上不易察觉）。用 --kb-inset（键盘未弹为 0）
+     把下拉限高到键盘之上的可视区，触发器、输入框、选项三者始终相连、不被键盘遮挡。 */
+  .ant-select-dropdown,
+  .voucher-platform-dropdown {
+    max-height: calc(100vh - var(--kb-inset) - 120px);
+    overflow-y: auto;
+  }
+}
+
+/* 分页 */
+.ant-pagination .ant-pagination-item {
+  border-radius: 8px;
+}
+.ant-pagination .ant-pagination-item-active {
+  background: var(--sel-bg);
+  border-color: transparent;
+}
+.ant-pagination .ant-pagination-item-active a {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* 标签 */
+.ant-tag {
+  border-radius: 6px;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+/* 状态标签统一到纸面色系：绿系→墨绿，负债→支出红，不混用 antd 预设彩 */
+.ant-tag-success.ant-tag,
+.ant-tag-green.ant-tag,
+.ant-tag-teal.ant-tag {
+  background: color-mix(in srgb, var(--primary) 11%, transparent) !important;
+  border-color: color-mix(in srgb, var(--primary) 28%, transparent) !important;
+  color: var(--primary) !important;
+}
+.ant-tag-volcano.ant-tag,
+.ant-tag-red.ant-tag {
+  background: color-mix(in srgb, var(--expense) 10%, transparent) !important;
+  border-color: color-mix(in srgb, var(--expense) 30%, transparent) !important;
+  color: var(--expense) !important;
+}
+.ant-tag-orange.ant-tag,
+.ant-tag-warning.ant-tag,
+.ant-tag-gold.ant-tag {
+  background: color-mix(in srgb, #b7791f 13%, transparent) !important;
+  border-color: color-mix(in srgb, #b7791f 34%, transparent) !important;
+  color: #96620f !important;
+}
+[data-theme='dark'] .ant-tag-orange.ant-tag,
+[data-theme='dark'] .ant-tag-warning.ant-tag,
+[data-theme='dark'] .ant-tag-gold.ant-tag {
+  color: #f0b458 !important;
+}
+.ant-tag-blue.ant-tag,
+.ant-tag-geekblue.ant-tag,
+.ant-tag-cyan.ant-tag,
+.ant-tag-purple.ant-tag {
+  background: color-mix(in srgb, var(--primary) 11%, transparent) !important;
+  border-color: color-mix(in srgb, var(--primary) 26%, transparent) !important;
+  color: var(--primary) !important;
+}
+
+/* 提示条：蓝改墨绿，橙改暖赭，红绿跟收支语义 */
+.ant-alert-info {
+  background: color-mix(in srgb, var(--primary) 8%, var(--panel)) !important;
+  border-color: color-mix(in srgb, var(--primary) 26%, transparent) !important;
+}
+.ant-alert-info .ant-alert-icon {
+  color: var(--primary) !important;
+}
+.ant-alert-success {
+  background: color-mix(in srgb, var(--income) 9%, var(--panel)) !important;
+  border-color: color-mix(in srgb, var(--income) 30%, transparent) !important;
+}
+.ant-alert-warning {
+  background: color-mix(in srgb, #b7791f 11%, var(--panel)) !important;
+  border-color: color-mix(in srgb, #b7791f 34%, transparent) !important;
+}
+.ant-alert-error {
+  background: color-mix(in srgb, var(--expense) 8%, var(--panel)) !important;
+  border-color: color-mix(in srgb, var(--expense) 30%, transparent) !important;
+}
+
+/* 空态：灰线图 + 弱化说明，别抢正文 */
+.ant-empty-description {
+  color: var(--muted);
+  font-size: 13px;
+}
+.ant-empty-img-simple-path,
+.ant-empty-img-simple-g > .ant-empty-img-simple-ellipse,
+.ant-empty-img-simple-g > .ant-empty-img-simple-circle {
+  fill: color-mix(in srgb, var(--text) 9%, transparent) !important;
+  stroke: color-mix(in srgb, var(--text) 9%, transparent) !important;
+}
+
+/* 骨架屏 */
+.ant-skeleton .ant-skeleton-content .ant-skeleton-paragraph > li,
+.ant-skeleton .ant-skeleton-input {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text) 5%, transparent) 25%,
+    color-mix(in srgb, var(--text) 10%, transparent) 37%,
+    color-mix(in srgb, var(--text) 5%, transparent) 63%
+  ) !important;
+}
+
+/* 消息提示 */
+.ant-message-notice-content {
+  border-radius: 11px;
+  box-shadow: var(--shadow-pop);
+  font-weight: 500;
+}

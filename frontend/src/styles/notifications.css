@@ -1,0 +1,130 @@
+/* ---------- 20. 提醒铃铛与列表 ---------- */
+
+.notif-bell {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--muted);
+  cursor: pointer;
+  position: relative;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s var(--ease-out);
+}
+.notif-bell:hover {
+  background: var(--hover-tint);
+  color: var(--primary);
+}
+.notif-bell:active {
+  transform: scale(0.9);
+}
+.notif-bell .anticon {
+  font-size: 17px;
+}
+/* 有未读时的呼吸点：图标右上角的小墨点（Badge 数字之外的节律） */
+.notif-bell[data-unread='1']::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--expense);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--expense) 60%, transparent);
+  animation: pulse 2.4s ease-out infinite;
+}
+
+.bottom-tabs .notif-bell {
+  height: 100%;
+  border-radius: 0;
+  border-left: 1px solid var(--line);
+  padding: 0;
+}
+
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 1160px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notif-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 15px;
+  box-shadow: var(--shadow-1);
+  transition:
+    border-color 0.22s ease,
+    transform 0.28s var(--ease-out),
+    box-shadow 0.28s var(--ease-out);
+}
+.notif-row:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-2);
+}
+.notif-row.unread {
+  border-left: 3px solid var(--primary);
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--primary) 5%, var(--panel)),
+    var(--panel) 40%
+  );
+}
+
+.notif-icon {
+  font-size: 17px;
+  margin-top: 2px;
+  flex: none;
+  color: var(--primary);
+}
+.notif-row.unread .notif-icon {
+  animation: nudge 0.5s var(--ease-spring);
+}
+
+.notif-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.notif-title .ant-tag {
+  margin-inline-start: auto;
+  font-weight: 400;
+}
+
+.notif-text {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+.notif-row .ant-btn {
+  flex: none;
+  margin-top: 2px;
+}
+.notif-read {
+  flex: none;
+  margin-top: 4px;
+}

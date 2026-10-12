@@ -1,0 +1,52 @@
+/* ---------- 29. 无障碍：减弱动效 ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .page,
+  .hero,
+  .stat-grid > *,
+  .panel > .ant-card-head + .ant-card-body,
+  .recent-row,
+  .notif-row,
+  .txn-row,
+  /* 登录页入场（rise-in）与流水定位闪烁（row-flash）也要关停 */
+  .art-title,
+  .art-sub,
+  .art-ledger,
+  .login-card,
+  .txn-row.flash,
+  tr.flash,
+  .bottom-tabs .tab.active .anticon,
+  .notif-row.unread .notif-icon,
+  .notif-bell[data-unread='1']::after {
+    animation: none !important;
+  }
+  .bottom-tabs .tab::before,
+  .recent-row,
+  .txn-row,
+  .stat-card,
+  .stat-card::before,
+  .txn-row::before,
+  .recent-row.clickable::after,
+  .row-actions,
+  .txn-actions,
+  /* 下拉刷新指示器在减弱动效下瞬时到位，不做过渡 */
+  .ptr-indicator {
+    transition: none !important;
+  }
+  .bottom-tabs .tab:active,
+  .recent-row.clickable:active,
+  .page-head .ant-btn:not(:disabled):active,
+  .ant-btn:not(:disabled):active,
+  .notif-bell:active,
+  .theme-toggle:active,
+  .app-sider .ant-menu-item:active {
+    transform: none !important;
+  }
+  .ant-skeleton .ant-skeleton-content .ant-skeleton-paragraph > li,
+  .ant-skeleton .ant-skeleton-input {
+    animation: none !important;
+  }
+}

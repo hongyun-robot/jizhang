@@ -1,0 +1,41 @@
+/* ---------- 7. 面板 ---------- */
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-1);
+}
+
+/* 版心：数据不多的表格/说明页不要拉满整屏宽，留出右侧纸面呼吸 */
+.panel--measure {
+  max-width: 1160px;
+}
+
+/* antd Card 接面板外观 */
+.ant-card.panel {
+  overflow: hidden;
+}
+.panel > .ant-card-head {
+  min-height: 48px;
+  padding: 12px 18px;
+  border-bottom-color: var(--line);
+}
+.panel > .ant-card-head .ant-card-head-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.panel > .ant-card-head .ant-card-extra {
+  padding: 0;
+}
+.panel > .ant-card-body {
+  padding: 16px 18px 18px;
+}
+
+/* 面板标题的细分隔线：让「最近流水 / 预算进度」这类标题读起来像账簿小节 */
+.section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}

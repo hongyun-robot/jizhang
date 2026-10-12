@@ -1,0 +1,82 @@
+/* ---------- 23. 底部 Tab（移动） ---------- */
+
+.bottom-tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  /* 4 个 Tab + 右端铃铛工具位（非 Tab，specs/notifications） */
+  grid-template-columns: repeat(4, 1fr) 56px;
+  background: var(--tab-bg);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+  box-shadow: 0 -8px 24px -20px rgba(0, 0, 0, 0.5);
+}
+/* ≤767px 毛玻璃降级为轻 blur：全宽 backdrop-filter 每帧合成开销高，滚动列表易掉帧 */
+@media (max-width: 767px) {
+  .bottom-tabs {
+    backdrop-filter: saturate(1.2) blur(8px);
+    -webkit-backdrop-filter: saturate(1.2) blur(8px);
+  }
+}
+
+.bottom-tabs .tab {
+  position: relative;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 58px;
+  font-size: 11px;
+  color: var(--tab-fg);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.bottom-tabs .tab .anticon {
+  font-size: 20px;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s var(--ease-spring);
+}
+.bottom-tabs .tab span {
+  font-size: 11px;
+  letter-spacing: 0.01em;
+}
+.bottom-tabs .tab.active {
+  color: var(--primary);
+}
+
+/* 选中态：图标背后的墨色药丸 */
+.bottom-tabs .tab::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 46px;
+  height: 26px;
+  border-radius: 99px;
+  background: var(--sel-bg);
+  transform: translateX(-50%) scaleX(0.35);
+  opacity: 0;
+  transition:
+    transform 0.36s var(--ease-out),
+    opacity 0.24s ease;
+}
+.bottom-tabs .tab.active::before {
+  transform: translateX(-50%) scaleX(1);
+  opacity: 1;
+}
+.bottom-tabs .tab.active .anticon {
+  animation: tab-pop 0.4s var(--ease-spring);
+}
+.bottom-tabs .tab:active {
+  transform: scale(0.95);
+}

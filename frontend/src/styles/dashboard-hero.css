@@ -1,0 +1,160 @@
+/* ---------- 8. 首页 hero ---------- */
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr);
+  background: linear-gradient(
+    135deg,
+    var(--panel) 0%,
+    var(--panel-sunken) 100%
+  );
+}
+.hero::before {
+  /* 跟随指针的柔光：只在精确指针设备上生效 */
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  background: radial-gradient(
+    420px circle at var(--mx, 50%) var(--my, 0%),
+    color-mix(in srgb, var(--primary) 12%, transparent),
+    transparent 62%
+  );
+}
+.hero:hover::before {
+  opacity: 1;
+}
+@media (hover: none), (pointer: coarse) {
+  .hero::before {
+    display: none;
+  }
+}
+/* 账簿横线纹理 */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 31px,
+    var(--line) 31px 32px
+  );
+  mask-image: linear-gradient(to right, transparent, #000 45%, #000);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 45%, #000);
+}
+
+.hero-main,
+.hero-side {
+  position: relative;
+  z-index: 1;
+  padding: 24px 26px;
+}
+.hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hero-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  border-left: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+}
+
+.hero-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.hero-range {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--panel);
+}
+
+.hero-value {
+  font-family: var(--font-display);
+  font-size: clamp(46px, 6.4vw, 76px);
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  margin-top: 6px;
+}
+.hero-value .money {
+  font-variant-numeric: tabular-nums;
+}
+.hero-value .cny {
+  font-size: 0.56em;
+  margin-right: 0.12em;
+  opacity: 0.6;
+}
+
+.hero-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 26px;
+  margin-top: 14px;
+}
+.hero-split .cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.hero-split .cell .money {
+  font-size: 15.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: currentColor;
+}
+.dot.income {
+  color: var(--income);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--income) 18%, transparent);
+}
+.dot.expense {
+  color: var(--expense);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--expense) 16%, transparent);
+}
+
+.hero-stat .k {
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.hero-stat .v {
+  margin-top: 4px;
+  font-family: var(--font-num);
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.hero-stat .s {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

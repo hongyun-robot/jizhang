@@ -1,0 +1,56 @@
+/* ---------- 12. 区间选择器 / 筛选栏 ---------- */
+
+.period-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-1);
+}
+
+.amount-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.amount-range .sep {
+  color: var(--muted);
+}
+
+/* 移动端筛选收纳：单行「筛选入口 + 条件摘要」+ 底部抽屉（specs/transactions 筛选栏收纳） */
+.filter-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-1);
+}
+.filter-entry-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+.filter-drawer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}

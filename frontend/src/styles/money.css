@@ -1,0 +1,13 @@
+/* ---------- 11. 金额语义 ---------- */
+
+.money {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  white-space: nowrap;
+}
+.money-expense {
+  color: var(--expense);
+}
+.money-income {
+  color: var(--income);
+}

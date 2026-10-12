@@ -1,3 +1,5 @@
+import { lazy } from 'react';
+import RouteContent from './components/RouteContent';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { BASENAME } from './base';
@@ -5,25 +7,26 @@ import AppShell from './components/AppShell';
 import RequireAuth from './components/RequireAuth';
 import RequireRole from './components/RequireRole';
 import { RECORDABLE_ROLES } from './stores/auth';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Records from './pages/Records';
-import Stats from './pages/Stats';
-import Mine from './pages/Mine';
-import Accounts from './pages/Accounts';
-import Liabilities from './pages/Liabilities';
-import LiabilityDetail from './pages/LiabilityDetail';
-import Categories from './pages/Categories';
-import Settings from './pages/Settings';
-import Audit from './pages/Audit';
-import Budgets from './pages/Budgets';
-import Recurring from './pages/Recurring';
-import Notifications from './pages/Notifications';
-import Vouchers from './pages/Vouchers';
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Records = lazy(() => import('./pages/Records'));
+const Stats = lazy(() => import('./pages/Stats'));
+const Mine = lazy(() => import('./pages/Mine'));
+const Accounts = lazy(() => import('./pages/Accounts'));
+const Liabilities = lazy(() => import('./pages/Liabilities'));
+const LiabilityDetail = lazy(() => import('./pages/LiabilityDetail'));
+const Categories = lazy(() => import('./pages/Categories'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Audit = lazy(() => import('./pages/Audit'));
+const Budgets = lazy(() => import('./pages/Budgets'));
+const Recurring = lazy(() => import('./pages/Recurring'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const Vouchers = lazy(() => import('./pages/Vouchers'));
 
 export default function App() {
   return (
     <BrowserRouter basename={BASENAME}>
+      <RouteContent>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
@@ -89,6 +92,7 @@ export default function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+      </RouteContent>
     </BrowserRouter>
   );
 }

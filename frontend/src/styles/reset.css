@@ -1,0 +1,27 @@
+/* ============================================================
+   记账 · 设计系统
+   方向：纸面账簿（ledger）—— 中性浅灰底 + 纯白面板（层次靠底/面明度差拉开）
+   + 单一墨绿主色 + 发丝线分栏 + 表格数字对齐 + 编辑式标题层级。
+   全部动画只动 transform / opacity，prefers-reduced-motion 下整层关停。
+   ============================================================ */
+
+/* ---------- 1. 盒模型与基线 reset ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}

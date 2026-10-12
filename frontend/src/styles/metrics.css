@@ -1,0 +1,59 @@
+/* ---------- 9. 指标栅格（保留旧结构，去掉「四张一模一样卡片」的观感） ---------- */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.stat-card {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.32s var(--ease-out),
+    box-shadow 0.32s var(--ease-out);
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--primary) 55%, transparent);
+  transform: scaleY(0.55);
+  transform-origin: center;
+  transition: transform 0.4s var(--ease-out);
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+.stat-card:hover::before {
+  transform: scaleY(1);
+}
+.stat-label {
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.stat-card .money {
+  font-family: var(--font-num);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.stat-card .ant-card-body {
+  padding: 15px 16px 16px;
+}
+
+@media (min-width: 768px) {
+  .stat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .stat-grid.three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

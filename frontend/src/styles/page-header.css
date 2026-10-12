@@ -1,0 +1,50 @@
+/* ---------- 6. 页面标题带 ---------- */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.page-head h2 {
+  margin: 0;
+  font-size: clamp(23px, 2.2vw, 28px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* 标题上方的眉标：账期 / 日期 / 说明，小字号 + 大字距的编辑式标签 */
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.eyebrow::before {
+  content: '';
+  width: 14px;
+  height: 1px;
+  background: var(--primary);
+  opacity: 0.7;
+}
+
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

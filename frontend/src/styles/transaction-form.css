@@ -1,0 +1,153 @@
+/* ---------- 16. 记一笔表单 ---------- */
+
+.txn-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 弹层挂载到触发器父级（lib/popup.popupInParent）后，父级必须是定位上下文，
+   面板坐标才以容器为原点贴合触发器；否则会按祖先偏移错位 */
+.txn-form,
+.transfer-row,
+.ant-form-item-control-input-content {
+  position: relative;
+}
+
+.txn-platform-field .pick-label {
+  display: block;
+}
+
+.amount-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1.5px solid var(--line-strong);
+  padding-bottom: 6px;
+  transition: border-color 0.24s ease;
+}
+.amount-row:focus-within {
+  border-color: var(--primary);
+}
+/* 内联校验：金额非法时底边线转语义红（.ant-input 的 status 样式被下方无边框规则覆盖） */
+.amount-row.amount-error {
+  border-bottom-color: var(--expense);
+}
+
+.amount-symbol {
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.amount-input .ant-input {
+  font-family: var(--font-num);
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  border: 0;
+  box-shadow: none;
+  padding-left: 0;
+  background: transparent;
+}
+
+.quick-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cat-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cat-roots,
+.cat-leaves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pick-label {
+  margin-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pick-label + .cat-leaves,
+.cat-roots + .pick-label {
+  margin-top: 10px;
+}
+/* 内联校验：未选分类时整块描红（提交后出现，选中即消失） */
+.cat-pick.pick-error {
+  border-radius: 8px;
+  outline: 2px solid var(--expense);
+  outline-offset: 4px;
+}
+
+/* 退款：关联原支出信息行与超额黄条 */
+.refund-related {
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--panel-sunken);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.refund-over .ant-alert-message {
+  font-size: 13px;
+}
+
+/* 流水列表：已退标记可点击（跳转定位关联退款） */
+.refunded-tag {
+  cursor: pointer;
+  margin-inline-end: 0 !important;
+}
+
+/* 可选标签：亮态是描边小磁贴，选中填墨绿（原生 checkable 无边框，悬停缺暗示） */
+.cat-leaves .ant-tag {
+  margin-inline-end: 0;
+  padding: 3px 11px;
+  font-size: 13px;
+  border-radius: 7px;
+}
+
+.ant-tag.ant-tag-checkable {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 12px;
+  font-size: 13px;
+  background: var(--panel-sunken);
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+.ant-tag.ant-tag-checkable:hover:not(.ant-tag-checkable-checked) {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--line));
+  background: color-mix(in srgb, var(--primary) 6%, var(--panel-sunken));
+}
+.ant-tag.ant-tag-checkable-checked,
+.cat-leaves .ant-tag.ant-tag-checkable-checked {
+  background: var(--primary-fill) !important;
+  border-color: transparent !important;
+  color: var(--primary-fg) !important;
+}
+[data-theme='dark'] .ant-tag.ant-tag-checkable {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.transfer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transfer-arrow {
+  color: var(--muted);
+}
