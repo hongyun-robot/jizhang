@@ -1,3 +1,4 @@
+import { liabilityClient } from './liability-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { readApi as get, writeApi } from './request';
 import { queryKeys, useScope } from './keys';
@@ -178,7 +179,7 @@ export function useLiabilityWrite() {
   const scope = useScope();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ method = 'post', url, input }: { method?: 'post' | 'put' | 'patch'; url: string; input: unknown }) => writeApi(method, url, input),
+    mutationFn: liabilityClient.execute,
     onSuccess: () => invalidateFinancialViews(qc, scope),
   });
 }
@@ -197,5 +198,3 @@ export function useEnsureLiabilities() {
     },
   });
 }
-
-export const liabilityWrite = writeApi;

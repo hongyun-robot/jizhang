@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
+import { submissionGate } from '../lib/submission';
+import { useRef as submissionRef } from 'react';
+import { amountError } from '../lib/money';
+import { accountOptions as buildAccountOptions } from '../domain/accounts';
+import { useAuth } from '../stores/auth';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
   Alert,
@@ -14,17 +20,15 @@ import {
   Switch,
   theme,
 } from 'antd';
-import {
-  useAccounts,
-  useCategoryForest,
-  useVoucherMutations,
-} from '../api/hooks';
+import { useAccounts } from '../api/accounts';
+import { useCategoryForest } from '../api/categories';
+import { useVoucherMutations } from '../api/vouchers';
 import { rootsOfKind } from '../api/category';
 import { errMsg } from '../api/client';
 import type { Voucher, VoucherInput } from '../api/types';
 import { popupInParent } from '../lib/popup';
 import CategoryPicker from './CategoryPicker';
-import VoucherPlatformInput from './VoucherPlatformInput';
+import PlatformInput from './PlatformInput';
 
 export function voucherToday(): Dayjs {
   return dayjs(
@@ -33,7 +37,7 @@ export function voucherToday(): Dayjs {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
-    }).format(new Date()),
+    }).format(new Date())
   );
 }
 export function voucherInputOf(v: Voucher): VoucherInput {
@@ -73,7 +77,11 @@ export default function VoucherFormModal({
   onClose: () => void;
   editing?: Voucher | null;
 }) {
+  useVisualViewportKeyboard(open);
+  const submitGate = submissionRef(submissionGate());
+
   const { message } = App.useApp();
+  const user = useAuth((state) => state.user);
   const { token } = theme.useToken();
   const screens = Grid.useBreakpoint();
   const [form] = Form.useForm<Fields>();
@@ -87,8 +95,15 @@ export default function VoucherFormModal({
   const [creatingPlatform, setCreatingPlatform] = useState(false);
   const financialLocked = !!editing && !editing.can_edit_purchase;
 
-  useEffect(() => {
-    if (!open) return;
+  const initialized = useRef<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (!open) {
+      initialized.current = undefined;
+      return;
+    }
+    const key = editing?.id ?? 0;
+    if (initialized.current === key) return;
+    initialized.current = key;
     form.resetFields();
     attempt.current = null;
     hadExpiry.current = !!editing?.expires_on;
@@ -110,49 +125,60 @@ export default function VoucherFormModal({
             expires_on: null,
             auto_refund_enabled: false,
             resume_auto_refund: false,
-          },
+          }
     );
   }, [open, editing, form]);
 
-  const accountOptions = (accounts.data ?? [])
-    .filter((a) => a.status === 'active' || a.id === editing?.account_id)
-    .map((a) => ({
-      value: a.id,
-      label: `${a.name}${a.status === 'disabled' ? '（已停用）' : ''}`,
-    }));
-  const categoryRoots = useMemo(() => rootsOfKind(forest.data, 'expense'), [forest.data]);
+  const accountOptions = buildAccountOptions(accounts.data, {
+    ownerId: user?.id,
+    history: !!editing,
+    selectedId: editing?.account_id,
+  });
+  const categoryRoots = useMemo(
+    () => rootsOfKind(forest.data, 'expense'),
+    [forest.data]
+  );
 
-  const submit = async (values: Fields) => {
-    if (creatingPlatform) return;
-    const input: VoucherInput = {
-      name: values.name,
-      platform: values.platform,
-      note: values.note,
-      paid_amount: String(values.paid_amount),
-      purchase_date: values.purchase_date.format('YYYY-MM-DD'),
-      account_id: values.account_id,
-      category_id: values.category_id,
-      total_units: values.total_units,
-      expires_on: values.expires_on?.format('YYYY-MM-DD') ?? null,
-      auto_refund_enabled: values.auto_refund_enabled,
-      ...(values.resume_auto_refund ? { resume_auto_refund: true } : {}),
-    };
-    const requestKey =
-      attempt.current ?? (attempt.current = crypto.randomUUID());
-    try {
-      if (editing)
-        await mutations.update.mutateAsync({ id: editing.id, input });
-      else
-        await mutations.create.mutateAsync({
-          ...input,
-          request_key: requestKey,
-        });
-      message.success(editing ? '券信息已保存' : '购券已记录，使用时再计消费');
-      onClose();
-    } catch (err) {
-      message.error(errMsg(err));
-    }
-  };
+  const submit = () =>
+    submitGate.current(async () => {
+      if (creatingPlatform) return;
+      let values: Fields;
+      try {
+        values = await form.validateFields();
+      } catch {
+        return;
+      }
+      const input: VoucherInput = {
+        name: values.name,
+        platform: values.platform ?? '',
+        note: values.note,
+        paid_amount: String(values.paid_amount),
+        purchase_date: values.purchase_date.format('YYYY-MM-DD'),
+        account_id: values.account_id,
+        category_id: values.category_id,
+        total_units: values.total_units,
+        expires_on: values.expires_on?.format('YYYY-MM-DD') ?? null,
+        auto_refund_enabled: values.auto_refund_enabled,
+        ...(values.resume_auto_refund ? { resume_auto_refund: true } : {}),
+      };
+      const requestKey =
+        attempt.current ?? (attempt.current = crypto.randomUUID());
+      try {
+        if (editing)
+          await mutations.update.mutateAsync({ id: editing.id, input });
+        else
+          await mutations.create.mutateAsync({
+            ...input,
+            request_key: requestKey,
+          });
+        message.success(
+          editing ? '券信息已保存' : '购券已记录，使用时再计消费'
+        );
+        onClose();
+      } catch (err) {
+        message.error(errMsg(err));
+      }
+    });
   const saving = mutations.create.isPending || mutations.update.isPending;
 
   return (
@@ -168,7 +194,7 @@ export default function VoucherFormModal({
       styles={{
         body: { maxHeight: 'calc(100dvh - 160px)', overflowY: 'auto' },
       }}
-      onOk={() => form.submit()}
+      onOk={submit}
       confirmLoading={saving}
       okButtonProps={{ disabled: creatingPlatform }}
       okText={editing ? '保存' : '登记购券'}
@@ -178,7 +204,10 @@ export default function VoucherFormModal({
       <Form
         form={form}
         layout="vertical"
-        onFinish={submit}
+        onSubmitCapture={(event) => {
+          event.preventDefault();
+          void submit();
+        }}
         onValuesChange={(changed) => {
           if ('expires_on' in changed) {
             if (!changed.expires_on)
@@ -207,14 +236,16 @@ export default function VoucherFormModal({
         <Form.Item
           name="platform"
           label="平台 / 商家"
-          rules={[{
-            validator: (_, value?: string) =>
-              Array.from((value ?? '').trim()).length <= 128
-                ? Promise.resolve()
-                : Promise.reject(new Error('平台 / 商家名称最多 128 字')),
-          }]}
+          rules={[
+            {
+              validator: (_, value?: string) =>
+                Array.from((value ?? '').trim()).length <= 128
+                  ? Promise.resolve()
+                  : Promise.reject(new Error('平台 / 商家名称最多 128 字')),
+            },
+          ]}
         >
-          <VoucherPlatformInput
+          <PlatformInput
             key={editing?.id ?? 'new'}
             active={open}
             disabled={saving}
@@ -236,7 +267,7 @@ export default function VoucherFormModal({
               { required: true, message: '请填写实付金额' },
               {
                 validator: (_, value) =>
-                  /^\d+(\.\d{1,2})?$/.test(String(value)) && Number(value) > 0
+                  !amountError(String(value))
                     ? Promise.resolve()
                     : Promise.reject(new Error('金额须大于 0，最多两位小数')),
               },
@@ -309,7 +340,10 @@ export default function VoucherFormModal({
           ]}
           extra="有效期当天仍可使用，按北京时间次日零点后处理。"
         >
-          <DatePicker style={{ width: '100%' }} getPopupContainer={popupInParent} />
+          <DatePicker
+            style={{ width: '100%' }}
+            getPopupContainer={popupInParent}
+          />
         </Form.Item>
         <Form.Item label="到期自动退款" className="voucher-switch">
           <Form.Item name="auto_refund_enabled" valuePropName="checked" noStyle>

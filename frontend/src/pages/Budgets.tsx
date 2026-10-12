@@ -1,12 +1,21 @@
-import { useEffect, useState } from 'react';
+import { QueryBoundary } from '../components/QueryState';
+import { useEffect, useRef, useState } from 'react';
 import { App, Button, Card, DatePicker, InputNumber, Tag } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 
 import { errMsg } from '../api/client';
-import { useBudgets, useUpdateBudgets } from '../api/hooks';
+import { useBudgets, useUpdateBudgets } from '../api/budgets';
 import type { BudgetSetInput } from '../api/types';
 import BudgetProgress from '../components/BudgetProgress';
 import { useAuth } from '../stores/auth';
+import { readApi } from '../api/request';
+import type { BudgetView } from '../api/types';
+import {
+  budgetFields,
+  receiveBudget,
+  savedBudget,
+  type BudgetDraft,
+} from '../features/budgets/draft';
 
 /**
  * 预算（specs/budgets，任务 8.3）：
@@ -15,11 +24,12 @@ import { useAuth } from '../stores/auth';
  * - 整单提交：留空/0 即不设预算；保存后立即生效，低于既有消耗会当场生成超支提醒。
  */
 export default function Budgets() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const user = useAuth((s) => s.user);
   const isAdmin = user?.role === 'admin';
 
   const [month, setMonth] = useState<Dayjs | null>(null);
+  const [pickerVersion, setPickerVersion] = useState(0);
   const view = useBudgets(month ? month.format('YYYY-MM') : undefined);
   const save = useUpdateBudgets();
 
@@ -29,14 +39,50 @@ export default function Budgets() {
   }, [view.data, month]);
 
   // 选择账期切换 / 保存返回后，用服务端值回填表单
-  const [form, setForm] = useState<Record<string, string>>({});
+  const [draft, setDraft] = useState<BudgetDraft>({
+    key: '',
+    fields: {},
+    dirty: false,
+  });
+  const form = draft.fields;
+  const revision = useRef(0);
+  const selectedKey = useRef('');
+  const confirmingMonth = useRef(false);
+  selectedKey.current = month?.format('YYYY-MM') ?? view.data?.period_key ?? '';
   useEffect(() => {
     if (!view.data) return;
-    const f: Record<string, string> = {};
-    if (view.data.total.budget) f.total = view.data.total.budget;
-    for (const c of view.data.categories) if (c.budget) f[String(c.category_id)] = c.budget;
-    setForm(f);
+    const snapshot = view.data;
+    if (selectedKey.current !== snapshot.period_key) return;
+    setDraft((current) =>
+      receiveBudget(current, snapshot.period_key, budgetFields(snapshot))
+    );
   }, [view.data]);
+  const selectMonth = (next: Dayjs | null) => {
+    if (
+      !next ||
+      next.format('YYYY-MM') === selectedKey.current ||
+      confirmingMonth.current
+    )
+      return;
+    const change = () => {
+      confirmingMonth.current = false;
+      revision.current++;
+      setMonth(next);
+    };
+    if (draft.dirty) {
+      confirmingMonth.current = true;
+      modal.confirm({
+        title: '放弃未保存的预算修改？',
+        okText: '放弃并切换',
+        cancelText: '保留修改',
+        onOk: change,
+        onCancel: () => {
+          confirmingMonth.current = false;
+          setPickerVersion((value) => value + 1);
+        },
+      });
+    } else change();
+  };
 
   const inputFor = (scope: 'total' | number) => {
     if (!isAdmin) return undefined;
@@ -47,15 +93,25 @@ export default function Budgets() {
         min={0}
         max={9999999999.99}
         precision={2}
+        disabled={save.isPending}
         placeholder="未设置"
         value={form[key] ? Number(form[key]) : null}
-        onChange={(v) => setForm((prev) => ({ ...prev, [key]: v === null ? '' : String(v) }))}
+        onChange={(v) => {
+          revision.current++;
+          setDraft((previous) => ({
+            ...previous,
+            fields: { ...previous.fields, [key]: v === null ? '' : String(v) },
+            dirty: true,
+          }));
+        }}
       />
     );
   };
 
   const doSave = async () => {
-    if (!view.data) return;
+    if (!view.data || save.isPending) return;
+    const key = view.data.period_key;
+    const version = revision.current;
     const input: BudgetSetInput = {
       total: form.total || null,
       items: Object.entries(form)
@@ -63,10 +119,20 @@ export default function Budgets() {
         .map(([k, v]) => ({ category_id: Number(k), amount: v })),
     };
     try {
-      await save.mutateAsync({ periodKey: view.data.period_key, input });
+      await save.mutateAsync({ periodKey: key, input });
       message.success('预算已保存');
     } catch (e) {
       message.error(errMsg(e));
+      return;
+    }
+    try {
+      const confirmed = await readApi<BudgetView>(`/budgets?period_key=${key}`);
+      if (selectedKey.current === key && revision.current === version)
+        setDraft((current) =>
+          savedBudget(current, key, budgetFields(confirmed))
+        );
+    } catch {
+      message.warning('预算已保存，最新配置读取失败，请重试更新');
     }
   };
 
@@ -74,41 +140,57 @@ export default function Budgets() {
     <div className="page">
       <div className="page-head">
         <div>
-          <div className="eyebrow">BUDGET · {month ? month.format('YYYY.MM') : '本期'}</div>
+          <div className="eyebrow">
+            BUDGET · {month ? month.format('YYYY.MM') : '本期'}
+          </div>
           <h2>预算</h2>
         </div>
-        <Tag color={isAdmin ? 'teal' : 'default'}>{isAdmin ? '可配置' : '仅查看'}</Tag>
+        <Tag color={isAdmin ? 'teal' : 'default'}>
+          {isAdmin ? '可配置' : '仅查看'}
+        </Tag>
       </div>
 
-      <Card
-        size="small"
-        className="panel panel--measure"
-        title="预算配置"
-        extra={
-          <DatePicker
-            picker="month"
-            value={month}
-            onChange={(v) => v && setMonth(v)}
-            allowClear={false}
-            format="YYYY-MM"
-          />
-        }
-        loading={view.isLoading}
-      >
-        {view.data && (
-          <>
-            <BudgetProgress view={view.data} showUnset inputFor={inputFor} />
-            {isAdmin && (
-              <div className="setting-row" style={{ marginTop: 14 }}>
-                <Button type="primary" loading={save.isPending} onClick={() => void doSave()}>
-                  保存
-                </Button>
-                <span className="muted small">留空或 0 表示不设预算；保存后立即生效</span>
-              </div>
-            )}
-          </>
-        )}
-      </Card>
+      <QueryBoundary query={view}>
+        <Card
+          size="small"
+          className="panel panel--measure"
+          title="预算配置"
+          extra={
+            <DatePicker
+              key={pickerVersion}
+              picker="month"
+              value={month}
+              onChange={selectMonth}
+              allowClear={false}
+              format="YYYY-MM"
+            />
+          }
+          loading={view.isLoading}
+        >
+          {view.data && (
+            <>
+              <BudgetProgress view={view.data} showUnset inputFor={inputFor} />
+              {isAdmin && (
+                <div className="setting-row" style={{ marginTop: 14 }}>
+                  <Button
+                    type="primary"
+                    loading={save.isPending}
+                    onClick={() => void doSave()}
+                  >
+                    保存
+                  </Button>
+                  <span className="muted small">
+                    留空或 0 表示不设预算；保存后立即生效
+                  </span>
+                  {draft.dirty && (
+                    <span className="small muted">有未保存修改</span>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+      </QueryBoundary>
     </div>
   );
 }

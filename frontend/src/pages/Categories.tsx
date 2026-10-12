@@ -1,9 +1,20 @@
+import { QueryBoundary } from '../components/QueryState';
 import { useState } from 'react';
-import { App, Button, Card, Empty, Input, Modal, Popconfirm, Spin, Tag } from 'antd';
+import {
+  App,
+  Button,
+  Card,
+  Empty,
+  Input,
+  Modal,
+  Popconfirm,
+  Spin,
+  Tag,
+} from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 
 import { errMsg } from '../api/client';
-import { useCategoryForest, useCategoryMutations } from '../api/hooks';
+import { useCategoryForest, useCategoryMutations } from '../api/categories';
 import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 import { rootsOfKind } from '../api/category';
 import type { CategoryKind, CategoryTreeNode } from '../api/types';
@@ -73,13 +84,21 @@ export default function Categories() {
     }
   };
 
-  const renderSection = (k: CategoryKind, title: string, roots?: CategoryTreeNode[] | null) => (
+  const renderSection = (
+    k: CategoryKind,
+    title: string,
+    roots?: CategoryTreeNode[] | null
+  ) => (
     <Card
       size="small"
       className="panel"
       title={title}
       extra={
-        <Button size="small" icon={<PlusOutlined />} onClick={() => openCreate(k, null)}>
+        <Button
+          size="small"
+          icon={<PlusOutlined />}
+          onClick={() => openCreate(k, null)}
+        >
           新建一级
         </Button>
       }
@@ -92,16 +111,27 @@ export default function Categories() {
             <div className="cat-root-row" key={root.id}>
               <div className="cat-root-line">
                 <span className="cat-root-name">{root.name}</span>
-                <Button type="link" size="small" onClick={() => openCreate(k, root)}>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => openCreate(k, root)}
+                >
                   +子分类
                 </Button>
-                <Button type="link" size="small" onClick={() => openRename(root)}>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => openRename(root)}
+                >
                   重命名
                 </Button>
                 <Popconfirm
                   title={`删除「${root.name}」？`}
                   onConfirm={() => doDelete(root)}
-                  okButtonProps={{ loading: remove.isPending, disabled: remove.isPending }}
+                  okButtonProps={{
+                    loading: remove.isPending,
+                    disabled: remove.isPending,
+                  }}
                 >
                   <Button type="link" size="small" danger>
                     删除
@@ -121,7 +151,12 @@ export default function Categories() {
                         void doDelete(c);
                       }}
                       onClick={(e) => {
-                        if ((e.target as HTMLElement).closest('.ant-tag-close-icon')) return;
+                        if (
+                          (e.target as HTMLElement).closest(
+                            '.ant-tag-close-icon'
+                          )
+                        )
+                          return;
                         openRename(c);
                       }}
                       onKeyDown={(e) => {
@@ -155,20 +190,34 @@ export default function Categories() {
         </div>
       </div>
 
-      {forest.isLoading ? (
-        <Spin />
-      ) : (
-        <>
-          {renderSection('expense', '支出分类', rootsOfKind(forest.data, 'expense'))}
-          {renderSection('income', '收入分类', rootsOfKind(forest.data, 'income'))}
-        </>
-      )}
+      <QueryBoundary query={forest}>
+        {forest.isLoading ? (
+          <Spin />
+        ) : (
+          <>
+            {renderSection(
+              'expense',
+              '支出分类',
+              rootsOfKind(forest.data, 'expense')
+            )}
+            {renderSection(
+              'income',
+              '收入分类',
+              rootsOfKind(forest.data, 'income')
+            )}
+          </>
+        )}
+      </QueryBoundary>
 
       <Modal
         open={open}
         onCancel={() => setOpen(false)}
         onOk={submit}
-        title={renaming ? '重命名分类' : `新建分类${parent ? `（挂在「${parent.name}」下）` : '（一级）'}`}
+        title={
+          renaming
+            ? '重命名分类'
+            : `新建分类${parent ? `（挂在「${parent.name}」下）` : '（一级）'}`
+        }
         confirmLoading={create.isPending || update.isPending}
         destroyOnHidden
       >

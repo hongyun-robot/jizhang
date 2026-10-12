@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { App, AutoComplete, Button, Drawer, Grid, Input } from 'antd';
 import { DownOutlined, LoadingOutlined } from '@ant-design/icons';
-import { useCreateVoucherPlatform, useVoucherPlatforms } from '../api/hooks';
+import { useCreateVoucherPlatform, useVoucherPlatforms } from '../api/vouchers';
 import type { VoucherPlatform } from '../api/types';
 import { errMsg } from '../api/client';
 import { popupInParent } from '../lib/popup';
@@ -21,8 +21,13 @@ interface Option {
   disabled?: boolean;
 }
 
-export default function VoucherPlatformInput({
-  id, value = '', onChange, active, disabled, onCreatingChange,
+export default function PlatformInput({
+  id,
+  value = '',
+  onChange,
+  active,
+  disabled,
+  onCreatingChange,
 }: Props) {
   const { message } = App.useApp();
   const screens = Grid.useBreakpoint();
@@ -46,7 +51,9 @@ export default function VoucherPlatformInput({
     generation.current++;
     setExpanded(false);
     setSearch(null);
-    return () => { generation.current++; };
+    return () => {
+      generation.current++;
+    };
   }, [active]);
   useEffect(() => {
     onCreatingChange(active && create.isPending);
@@ -66,30 +73,38 @@ export default function VoucherPlatformInput({
     return () => observer.disconnect();
   }, [isDesktop, active]);
 
-  const change = (next: string) => {
+  const change = (input: string | undefined) => {
+    const next = input ?? '';
     currentValue.current = next;
     onChange?.(next);
   };
   const name = value.trim();
   const rows = platforms.data ?? [];
   // 搜索词：桌面端跟随下拉的 search（创建走输入框原值 name），移动端跟随浮层搜索框原值
-  const activeSearch = isDesktop ? search : (sheetOpen ? sheetSearch : null);
+  const activeSearch = isDesktop ? search : sheetOpen ? sheetSearch : null;
   const query = (activeSearch ?? '').trim().toLowerCase();
   // 移动端的"新建"候选词：浮层搜索框的原始输入（保留大小写），桌面端用输入框原值
-  const rawCreate = isDesktop ? name : (sheetOpen ? sheetSearch.trim() : '');
-  const matched: VoucherPlatform[] = rows.filter(
-    (row) => row.name.toLowerCase().includes(query),
+  const rawCreate = isDesktop ? name : sheetOpen ? sheetSearch.trim() : '';
+  const matched: VoucherPlatform[] = rows.filter((row) =>
+    row.name.toLowerCase().includes(query)
   );
   const canCreate =
-    !!rawCreate && Array.from(rawCreate).length <= 128 && !rows.some((row) => row.name === rawCreate);
+    !!rawCreate &&
+    Array.from(rawCreate).length <= 128 &&
+    !rows.some((row) => row.name === rawCreate);
   // 过滤后无匹配也无创建项时，才回落到提示占位
   const noMatch = !matched.length && !canCreate;
 
-  const options: Option[] = matched.map((row) => ({ value: row.name, label: row.name }));
+  const options: Option[] = matched.map((row) => ({
+    value: row.name,
+    label: row.name,
+  }));
   if (canCreate) {
     options.push({
       value: rawCreate,
-      label: create.isPending ? `正在创建「${rawCreate}」…` : `创建「${rawCreate}」`,
+      label: create.isPending
+        ? `正在创建「${rawCreate}」…`
+        : `创建「${rawCreate}」`,
       create: true,
       disabled: create.isPending,
     });
@@ -123,7 +138,10 @@ export default function VoucherPlatformInput({
     inFlight.current = true;
     try {
       const row = await create.mutateAsync(selected);
-      if (generation.current === requestGeneration && currentValue.current === requestValue) {
+      if (
+        generation.current === requestGeneration &&
+        currentValue.current === requestValue
+      ) {
         change(row.name);
         message.success('平台 / 商家已创建');
         setSheetOpen(false);
@@ -162,11 +180,20 @@ export default function VoucherPlatformInput({
           onFocus={() => setExpanded(true)}
           showSearch={{
             filterOption: false,
-            onSearch: (next) => { setSearch(next); setExpanded(true); },
+            onSearch: (next) => {
+              setSearch(next);
+              setExpanded(true);
+            },
           }}
-          onSelect={(selected, option) => { void select(selected, option); }}
+          onSelect={(selected, option) => {
+            void select(selected, option);
+          }}
           onInputKeyDown={(event) => {
-            if (event.key === 'Enter' && expanded && !event.nativeEvent.isComposing) {
+            if (
+              event.key === 'Enter' &&
+              expanded &&
+              !event.nativeEvent.isComposing
+            ) {
               event.preventDefault();
             }
           }}
@@ -180,11 +207,16 @@ export default function VoucherPlatformInput({
             allowClear
             placeholder="选择或输入平台 / 商家"
             suffix={
-              create.isPending ? <LoadingOutlined /> : (
+              create.isPending ? (
+                <LoadingOutlined />
+              ) : (
                 <DownOutlined
                   aria-label="展开平台 / 商家选项"
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => { setSearch(null); setExpanded(!expanded); }}
+                  onClick={() => {
+                    setSearch(null);
+                    setExpanded(!expanded);
+                  }}
                   style={{ cursor: 'pointer' }}
                 />
               )
@@ -201,9 +233,17 @@ export default function VoucherPlatformInput({
             className="voucher-platform-trigger"
             disabled={disabled}
             aria-haspopup="dialog"
-            onClick={() => { if (active) setSheetOpen(true); }}
+            onClick={() => {
+              if (active) setSheetOpen(true);
+            }}
           >
-            <span className={value ? 'voucher-platform-trigger-value' : 'voucher-platform-trigger-placeholder'}>
+            <span
+              className={
+                value
+                  ? 'voucher-platform-trigger-value'
+                  : 'voucher-platform-trigger-placeholder'
+              }
+            >
               {value || '选择或输入平台 / 商家'}
             </span>
             <DownOutlined className="voucher-platform-trigger-arrow" />
@@ -211,7 +251,7 @@ export default function VoucherPlatformInput({
           <Drawer
             title="选择平台 / 商家"
             placement="bottom"
-            height="64vh"
+            size="64vh"
             open={sheetOpen}
             onClose={() => setSheetOpen(false)}
             className="voucher-platform-sheet"
@@ -225,9 +265,22 @@ export default function VoucherPlatformInput({
               disabled={create.isPending}
             />
             <div className="voucher-platform-sheet-list">
+              {value && (
+                <button
+                  type="button"
+                  className="voucher-platform-sheet-item"
+                  onClick={() => pick('')}
+                >
+                  清空平台 / 商家
+                </button>
+              )}
               {options.map((option) =>
                 option.disabled ? (
-                  <div key="empty" className="voucher-platform-sheet-empty" role="status">
+                  <div
+                    key="empty"
+                    className="voucher-platform-sheet-empty"
+                    role="status"
+                  >
                     {option.label}
                   </div>
                 ) : (
@@ -235,16 +288,19 @@ export default function VoucherPlatformInput({
                     key={option.create ? 'create' : option.value}
                     type="button"
                     className={`voucher-platform-sheet-item${option.create ? ' is-create' : ''}`}
+                    aria-label={option.label}
                     disabled={create.isPending}
                     onClick={() => {
                       if (option.create) void select(option.value, option);
                       else pick(option.value);
                     }}
                   >
-                    {option.create && <LoadingOutlined className="voucher-platform-sheet-item-icon" />}
+                    {option.create && (
+                      <LoadingOutlined className="voucher-platform-sheet-item-icon" />
+                    )}
                     {option.label}
                   </button>
-                ),
+                )
               )}
             </div>
           </Drawer>
@@ -253,7 +309,13 @@ export default function VoucherPlatformInput({
       {platforms.isError && (
         <div role="status" className="muted">
           选项加载失败，可直接输入。
-          <Button type="link" size="small" onClick={() => { void platforms.refetch(); }}>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => {
+              void platforms.refetch();
+            }}
+          >
             重试
           </Button>
         </div>

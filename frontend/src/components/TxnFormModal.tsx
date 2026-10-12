@@ -1,15 +1,33 @@
+import { submissionGate } from '../lib/submission';
+import { useRef as submissionRef } from 'react';
+import CategoryPicker from './CategoryPicker';
+import { accountOptions as buildAccountOptions } from '../domain/accounts';
+import { amountError } from '../lib/money';
 import { useEffect, useMemo, useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
-import { Alert, App, Button, DatePicker, Grid, Input, Modal, Segmented, Select, Tag } from 'antd';
+import {
+  Alert,
+  App,
+  Button,
+  DatePicker,
+  Grid,
+  Input,
+  Modal,
+  Segmented,
+  Select,
+} from 'antd';
 
-import { useAccounts, useCategoryForest, useCreateTxn, useUpdateTxn } from '../api/hooks';
+import { useAccounts } from '../api/accounts';
+import { useCategoryForest } from '../api/categories';
+import { useCreateTxn, useUpdateTxn } from '../api/transactions';
 import { rootsOfKind } from '../api/category';
 import type { TxnKind, Transaction } from '../api/types';
 import { errMsg } from '../api/client';
 import { useAuth } from '../stores/auth';
+import { canRecord } from '../domain/permissions';
 import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 import VoucherFormModal from './VoucherFormModal';
-import VoucherPlatformInput from './VoucherPlatformInput';
+import PlatformInput from './PlatformInput';
 import { useNavigate } from 'react-router-dom';
 import { useLiabilityDetail } from '../api/liability';
 import { plannedBills } from '../lib/liability';
@@ -34,7 +52,7 @@ export interface TxnRefill {
   /** 原支出金额（超额黄条计算） */
   related_amount?: string;
   /** 原支出已退累计 */
-  refunded?: number;
+  refunded?: string;
   platform?: string;
   installment_plan_id?: number;
   liability_account_id?: number;
@@ -56,7 +74,13 @@ interface Props {
  * - 转账双账户且无分类；日期默认今天
  * - 退款可关联原支出（related_txn_id），累计超原支出时黄条提示、二次确认提交
  */
-export default function TxnFormModal({ open, onClose, editing, refill }: Props) {
+export default function TxnFormModal({
+  open,
+  onClose,
+  editing,
+  refill,
+}: Props) {
+  const submitGate = submissionRef(submissionGate());
   const { message } = App.useApp();
   const navigate = useNavigate();
   const screens = Grid.useBreakpoint();
@@ -70,14 +94,15 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   const user = useAuth((s) => s.user);
   // 退款是入账动作，只读角色（viewer）不显示该选项（specs/refunds 权限约束）
   const kindOptions =
-    user?.role === 'viewer' ? KIND_OPTIONS.filter((o) => o.value !== 'refund') : KIND_OPTIONS;
+    user?.role === 'viewer'
+      ? KIND_OPTIONS.filter((o) => o.value !== 'refund')
+      : KIND_OPTIONS;
 
   const [kind, setKind] = useState<TxnKind>('expense');
   const [amount, setAmount] = useState('');
   const [accountId, setAccountId] = useState<number | undefined>();
   const [transferId, setTransferId] = useState<number | undefined>();
   const [categoryId, setCategoryId] = useState<number | undefined>();
-  const [activeRootId, setActiveRootId] = useState<number | undefined>();
   const [date, setDate] = useState<Dayjs>(() => dayjs());
   const [note, setNote] = useState('');
   const [platform, setPlatform] = useState('');
@@ -85,15 +110,29 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
   // 退款关联上下文：关联 id / 原支出金额 / 已退累计 / 超额二次确认
   const [relatedId, setRelatedId] = useState<number | undefined>();
   const [relatedAmount, setRelatedAmount] = useState<string | undefined>();
-  const [refundedBase, setRefundedBase] = useState(0);
+  const [refundedBase, setRefundedBase] = useState('0');
   const [overAck, setOverAck] = useState(false);
   const [voucherOpen, setVoucherOpen] = useState(false);
   // 内联校验：提交失败后才提示（specs/ui-shell 记账表单内联校验），Alert 与字段错误态同步展示
   const [showErrors, setShowErrors] = useState(false);
-  const creditAccount = (accounts.data ?? []).find((a) => a.id === (kind === 'transfer' ? transferId : accountId) && a.type === 'liability');
+  const creditAccount = (accounts.data ?? []).find(
+    (a) =>
+      a.id === (kind === 'transfer' ? transferId : accountId) &&
+      a.type === 'liability'
+  );
   const liability = useLiabilityDetail(creditAccount?.id ?? 0);
-  const managed = !!editing && !!(editing.installment_plan_id || editing.liability_term_id || editing.liability_operation_id);
-  const cycle = plannedBills(liability.data?.rules ?? [], date.format('YYYY-MM-DD'), 1)[0];
+  const managed =
+    !!editing &&
+    !!(
+      editing.installment_plan_id ||
+      editing.liability_term_id ||
+      editing.liability_operation_id
+    );
+  const cycle = plannedBills(
+    liability.data?.rules ?? [],
+    date.format('YYYY-MM-DD'),
+    1
+  )[0];
 
   // 打开时初始化（编辑回填 / 行内退款预填 / 新建默认今天）
   useEffect(() => {
@@ -111,20 +150,19 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
       setPlatform(editing.platform ?? '');
       setRelatedId(editing.related_txn_id ?? undefined);
       setRelatedAmount(undefined);
-      setRefundedBase(0);
+      setRefundedBase('0');
     } else if (refill) {
       setKind(refill.kind);
       setAmount('');
       setAccountId(refill.account_id);
       setTransferId(undefined);
       setCategoryId(refill.category_id);
-      setActiveRootId(undefined);
       setDate(dayjs());
       setNote('');
       setPlatform(refill.platform ?? '');
       setRelatedId(refill.related_txn_id);
       setRelatedAmount(refill.related_amount);
-      setRefundedBase(refill.refunded ?? 0);
+      setRefundedBase(refill.refunded ?? '0');
     } else {
       setKind('expense');
       setAmount('');
@@ -136,54 +174,28 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
       setPlatform('');
       setRelatedId(undefined);
       setRelatedAmount(undefined);
-      setRefundedBase(0);
+      setRefundedBase('0');
     }
   }, [open, editing, refill]);
 
-  const activeAccounts = useMemo(
-    () => (accounts.data ?? []).filter((a) => a.status === 'active'),
-    [accounts.data],
-  );
-
   const roots = useMemo(
     () => rootsOfKind(forest.data, kind === 'income' ? 'income' : 'expense'),
-    [forest.data, kind],
+    [forest.data, kind]
   );
-
-  // 当前一级分类：由已选子分类推导，否则取第一个
-  const activeRoot = useMemo(() => {
-    if (activeRootId) return roots.find((r) => r.id === activeRootId) ?? roots[0];
-    if (categoryId) {
-      const parent = roots.find((r) => r.children?.some((c) => c.id === categoryId));
-      if (parent) return parent;
-      const self = roots.find((r) => r.id === categoryId);
-      if (self) return self;
-    }
-    return roots[0];
-  }, [roots, activeRootId, categoryId]);
-
-  const leaves = useMemo(() => {
-    if (!activeRoot) return [];
-    return activeRoot.children?.length ? activeRoot.children : [activeRoot];
-  }, [activeRoot]);
-
-  const pickRoot = (id: number) => {
-    setActiveRootId(id);
-    const root = roots.find((r) => r.id === id);
-    if (root && !root.children?.length) setCategoryId(root.id);
-  };
 
   const setQuick = (v: number) => {
     setAmount(money(cents(amount) + BigInt(v) * 100n));
   };
 
   const validate = (): string | null => {
-    if (Array.from(platform.trim()).length > 128) return '平台 / 商家名称最多 128 字';
-    if (!/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) {
+    if (Array.from(platform.trim()).length > 128)
+      return '平台 / 商家名称最多 128 字';
+    if (amountError(amount)) {
       return '请输入大于 0 的金额，最多两位小数';
     }
     if (!accountId) return '请选择账户';
-    if (creditAccount && !creditAccount.billing_enabled) return '请在我的负债账户中设置此账户的账单日和还款日';
+    if (creditAccount && !creditAccount.billing_enabled)
+      return '请在我的负债账户中设置此账户的账单日和还款日';
     if (kind === 'transfer') {
       if (!transferId) return '请选择转入账户';
       if (transferId === accountId) return '转出与转入账户不能相同';
@@ -195,267 +207,369 @@ export default function TxnFormModal({ open, onClose, editing, refill }: Props) 
 
   // 提交后才展示的内联错误：Alert 文案 + 逐字段错误态（status="error"）
   const fieldErr = showErrors ? validate() : null;
-  const amountInvalid = !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0;
+  const amountInvalid = !!amountError(amount);
 
   // 超额黄条：累计退款（已退 + 本次）超过原支出（specs/refunds 超额仅提示不拦截）
   const overTotal =
     relatedId && relatedAmount && cents(amount) > 0n
       ? cents(String(refundedBase)) + cents(amount)
       : null;
-  const isOver = overTotal !== null && relatedAmount !== undefined && overTotal > cents(relatedAmount);
+  const isOver =
+    overTotal !== null &&
+    relatedAmount !== undefined &&
+    overTotal > cents(relatedAmount);
 
-  const submit = async () => {
-    if (creatingPlatform || createTxn.isPending || updateTxn.isPending) return;
-    if (managed) return;
-    const err = validate();
-    if (err) {
-      setShowErrors(true); // 内联提示出错项，表单不关闭
-      return;
-    }
-    if (isOver && !overAck) {
-      setOverAck(true);
-      message.warning(
-        `累计退款 ¥${money(overTotal!)} 已超过原支出 ¥${relatedAmount}，如确认请再次点击提交`,
-      );
-      return;
-    }
-    const input = {
-      kind,
-      amount,
-      account_id: accountId!,
-      ...(kind === 'transfer'
-        ? { transfer_account_id: transferId }
-        : { category_id: categoryId }),
-      ...(kind === 'refund' && relatedId ? { related_txn_id: relatedId } : {}),
-      entry_date: date.format('YYYY-MM-DD'),
-      note: note || undefined,
-      platform: platform.trim(),
-    };
-    try {
-      if (editing) {
-        await updateTxn.mutateAsync({ id: editing.id, input });
-        message.success('已保存修改');
-      } else {
-        await createTxn.mutateAsync(input);
-        message.success('已记一笔');
+  const submit = () =>
+    submitGate.current(async () => {
+      if (!canRecord(user?.role)) return;
+      if (creatingPlatform || createTxn.isPending || updateTxn.isPending)
+        return;
+      if (managed) return;
+      const err = validate();
+      if (err) {
+        setShowErrors(true); // 内联提示出错项，表单不关闭
+        return;
       }
-      onClose();
-      if (kind === 'refund' && refill?.installment_plan_id && refill.liability_account_id) {
-        message.info('退款已入账，请核对剩余分期期次；手续费按实际退款处理');
-        navigate(`/liabilities/${refill.liability_account_id}?plan=${refill.installment_plan_id}`);
+      if (isOver && !overAck) {
+        setOverAck(true);
+        message.warning(
+          `累计退款 ¥${money(overTotal!)} 已超过原支出 ¥${relatedAmount}，如确认请再次点击提交`
+        );
+        return;
       }
-    } catch (e) {
-      message.error(errMsg(e));
-    }
-  };
+      const input = {
+        kind,
+        amount,
+        account_id: accountId!,
+        ...(kind === 'transfer'
+          ? { transfer_account_id: transferId }
+          : { category_id: categoryId }),
+        ...(kind === 'refund' && relatedId
+          ? { related_txn_id: relatedId }
+          : {}),
+        entry_date: date.format('YYYY-MM-DD'),
+        note: note || undefined,
+        platform: platform.trim(),
+      };
+      try {
+        if (editing) {
+          await updateTxn.mutateAsync({ id: editing.id, input });
+          message.success('已保存修改');
+        } else {
+          await createTxn.mutateAsync(input);
+          message.success('已记一笔');
+        }
+        onClose();
+        if (
+          kind === 'refund' &&
+          refill?.installment_plan_id &&
+          refill.liability_account_id
+        ) {
+          message.info('退款已入账，请核对剩余分期期次；手续费按实际退款处理');
+          navigate(
+            `/liabilities/${refill.liability_account_id}?plan=${refill.installment_plan_id}`
+          );
+        }
+      } catch (e) {
+        message.error(errMsg(e));
+      }
+    });
 
   const saving = createTxn.isPending || updateTxn.isPending;
-  const accountOptions = activeAccounts.map((a) => ({
-    value: a.id,
-    label: `${a.name}${a.type === 'liability' ? '（信用）' : ''}`,
-  }));
+  const accountOptions = buildAccountOptions(accounts.data, {
+    ownerId: user?.id,
+    history: !!editing,
+    selectedIds: [accountId, transferId].flatMap((id) =>
+      id === undefined ? [] : [id]
+    ),
+  });
   const startPlan = () => {
     const error = validate();
-    if (error) { setShowErrors(true); return; }
+    if (error) {
+      setShowErrors(true);
+      return;
+    }
     onClose();
-    navigate(`/liabilities/${creditAccount!.id}`, { state: { liabilityDraft: { amount, entry_date: date.format('YYYY-MM-DD'), category_id: categoryId, note, platform:platform.trim(), source_txn_id: editing?.id } } });
+    navigate(`/liabilities/${creditAccount!.id}`, {
+      state: {
+        liabilityDraft: {
+          amount,
+          entry_date: date.format('YYYY-MM-DD'),
+          category_id: categoryId,
+          note,
+          platform: platform.trim(),
+          source_txn_id: editing?.id,
+        },
+      },
+    });
   };
 
   return (
     <>
-    <Modal
-      open={open}
-      onCancel={onClose}
-      title={editing ? '编辑流水' : '记一笔'}
-      width={isMobile ? '100%' : 520}
-      style={isMobile ? { top: 0, maxWidth: '100%', paddingBottom: 0 } : undefined}
-      styles={{ body: { maxHeight: `calc(100dvh - ${isMobile ? 160 : 240}px)`, overflowY: 'auto' } }}
-      footer={[
-        <Button key="cancel" onClick={onClose}>
-          取消
-        </Button>,
-        <Button key="ok" type="primary" loading={saving} disabled={creatingPlatform || managed} onClick={submit}>
-          {editing ? '保存' : '记账'}
-        </Button>,
-      ]}
-    >
-      <div className="txn-form">
-        {/* body 顶部受控错误 Alert：提交未通过 validate() 时出现，修好后自动消失，Modal 不关闭 */}
-        {fieldErr && <Alert type="error" showIcon message={fieldErr} className="txn-form-error" />}
-        {managed && <Alert type="info" title="此流水由负债计划管理" description={<Button type="link" onClick={() => { onClose(); navigate(`/liabilities/${editing!.liability_account_id ?? editing!.account_id}`); }}>查看计划、费用与修正入口</Button>} />}
-        {!editing && user?.role !== 'viewer' && <Button onClick={() => { setVoucherOpen(true); onClose(); }}>购券：先付款，使用时计消费</Button>}
-        <Segmented
-          block
-          value={kind}
-          options={kindOptions}
-          onChange={(v) => {
-            setKind(v as TxnKind);
-            setCategoryId(undefined);
-            setActiveRootId(undefined);
-            setOverAck(false);
-            if (v !== 'refund') {
-              setRelatedId(undefined);
-              setRelatedAmount(undefined);
-              setRefundedBase(0);
-            }
-          }}
-        />
-
-        {/* 金额：大字 + 系统数字键盘 + 常用金额快捷键 */}
-        <div className={`amount-row${showErrors && amountInvalid ? ' amount-error' : ''}`}>
-          <span className="amount-symbol">¥</span>
-          <Input
-            value={amount}
-            onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
-            inputMode="decimal"
-            placeholder="0.00"
-            size="large"
-            className="amount-input"
-            status={showErrors && amountInvalid ? 'error' : undefined}
-            autoFocus
-            // 金额框回车即记账：桌面端免去一次「再找按钮」的视线跳跃
-            onPressEnter={submit}
-          />
-        </div>
-        <div className="quick-amounts">
-          {QUICK_AMOUNTS.map((v) => (
-            <Button key={v} size="small" onClick={() => setQuick(v)}>
-              +{v}
-            </Button>
-          ))}
-          <Button size="small" onClick={() => setAmount('')}>
-            清零
-          </Button>
-        </div>
-
-        {/* 分类（转账无分类；退款分类可留空） */}
-        {kind !== 'transfer' && roots.length > 0 && (
-          <div className={`cat-pick${showErrors && kind !== 'refund' && !categoryId ? ' pick-error' : ''}`}>
-            <div className="pick-label">分类{kind === 'refund' ? '（可留空）' : ''}</div>
-            <div className="cat-roots">
-              {roots.map((r) => (
-                <Tag.CheckableTag
-                  key={r.id}
-                  checked={activeRoot?.id === r.id}
-                  onChange={() => pickRoot(r.id)}
-                >
-                  {r.name}
-                </Tag.CheckableTag>
-              ))}
-            </div>
-            {leaves.length > 0 && <div className="pick-label">子分类</div>}
-            <div className="cat-leaves">
-              {leaves.map((c) => (
-                <Tag.CheckableTag
-                  key={c.id}
-                  checked={categoryId === c.id}
-                  onChange={() => setCategoryId(c.id)}
-                >
-                  {c.name}
-                </Tag.CheckableTag>
-              ))}
-              {kind === 'refund' && (
-                <Tag.CheckableTag
-                  checked={!categoryId}
-                  onChange={() => {
-                    setCategoryId(undefined);
-                    setActiveRootId(undefined);
+      <Modal
+        open={open}
+        onCancel={onClose}
+        title={editing ? '编辑流水' : '记一笔'}
+        width={isMobile ? '100%' : 520}
+        style={
+          isMobile ? { top: 0, maxWidth: '100%', paddingBottom: 0 } : undefined
+        }
+        styles={{
+          body: {
+            maxHeight: `calc(100dvh - ${isMobile ? 160 : 240}px)`,
+            overflowY: 'auto',
+          },
+        }}
+        footer={[
+          <Button key="cancel" onClick={onClose}>
+            取消
+          </Button>,
+          <Button
+            key="ok"
+            type="primary"
+            loading={saving}
+            disabled={creatingPlatform || managed}
+            onClick={submit}
+          >
+            {editing ? '保存' : '记账'}
+          </Button>,
+        ]}
+      >
+        <div className="txn-form">
+          {/* body 顶部受控错误 Alert：提交未通过 validate() 时出现，修好后自动消失，Modal 不关闭 */}
+          {fieldErr && (
+            <Alert
+              type="error"
+              showIcon
+              message={fieldErr}
+              className="txn-form-error"
+            />
+          )}
+          {managed && (
+            <Alert
+              type="info"
+              title="此流水由负债计划管理"
+              description={
+                <Button
+                  type="link"
+                  onClick={() => {
+                    onClose();
+                    navigate(
+                      `/liabilities/${editing!.liability_account_id ?? editing!.account_id}`
+                    );
                   }}
                 >
-                  未分类
-                </Tag.CheckableTag>
-              )}
-            </div>
-          </div>
-        )}
-
-        {creditAccount && <Alert type={creditAccount.billing_enabled ? 'info' : 'warning'} title={creditAccount.billing_enabled ? kind === 'transfer' ? '转入负债账户会记录还款' : kind === 'refund' ? '同账户退款优先抵扣原未还本金' : '消费时计支出，下月还款记转账' : '此账户尚未配置账单规则'} description={<>{cycle && kind === 'expense' && <p>归属 {cycle.close} 账单，{cycle.due} 到期。还款本金不会再计支出。</p>}{kind === 'transfer' && <p>先还最早到期账单，超额保留待抵扣，可在负债详情调整分配。</p>}{!managed && kind === 'expense' && creditAccount.billing_enabled && user?.role !== 'viewer' && <Button onClick={startPlan}>{editing ? '将这笔消费转为固定分期' : '填写期次和手续费，记固定分期'}</Button>}</>} />}
-
-        <div className="txn-platform-field">
-          <label className="pick-label" htmlFor="txn-platform">平台 / 商家</label>
-          <VoucherPlatformInput
-            key={editing?.id ?? 'new'}
-            id="txn-platform"
-            value={platform}
-            onChange={setPlatform}
-            active={open}
-            disabled={saving}
-            onCreatingChange={setCreatingPlatform}
+                  查看计划、费用与修正入口
+                </Button>
+              }
+            />
+          )}
+          {!editing && user?.role !== 'viewer' && (
+            <Button
+              onClick={() => {
+                setVoucherOpen(true);
+                onClose();
+              }}
+            >
+              购券：先付款，使用时计消费
+            </Button>
+          )}
+          <Segmented
+            block
+            value={kind}
+            options={kindOptions}
+            onChange={(v) => {
+              setKind(v as TxnKind);
+              setCategoryId(undefined);
+              setOverAck(false);
+              if (v !== 'refund') {
+                setRelatedId(undefined);
+                setRelatedAmount(undefined);
+                setRefundedBase('0');
+              }
+            }}
           />
-        </div>
 
-        {/* 账户 */}
-        {kind === 'transfer' ? (
-          <div className="transfer-row">
+          {/* 金额：大字 + 系统数字键盘 + 常用金额快捷键 */}
+          <div
+            className={`amount-row${showErrors && amountInvalid ? ' amount-error' : ''}`}
+          >
+            <span className="amount-symbol">¥</span>
+            <Input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
+              inputMode="decimal"
+              placeholder="0.00"
+              size="large"
+              className="amount-input"
+              status={showErrors && amountInvalid ? 'error' : undefined}
+              autoFocus
+              // 金额框回车即记账：桌面端免去一次「再找按钮」的视线跳跃
+              onPressEnter={submit}
+            />
+          </div>
+          <div className="quick-amounts">
+            {QUICK_AMOUNTS.map((v) => (
+              <Button key={v} size="small" onClick={() => setQuick(v)}>
+                +{v}
+              </Button>
+            ))}
+            <Button size="small" onClick={() => setAmount('')}>
+              清零
+            </Button>
+          </div>
+
+          {/* 分类（转账无分类；退款分类可留空） */}
+          {kind !== 'transfer' && roots.length > 0 && (
+            <CategoryPicker
+              key={String(open) + String(editing?.id) + kind}
+              roots={roots}
+              value={categoryId}
+              onChange={setCategoryId}
+              allowEmpty={kind === 'refund'}
+              error={showErrors && kind !== 'refund' && !categoryId}
+              heading={kind === 'refund' ? '分类（可留空）' : '分类'}
+            />
+          )}
+
+          {creditAccount && (
+            <Alert
+              type={creditAccount.billing_enabled ? 'info' : 'warning'}
+              title={
+                creditAccount.billing_enabled
+                  ? kind === 'transfer'
+                    ? '转入负债账户会记录还款'
+                    : kind === 'refund'
+                      ? '同账户退款优先抵扣原未还本金'
+                      : '消费时计支出，下月还款记转账'
+                  : '此账户尚未配置账单规则'
+              }
+              description={
+                <>
+                  {cycle && kind === 'expense' && (
+                    <p>
+                      归属 {cycle.close} 账单，{cycle.due}{' '}
+                      到期。还款本金不会再计支出。
+                    </p>
+                  )}
+                  {kind === 'transfer' && (
+                    <p>
+                      先还最早到期账单，超额保留待抵扣，可在负债详情调整分配。
+                    </p>
+                  )}
+                  {!managed &&
+                    kind === 'expense' &&
+                    creditAccount.billing_enabled &&
+                    user?.role !== 'viewer' && (
+                      <Button onClick={startPlan}>
+                        {editing
+                          ? '将这笔消费转为固定分期'
+                          : '填写期次和手续费，记固定分期'}
+                      </Button>
+                    )}
+                </>
+              }
+            />
+          )}
+
+          <div className="txn-platform-field">
+            <label className="pick-label" htmlFor="txn-platform">
+              平台 / 商家
+            </label>
+            <PlatformInput
+              key={editing?.id ?? 'new'}
+              id="txn-platform"
+              value={platform}
+              onChange={setPlatform}
+              active={open}
+              disabled={saving}
+              onCreatingChange={setCreatingPlatform}
+            />
+          </div>
+
+          {/* 账户 */}
+          {kind === 'transfer' ? (
+            <div className="transfer-row">
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder="转出账户"
+                options={accountOptions}
+                value={accountId}
+                onChange={setAccountId}
+                style={{ flex: 1 }}
+                status={showErrors && !accountId ? 'error' : undefined}
+                getPopupContainer={popupInParent}
+              />
+              <span className="transfer-arrow">→</span>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder="转入账户"
+                options={accountOptions.filter((o) => o.value !== accountId)}
+                value={transferId}
+                onChange={setTransferId}
+                style={{ flex: 1 }}
+                status={showErrors && !transferId ? 'error' : undefined}
+                getPopupContainer={popupInParent}
+              />
+            </div>
+          ) : (
             <Select
-              showSearch optionFilterProp="label"
-              placeholder="转出账户"
+              showSearch
+              optionFilterProp="label"
+              placeholder="账户"
               options={accountOptions}
               value={accountId}
               onChange={setAccountId}
-              style={{ flex: 1 }}
+              style={{ width: '100%' }}
               status={showErrors && !accountId ? 'error' : undefined}
               getPopupContainer={popupInParent}
             />
-            <span className="transfer-arrow">→</span>
-            <Select
-              showSearch optionFilterProp="label"
-              placeholder="转入账户"
-              options={accountOptions.filter((o) => o.value !== accountId)}
-              value={transferId}
-              onChange={setTransferId}
-              style={{ flex: 1 }}
-              status={showErrors && !transferId ? 'error' : undefined}
-              getPopupContainer={popupInParent}
-            />
-          </div>
-        ) : (
-          <Select
-            showSearch optionFilterProp="label"
-            placeholder="账户"
-            options={accountOptions}
-            value={accountId}
-            onChange={setAccountId}
+          )}
+
+          {/* 退款关联信息 + 超额黄条（累计可超原支出，仅提示需二次确认） */}
+          {kind === 'refund' && relatedId && (
+            <div className="refund-related">
+              已关联原支出 #{relatedId}
+              {relatedAmount
+                ? `（原 ¥${relatedAmount}，已退 ¥${refundedBase}）`
+                : ''}
+            </div>
+          )}
+          {kind === 'refund' &&
+            isOver &&
+            relatedAmount !== undefined &&
+            overTotal !== null && (
+              <Alert
+                type="warning"
+                showIcon
+                className="refund-over"
+                message={`累计退款 ¥${money(overTotal)} 超过原支出 ¥${relatedAmount}（本次 ¥${amount}），如确认请再次点击「${editing ? '保存' : '记账'}」`}
+              />
+            )}
+
+          <DatePicker
+            value={date}
+            onChange={(v) => v && setDate(v)}
             style={{ width: '100%' }}
-            status={showErrors && !accountId ? 'error' : undefined}
+            allowClear={false}
             getPopupContainer={popupInParent}
           />
-        )}
 
-        {/* 退款关联信息 + 超额黄条（累计可超原支出，仅提示需二次确认） */}
-        {kind === 'refund' && relatedId && (
-          <div className="refund-related">
-            已关联原支出 #{relatedId}
-            {relatedAmount ? `（原 ¥${relatedAmount}，已退 ¥${refundedBase}）` : ''}
-          </div>
-        )}
-        {kind === 'refund' && isOver && relatedAmount !== undefined && overTotal !== null && (
-          <Alert
-            type="warning"
-            showIcon
-            className="refund-over"
-            message={`累计退款 ¥${money(overTotal)} 超过原支出 ¥${relatedAmount}（本次 ¥${amount}），如确认请再次点击「${editing ? '保存' : '记账'}」`}
+          <Input.TextArea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="备注（可选）"
+            maxLength={255}
+            rows={2}
           />
-        )}
-
-        <DatePicker
-          value={date}
-          onChange={(v) => v && setDate(v)}
-          style={{ width: '100%' }}
-          allowClear={false}
-          getPopupContainer={popupInParent}
-        />
-
-        <Input.TextArea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="备注（可选）"
-          maxLength={255}
-          rows={2}
-        />
-      </div>
-    </Modal>
-    <VoucherFormModal open={voucherOpen} onClose={() => setVoucherOpen(false)} />
+        </div>
+      </Modal>
+      <VoucherFormModal
+        open={voucherOpen}
+        onClose={() => setVoucherOpen(false)}
+      />
     </>
   );
 }

@@ -1,9 +1,10 @@
+import { QueryBoundary } from '../components/QueryState';
 import { useState } from 'react';
 import { Card, Empty, Table, Tag } from 'antd';
 import type { TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
 
-import { useAuditLogs } from '../api/hooks';
+import { useAuditLogs } from '../api/settings';
 import type { AuditItem } from '../api/types';
 
 /** 动作标签（与后端 action 编码一一对应）。 */
@@ -54,27 +55,34 @@ export default function Audit() {
         </div>
       </div>
 
-      <Card size="small" className="panel">
-        <Table<AuditItem>
-          rowKey="id"
-          size="small"
-          columns={columns}
-          dataSource={logs.data?.items}
-          loading={logs.isLoading}
-          locale={{
-            emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无审计日志" />,
-          }}
-          pagination={{
-            current: page,
-            pageSize: logs.data?.page_size ?? 20,
-            total: logs.data?.total ?? 0,
-            onChange: setPage,
-            showSizeChanger: false,
-            hideOnSinglePage: true,
-            size: 'small',
-          }}
-        />
-      </Card>
+      <QueryBoundary query={logs}>
+        <Card size="small" className="panel">
+          <Table<AuditItem>
+            rowKey="id"
+            size="small"
+            columns={columns}
+            dataSource={logs.data?.items}
+            loading={logs.isLoading}
+            locale={{
+              emptyText: (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="暂无审计日志"
+                />
+              ),
+            }}
+            pagination={{
+              current: page,
+              pageSize: logs.data?.page_size ?? 20,
+              total: logs.data?.total ?? 0,
+              onChange: setPage,
+              showSizeChanger: false,
+              hideOnSinglePage: true,
+              size: 'small',
+            }}
+          />
+        </Card>
+      </QueryBoundary>
     </div>
   );
 }
