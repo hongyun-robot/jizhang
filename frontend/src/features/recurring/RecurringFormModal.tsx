@@ -1,4 +1,5 @@
 import { submissionGate } from '../../lib/submission';
+import { useEditorSession } from '../../hooks/useEditorSession';
 import { useRef as submissionRef } from 'react';
 import { useState } from 'react';
 
@@ -87,6 +88,12 @@ export default function RecurringFormModal({
   onClose: () => void;
 }) {
   const submitGate = submissionRef(submissionGate());
+  const editor = useEditorSession(open, editing?.id ?? 'new');
+  const close = () => {
+    editor.close();
+    onClose();
+  };
+
   const { create, update } = useRuleMutations();
   const [form, setForm] = useState<FormState>(defaultForm);
   useVisualViewportKeyboard(open);
@@ -124,6 +131,8 @@ export default function RecurringFormModal({
   };
   const submit = () =>
     submitGate.current(async () => {
+      const isCurrent = editor.capture();
+      if (!isCurrent()) return;
       const err = validate();
       if (err) {
         message.warning(err);
@@ -140,14 +149,16 @@ export default function RecurringFormModal({
       try {
         if (editing) {
           await update.mutateAsync({ id: editing.id, input });
+          if (!isCurrent()) return;
           message.success('已保存模板');
         } else {
           await create.mutateAsync(input);
+          if (!isCurrent()) return;
           message.success('已创建周期模板');
         }
-        onClose();
+        close();
       } catch (e) {
-        message.error(errMsg(e));
+        if (isCurrent()) message.error(errMsg(e));
       }
     });
   const initialized = useRef<number | undefined>(undefined);
@@ -188,14 +199,14 @@ export default function RecurringFormModal({
   return (
     <Modal
       open={open}
-      onCancel={onClose}
+      onCancel={close}
       title={editing ? '编辑周期模板' : '新建周期模板'}
       width={isMobile ? '100%' : 520}
       style={
         isMobile ? { top: 0, maxWidth: '100%', paddingBottom: 0 } : undefined
       }
       footer={[
-        <Button key="cancel" onClick={onClose}>
+        <Button key="cancel" onClick={close}>
           取消
         </Button>,
         <Button

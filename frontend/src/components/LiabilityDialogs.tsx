@@ -77,6 +77,11 @@ export default function LiabilityDialogs({
 }) {
   useVisualViewportKeyboard(true);
   const submitGate = submissionRef(submissionGate());
+  // This component is keyed by requestKey. Refreshes replace query data but must
+  // not change this editor's diff baseline, operation mode or registered fields.
+  const editingBaseline = useRef(d).current;
+  const operationDetail = dialog?.mode === 'edit_plan' ? editingBaseline : d;
+
   const [form] = Form.useForm<Values>();
   const values = Form.useWatch([], form) as Values | undefined;
   const accounts = useAccounts();
@@ -87,7 +92,7 @@ export default function LiabilityDialogs({
   const [preview, setPreview] = useState<SettlementPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [feeDates, setFeeDates] = useState<Record<number, string>>({});
-  const plan = d.plans.find((p) => p.id === dialog?.planId);
+  const plan = operationDetail.plans.find((p) => p.id === dialog?.planId);
   const bill = d.statements.find((b) => b.id === dialog?.billId);
   const feeCandidates = useFeeTransactions(
     plan?.fee_account_id,
@@ -287,7 +292,7 @@ export default function LiabilityDialogs({
             ? schedule.map((row) => row.feeDate)
             : undefined;
         await write.mutateAsync(
-          liabilityCommand(d, dialog, v, feeDatesInput)
+          liabilityCommand(operationDetail, dialog, v, feeDatesInput)
         );
         message.success('已保存，账单与资金记录已更新');
         onClose();

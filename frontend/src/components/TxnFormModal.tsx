@@ -1,4 +1,5 @@
 import { submissionGate } from '../lib/submission';
+import { useEditorSession } from '../hooks/useEditorSession';
 import { useRef as submissionRef } from 'react';
 import CategoryPicker from './CategoryPicker';
 import { accountOptions as buildAccountOptions } from '../domain/accounts';
@@ -81,6 +82,19 @@ export default function TxnFormModal({
   refill,
 }: Props) {
   const submitGate = submissionRef(submissionGate());
+  const editor = useEditorSession(
+    open,
+    editing
+      ? `edit:${editing.id}`
+      : refill
+        ? `refill:${refill.kind}:${refill.related_txn_id ?? 0}`
+        : 'new'
+  );
+  const close = () => {
+    editor.close();
+    onClose();
+  };
+
   const { message } = App.useApp();
   const navigate = useNavigate();
   const screens = Grid.useBreakpoint();
@@ -221,6 +235,8 @@ export default function TxnFormModal({
 
   const submit = () =>
     submitGate.current(async () => {
+      const isCurrent = editor.capture();
+      if (!isCurrent()) return;
       if (!canRecord(user?.role)) return;
       if (creatingPlatform || createTxn.isPending || updateTxn.isPending)
         return;
@@ -254,12 +270,14 @@ export default function TxnFormModal({
       try {
         if (editing) {
           await updateTxn.mutateAsync({ id: editing.id, input });
+          if (!isCurrent()) return;
           message.success('已保存修改');
         } else {
           await createTxn.mutateAsync(input);
+          if (!isCurrent()) return;
           message.success('已记一笔');
         }
-        onClose();
+        close();
         if (
           kind === 'refund' &&
           refill?.installment_plan_id &&
@@ -271,7 +289,7 @@ export default function TxnFormModal({
           );
         }
       } catch (e) {
-        message.error(errMsg(e));
+        if (isCurrent()) message.error(errMsg(e));
       }
     });
 
@@ -289,7 +307,7 @@ export default function TxnFormModal({
       setShowErrors(true);
       return;
     }
-    onClose();
+    close();
     navigate(`/liabilities/${creditAccount!.id}`, {
       state: {
         liabilityDraft: {
@@ -308,7 +326,7 @@ export default function TxnFormModal({
     <>
       <Modal
         open={open}
-        onCancel={onClose}
+        onCancel={close}
         title={editing ? '编辑流水' : '记一笔'}
         width={isMobile ? '100%' : 520}
         style={
@@ -321,7 +339,7 @@ export default function TxnFormModal({
           },
         }}
         footer={[
-          <Button key="cancel" onClick={onClose}>
+          <Button key="cancel" onClick={close}>
             取消
           </Button>,
           <Button
@@ -353,7 +371,7 @@ export default function TxnFormModal({
                 <Button
                   type="link"
                   onClick={() => {
-                    onClose();
+                    close();
                     navigate(
                       `/liabilities/${editing!.liability_account_id ?? editing!.account_id}`
                     );
@@ -368,7 +386,7 @@ export default function TxnFormModal({
             <Button
               onClick={() => {
                 setVoucherOpen(true);
-                onClose();
+                close();
               }}
             >
               购券：先付款，使用时计消费

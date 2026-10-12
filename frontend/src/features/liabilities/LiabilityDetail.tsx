@@ -449,6 +449,7 @@ export default function LiabilityDetail() {
       )}
       {dialog && (
         <LiabilityDialogs
+          key={dialog.requestKey}
           detail={d}
           dialog={dialog}
           onClose={() => setDialog(null)}

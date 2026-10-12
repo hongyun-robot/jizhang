@@ -21,6 +21,7 @@ import { resolve, useTheme } from '../stores/theme';
 import Brand from './Brand';
 import Money, { fmtMoney } from './Money';
 import NotifBell from './NotifBell';
+import QueryState from './QueryState';
 
 const { Sider } = Layout;
 
@@ -64,10 +65,20 @@ function SiderBrief() {
           <>
             收入 {fmtMoney(cur?.income)} · 支出 {fmtMoney(cur?.expense)}
           </>
-        ) : (
+        ) : compare.error ? null : (
           '读取中…'
         )}
       </div>
+      <QueryState
+        error={compare.error}
+        hasData={compare.data !== undefined}
+        onRetry={() => void compare.refetch()}
+      />
+      <QueryState
+        error={budgets.error}
+        hasData={budgets.data !== undefined}
+        onRetry={() => void budgets.refetch()}
+      />
       {total?.budget && (
         <>
           <div className={total.over ? 'brief-bar over' : 'brief-bar'}>

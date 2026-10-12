@@ -69,6 +69,7 @@ export function settlementInput(
     entry_date: required(value.entry_date, '实际日期').format('YYYY-MM-DD'),
   };
 }
+/** For edit_plan, detail is the stable snapshot of this editor, not refreshed query data. */
 export function liabilityCommand(
   detail: LiabilityDetail,
   dialog: LiabilityDialog,
