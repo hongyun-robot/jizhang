@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { App, AutoComplete, Button, Drawer, Grid, Input } from 'antd';
+import { App, AutoComplete, Button, Grid, Input } from 'antd';
 import { DownOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useCreateVoucherPlatform, useVoucherPlatforms } from '../api/vouchers';
 import type { VoucherPlatform } from '../api/types';
 import { errMsg } from '../api/client';
 import { popupInParent } from '../lib/popup';
+import SelectionSheet, { SelectionTrigger } from './SelectionSheet';
+import { useSelectionActive } from './SelectionScope';
 
 interface Props {
   id?: string;
@@ -25,10 +27,11 @@ export default function PlatformInput({
   id,
   value = '',
   onChange,
-  active,
+  active: requestedActive,
   disabled,
   onCreatingChange,
 }: Props) {
+  const active = useSelectionActive(requestedActive);
   const { message } = App.useApp();
   const screens = Grid.useBreakpoint();
   // md 起为桌面：保留下拉框；移动端改用底部浮层，绕开下拉定位在软键盘/滚动下的错乱。
@@ -42,6 +45,7 @@ export default function PlatformInput({
   const [sheetSearch, setSheetSearch] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const generation = useRef(0);
   const currentValue = useRef(value);
   const inFlight = useRef(false);
@@ -51,10 +55,12 @@ export default function PlatformInput({
     generation.current++;
     setExpanded(false);
     setSearch(null);
+    setSheetOpen(false);
+    setSheetSearch('');
     return () => {
       generation.current++;
     };
-  }, [active]);
+  }, [active, isDesktop]);
   useEffect(() => {
     onCreatingChange(active && create.isPending);
   }, [active, create.isPending, onCreatingChange]);
@@ -122,10 +128,14 @@ export default function PlatformInput({
   }
 
   // 选中现有项（不触发创建）
-  const pick = (selected: string) => {
-    change(selected);
+  const closeSheet = () => {
+    generation.current++;
     setSheetOpen(false);
     setSheetSearch('');
+  };
+  const pick = (selected: string) => {
+    change(selected);
+    closeSheet();
   };
 
   // 创建新平台：桌面端/移动端共用一套防抖与幂等守卫
@@ -159,6 +169,7 @@ export default function PlatformInput({
       className="voucher-platform-input"
       ref={container}
       onKeyDownCapture={(event) => {
+        if (!isDesktop) return;
         // 组件库会用 Tab 确认高亮项；这里 Tab 只移动焦点，不能创建选项。
         if (event.nativeEvent.isComposing || event.keyCode === 229) {
           event.stopPropagation();
@@ -224,86 +235,99 @@ export default function PlatformInput({
           />
         </AutoComplete>
       ) : (
-        // 移动端：只读触发器 + 底部浮层。触发器不弹键盘，选/建都在浮层内完成，
-        // 浮层是固定覆盖层，不受软键盘与滚动容器位移影响。
         <>
-          <button
-            type="button"
+          <SelectionTrigger
             id={id}
-            className="voucher-platform-trigger"
+            label={value || undefined}
+            placeholder="选择或输入平台 / 商家"
             disabled={disabled}
-            aria-haspopup="dialog"
+            className="voucher-platform-trigger"
+            triggerRef={trigger}
+            open={sheetOpen && active}
             onClick={() => {
-              if (active) setSheetOpen(true);
+              if (!active) return;
+              generation.current++;
+              if (!inFlight.current) create.reset();
+              setSheetSearch('');
+              setSheetOpen(true);
             }}
-          >
-            <span
-              className={
-                value
-                  ? 'voucher-platform-trigger-value'
-                  : 'voucher-platform-trigger-placeholder'
-              }
-            >
-              {value || '选择或输入平台 / 商家'}
-            </span>
-            <DownOutlined className="voucher-platform-trigger-arrow" />
-          </button>
-          <Drawer
+          />
+          <SelectionSheet<string>
             title="选择平台 / 商家"
-            placement="bottom"
-            size="64vh"
-            open={sheetOpen}
-            onClose={() => setSheetOpen(false)}
+            open={sheetOpen && active}
             className="voucher-platform-sheet"
-          >
-            <Input
-              autoFocus
-              allowClear
-              value={sheetSearch}
-              onChange={(e) => setSheetSearch(e.target.value)}
-              placeholder="搜索，或输入新名称创建"
-              disabled={create.isPending}
-            />
-            <div className="voucher-platform-sheet-list">
-              {value && (
-                <button
-                  type="button"
-                  className="voucher-platform-sheet-item"
-                  onClick={() => pick('')}
-                >
-                  清空平台 / 商家
-                </button>
-              )}
-              {options.map((option) =>
-                option.disabled ? (
-                  <div
-                    key="empty"
-                    className="voucher-platform-sheet-empty"
-                    role="status"
-                  >
-                    {option.label}
-                  </div>
-                ) : (
+            value={value || undefined}
+            currentLabel={value || undefined}
+            trigger={trigger}
+            options={matched.map((row) => ({
+              value: row.name,
+              label: row.name,
+            }))}
+            query={sheetSearch}
+            onSearch={(next) => {
+              generation.current++;
+              setSheetSearch(next);
+            }}
+            searchPlaceholder="搜索，或输入新名称创建"
+            onClose={closeSheet}
+            onSelect={pick}
+            allowClear
+            onClear={() => pick('')}
+            busy={create.isPending}
+            loading={platforms.isFetching && !rows.length}
+            error={
+              platforms.isError ? '选项加载失败，可重试或填写名称。' : undefined
+            }
+            onRetry={() => {
+              void platforms.refetch();
+            }}
+            emptyText={
+              Array.from(rawCreate).length > 128 ? '名称最多 128 字' : undefined
+            }
+            actions={
+              <>
+                {canCreate && (
                   <button
-                    key={option.create ? 'create' : option.value}
                     type="button"
-                    className={`voucher-platform-sheet-item${option.create ? ' is-create' : ''}`}
-                    aria-label={option.label}
+                    className="selection-sheet-item is-create"
                     disabled={create.isPending}
                     onClick={() => {
-                      if (option.create) void select(option.value, option);
-                      else pick(option.value);
+                      void select(rawCreate, {
+                        value: rawCreate,
+                        label: rawCreate,
+                        create: true,
+                      });
                     }}
                   >
-                    {option.create && (
-                      <LoadingOutlined className="voucher-platform-sheet-item-icon" />
-                    )}
-                    {option.label}
+                    {create.isPending && <LoadingOutlined />}
+                    {create.isPending
+                      ? `正在创建「${rawCreate}」…`
+                      : `创建「${rawCreate}」`}
                   </button>
-                )
-              )}
-            </div>
-          </Drawer>
+                )}
+                {create.isError && (
+                  <div className="selection-error" role="status">
+                    {errMsg(create.error)}
+                  </div>
+                )}
+                {(platforms.isError || create.isError) &&
+                  rawCreate &&
+                  Array.from(rawCreate).length <= 128 && (
+                    <>
+                      <button
+                        type="button"
+                        className="selection-sheet-item"
+                        disabled={create.isPending}
+                        onClick={() => pick(rawCreate)}
+                      >
+                        使用此名称
+                      </button>
+                      <small>填写到表单，保存时加入目录</small>
+                    </>
+                  )}
+              </>
+            }
+          />
         </>
       )}
       {platforms.isError && (
