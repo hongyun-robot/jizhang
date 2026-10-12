@@ -5,6 +5,7 @@
  * 运行：node e2e/prod_smoke.mjs
  */
 import { chromium } from 'playwright-core';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,10 +20,15 @@ const EXE =
 const BASE = process.env.BASE ?? 'https://jizhang.zhanghongyun.cn';
 const USER = process.env.JZ_USER ?? 'admin';
 const PASS = process.env.JZ_PASS;
+const SMOKE_NOTE = `生产冒烟-${randomUUID()}`;
+const INITIAL_COMPARE_DELAY = Number(process.env.PROD_SMOKE_COMPARE_DELAY_MS ?? 0);
 
 if (!PASS) {
   console.error('FATAL 需要环境变量 JZ_PASS（生产管理员口令）');
   process.exit(2);
+}
+if (!Number.isFinite(INITIAL_COMPARE_DELAY) || INITIAL_COMPARE_DELAY < 0 || INITIAL_COMPARE_DELAY > 15000) {
+  throw new Error('PROD_SMOKE_COMPARE_DELAY_MS 必须为 0–15000 毫秒');
 }
 
 const results = [];
@@ -40,6 +46,17 @@ const failedRequests = [];
 const browser = await chromium.launch({ executablePath: EXE, headless: true });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
+if (INITIAL_COMPARE_DELAY > 0) {
+  let delayed = false;
+  // Exercise the real loading boundary once; later requests keep normal timing.
+  await page.route('**/api/v1/stats/compare*', async (route) => {
+    if (!delayed) {
+      delayed = true;
+      await new Promise((resolve) => setTimeout(resolve, INITIAL_COMPARE_DELAY));
+    }
+    await route.continue();
+  });
+}
 
 page.on('console', (m) => {
   if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 200));
@@ -71,9 +88,9 @@ try {
   ok(page.url() === BASE + '/' || page.url() === BASE, '首页地址正确（无多余前缀）', page.url());
 
   // 3. 首页数据面板渲染
-  await page.locator('.page-head').first().waitFor({ timeout: 20000 });
-  const hasIncome = await page.getByText('本期收入').count();
-  ok(hasIncome > 0, '首页渲染「本期收入」面板', String(hasIncome));
+  const hasIncome = await page.locator('.hero-split').getByText('本期收入')
+    .waitFor({ state: 'visible', timeout: 20000 }).then(() => true).catch(() => false);
+  ok(hasIncome, '首页渲染「本期收入」面板', hasIncome ? 'ready' : 'not ready');
   await shot(page, 'prod-01-home');
 
   // 4. 各路由可达（SPA 路由 + 深链刷新）
@@ -108,8 +125,8 @@ try {
   // 选一个末级分类（一级分类不可直接记账）
   const leaf = modal.locator('.cat-leaves .ant-tag, .cat-leaves button, .cat-leaves [role="button"]').first();
   if ((await leaf.count()) > 0) await leaf.click();
-  // 填清理标记，冒烟结束按此关键词删除还原
-  await modal.getByPlaceholder('备注（可选）').fill('生产冒烟');
+  // 唯一标记只匹配本次运行，不清理其他冒烟或用户已有流水。
+  await modal.getByPlaceholder('备注（可选）').fill(SMOKE_NOTE);
   // 账户必填（不选会被表单校验拦下）；AntD Select 的 placeholder 是独立节点
   const acctSelect = modal.locator('.ant-select', { hasText: '账户' }).first();
   await acctSelect.click();
@@ -158,11 +175,12 @@ try {
   await page.getByRole('button', { name: /登\s*录/ }).click();
   await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 20000 });
   await page.waitForLoadState('networkidle').catch(() => {});
-  const tabs = await page.locator('.ant-tabs-tab, [class*="mobile-tab"], nav a').count();
-  ok(true, '移动端视口渲染完成', `tab-like=${tabs}`);
+  await page.locator('.bottom-tabs').waitFor({ state: 'visible', timeout: 10000 });
+  const tabs = await page.locator('.bottom-tabs .tab').count();
+  ok(tabs === 4, '移动端四项导航可见', `tabs=${tabs}`);
   await shot(page, 'prod-05-mobile');
 } catch (e) {
-  ok(false, '执行异常', String(e).slice(0, 300));
+  ok(false, '执行异常', String(e).replaceAll(PASS, '<REDACTED>').slice(0, 300));
   await shot(page, 'prod-99-error').catch(() => {});
 }
 
@@ -184,7 +202,8 @@ filteredErrors.slice(0, 8).forEach((t) => console.log(`   ${t}`));
 console.log(`-- 失败请求 ${realFails.length} 条`);
 realFails.slice(0, 8).forEach((t) => console.log(`   ${t}`));
 
-// 还原：删除本冒烟记入的流水（按 note 标记），保持生产库干净
+// 还原：只删除本次运行的唯一标记流水，验证清理确实成功。
+let cleanupFailed = false;
 try {
   const lr = await fetch(BASE + '/api/v1/auth/login', {
     method: 'POST',
@@ -193,18 +212,28 @@ try {
   });
   const lj = await lr.json();
   const tok = lj?.data?.access_token;
+  if (lj?.code !== 0 || !tok) throw new Error('清理登录失败');
   if (tok) {
-    const list = await fetch(BASE + '/api/v1/transactions?page=1&page_size=100&keyword=' + encodeURIComponent('生产冒烟'), {
+    const listUrl = BASE + '/api/v1/transactions?page=1&page_size=100&keyword=' + encodeURIComponent(SMOKE_NOTE);
+    const list = await fetch(listUrl, {
       headers: { authorization: `Bearer ${tok}` },
     }).then((r) => r.json());
-    const hits = (list?.data?.items ?? list?.data?.list ?? []).filter((t) => String(t.note || '').includes('生产冒烟'));
+    if (list?.code !== 0) throw new Error('清理流水查询失败');
+    const hits = (list?.data?.items ?? list?.data?.list ?? []).filter((t) => t.note === SMOKE_NOTE);
     for (const t of hits) {
-      await fetch(BASE + `/api/v1/transactions/${t.id}`, { method: 'DELETE', headers: { authorization: `Bearer ${tok}` } });
+      const response = await fetch(BASE + `/api/v1/transactions/${t.id}`, { method: 'DELETE', headers: { authorization: `Bearer ${tok}` } });
+      const result = await response.json();
+      if (!response.ok || result?.code !== 0) throw new Error(`清理流水 ${t.id} 失败`);
+    }
+    const remaining = await fetch(listUrl, { headers: { authorization: `Bearer ${tok}` } }).then((r) => r.json());
+    if (remaining?.code !== 0 || (remaining?.data?.items ?? remaining?.data?.list ?? []).some((t) => t.note === SMOKE_NOTE)) {
+      throw new Error('清理后仍有本次冒烟流水或查询失败');
     }
     console.log(`-- 清理冒烟流水 ${hits.length} 条`);
   }
 } catch (e) {
-  console.log(`-- 清理跳过: ${String(e).slice(0, 120)}`);
+  cleanupFailed = true;
+  console.log(`-- 清理失败: ${String(e).replaceAll(PASS, '<REDACTED>').slice(0, 120)}`);
 }
 
 await browser.close();
@@ -212,7 +241,7 @@ await browser.close();
 const pass = results.filter((r) => r.pass).length;
 const fail = results.length - pass;
 console.log(`\n==== ${pass}/${results.length} PASS ====`);
-if (fail > 0 || realFails.length > 0 || filteredErrors.length > 0) {
+if (fail > 0 || realFails.length > 0 || filteredErrors.length > 0 || cleanupFailed) {
   console.log('HAS_ISSUES');
   process.exit(1);
 }
