@@ -71,9 +71,13 @@ export default function PersonalLiabilityAccountModal({
     values?.repayment_month_offset
   );
   const today = dayjs().format('YYYY-MM-DD');
+  const active = detail?.rules
+    .filter((rule) => rule.effective_from <= today)
+    .at(-1);
+  const repaymentOnly = active?.statement_day === values?.statement_day;
   const current = plannedBills(detail?.rules ?? [], today, 1)[0];
   const effective =
-    detail?.account.billing_enabled && current
+    detail?.account.billing_enabled && current && !repaymentOnly
       ? dayjs(current.close).add(1, 'day').format('YYYY-MM-DD')
       : today;
   const preview =
@@ -124,7 +128,10 @@ export default function PersonalLiabilityAccountModal({
           last.statement_day === v.statement_day &&
           last.repayment_day === v.repayment_day &&
           last.repayment_month_offset === v.repayment_month_offset &&
-          detail.account.liability_type === v.liability_type
+          detail.account.liability_type === v.liability_type &&
+          (active?.statement_day !== v.statement_day ||
+            (active.repayment_day === v.repayment_day &&
+              active.repayment_month_offset === v.repayment_month_offset))
         ) {
           Object.assign(input, {
             statement_day: undefined,
@@ -227,7 +234,9 @@ export default function PersonalLiabilityAccountModal({
           {preview.map((p) => `${p.close} 出账 → ${p.due} 还款`).join('；')}
           。短月份取月底。
           {detail?.account.billing_enabled &&
-            `当前和历史账单保留，新日期自 ${effective} 生效。`}
+            (repaymentOnly
+              ? '还款日期立即同步至当前及后续未出账账单；已出账账单保留原日期。'
+              : `账单日变更自 ${effective} 生效；当前及已出账账单保留原日期。`)}
         </p>
       )}
     </Modal>

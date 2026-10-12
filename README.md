@@ -127,6 +127,8 @@ foreach ($script in $scripts) {
 
 负债 fixture 使用 18085/5602，在 `liabilities.mjs` 后运行 `refactor_settlement.mjs`，验证改字段后的预览失效、失败草稿、防重和重试标识。后者在 finally 关闭整个 18085 临时账本，不与其他负债脚本并行；重新运行会改变时钟的负债原始验收时应重新启动 fixture。`refactor_plan_retry.mjs` 使用新启动的负债 fixture，覆盖调整与退款核对的已提交响应丢失、后台更新后的完整请求重放，以及改值 409；也会在 finally 销毁账本，可用 `LIABILITY_FIXTURE_API` 指定对应本机 fixture 地址。`refactor_repairs.mjs` 验证记账/周期新草稿不被旧成功或旧失败关闭，以及侧栏首次/后台错误与重试。`refactor_keyboard` 模拟 visualViewport 收缩，实体手机键盘可另作人工复核。
 
+还款日期回归使用新启动的负债 fixture，执行 `node e2e/liability_repayment_dates.mjs`，覆盖桌面修改还款日以及手机重新保存旧版本的待生效设置：已有未出账消费从次月 1 日同步到 8 日，账单标识、流水和金额不变。脚本使用当前日期并在结束时销毁临时账本，不与其他负债脚本并行。
+
 旧 SQL/开发脚本依赖历史种子账号，部分硬编码客户端路径和 `jizhang` 开发库并直接删除数据。应先按其文档建立临时 MySQL 账本，不能仅修改 BASE 就对真实库运行。本次结果、明确跳过的旧检查、截图和回滚说明见 `openspec/changes/archive/2026-10-12-refactor-frontend-foundations/acceptance.md`。
 
 ## 目录结构

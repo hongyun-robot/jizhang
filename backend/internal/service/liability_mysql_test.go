@@ -237,6 +237,20 @@ func TestLiabilityMySQL(t *testing.T) {
 		}
 	})
 	owner := int64(1)
+	for _, scenario := range []struct {
+		name string
+		run  func(*testing.T, *liabilityEnv)
+	}{
+		{"repayment-day-update", checkRepaymentDayUpdatesUnissuedStatement},
+		{"repayment-day-legacy-pending", checkRepaymentChangeSupersedesLegacyPendingRule},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			settingsEnv := &liabilityEnv{voucherEnv: base, now: vdate(t, "2026-10-15")}
+			settingsEnv.svcL = NewLiabilityService(db, settingsEnv.txn)
+			settingsEnv.svcL.Now = func() time.Time { return settingsEnv.now }
+			scenario.run(t, settingsEnv)
+		})
+	}
 	card := model.Account{Name: "mysql花呗", Type: model.AccountLiability, OwnerID: &owner, Status: model.StatusActive}
 	mustOK(t, db.Create(&card).Error)
 	e := &liabilityEnv{voucherEnv: base, card: card.ID, now: vdate(t, "2026-10-15")}

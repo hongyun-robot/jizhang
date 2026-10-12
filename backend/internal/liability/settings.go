@@ -48,7 +48,7 @@ func Configure(db *gorm.DB, account int64, kind string, day, due, offset int, ac
 		if e != nil {
 			return rule, e
 		}
-		_, end, _, e := Range(active, Date(now))
+		currentStart, end, _, e := Range(active, Date(now))
 		if e != nil {
 			return rule, e
 		}
@@ -57,6 +57,12 @@ func Configure(db *gorm.DB, account int64, kind string, day, due, offset int, ac
 			return rule, e
 		}
 		start = Date(close.AddDate(0, 0, 1))
+		// Repayment dates can change before a statement is issued without
+		// changing its cycle or any financial record. Cycle boundary changes
+		// still take effect after the current cycle closes.
+		if day == active.StatementDay {
+			start = currentStart
+		}
 		version = rules[len(rules)-1].Version + 1
 		// Replace a not-yet-effective rule only while it has no frozen statements.
 		for _, old := range rules {
@@ -92,6 +98,18 @@ func Configure(db *gorm.DB, account int64, kind string, day, due, offset int, ac
 			return rule, e
 		}
 	}
+	if start <= Date(now) {
+		// A newly effective rule supersedes pending settings. Keep their
+		// snapshots in the operation log, and remove them only after every
+		// unfrozen statement has been moved to the new rule.
+		for _, old := range rules {
+			if old.EffectiveFrom > Date(now) {
+				if e := db.Delete(&old).Error; e != nil {
+					return rule, e
+				}
+			}
+		}
+	}
 	dueDisplay := due
 	var ordinary []model.LiabilityDebtItem
 	if e := db.Where("account_id = ? AND active = ? AND plan_id IS NULL AND manual_assignment = ? AND source_txn_id IS NOT NULL", account, true, false).Find(&ordinary).Error; e != nil {
@@ -113,7 +131,7 @@ func Configure(db *gorm.DB, account int64, kind string, day, due, offset int, ac
 			return rule, e
 		}
 	}
-	if len(rules) > 0 && a.RepaymentDay != nil {
+	if start > Date(now) && a.RepaymentDay != nil {
 		dueDisplay = *a.RepaymentDay
 	}
 	if e := db.Model(&a).Updates(map[string]any{"billing_enabled": true, "liability_type": kind, "repayment_day": dueDisplay}).Error; e != nil {
