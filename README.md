@@ -45,6 +45,8 @@ node e2e/liabilities.mjs
 
 平台 / 商家选项的读取和创建只要求登录，四个角色均可使用，包括只读成员。创建选项不产生券或账务记录；购券、编辑券及流水操作仍按原权限执行。
 
+小于 768px 的手机视口中，选项下拉统一使用底部选择面板：打开先展示已有选项，点击面板内搜索框才进入文字输入。账户、分类、账单和关联流水可搜索；角色、状态、月份等短枚举直接点选。仅平台 / 商家提供创建新名称，其他字段只选择已有项。平台目录读取或独立创建失败时，可明确选择“使用此名称”回填草稿，再随父表单保存；搜索和取消不会改变原值。桌面下拉与日期选择器沿用原交互。
+
 | 操作 | 账户余额 | 消费与预算 |
 |---|---|---|
 | 购券 | 按实付扣款 | 不计入 |
@@ -120,6 +122,8 @@ foreach ($script in $scripts) {
 ```
 
 `refactor_loading` 需要生产构建，检查实际 JS/modulepreload 合计 gzip、资源失败恢复、主题和六档宽度。对子路径使用 `npx vite build --base=/jizhang/ --outDir=dist-subpath`，预览改为 `--dist=dist-subpath --port=5604 --base=/jizhang`，测试终端设置 `REFACTOR_E2E_BASE=http://127.0.0.1:5604/jizhang` 和 `REFACTOR_DIST=dist-subpath`。重建独立输出目录前应清理其旧构建产物，避免将过期文件算入总产物。
+
+手机选择面板在同一独立券 fixture 的 5601 预览上顺序运行 `node e2e/mobile_selections.mjs` 和 `node e2e/mobile_selection_lifecycle.mjs`。前者覆盖搜索 / 选择 / 清空 / 创建限制、模拟键盘、分类路径、账户与角色保存和六档断点；后者覆盖读取失败重试、跨断点关闭、父弹窗关闭清理及真实明暗主题切换。它们仅写入已校验身份的临时测试账本，截图保存在 `frontend/e2e/shots/refactor-frontend`；iOS / Android 实体键盘仍需单独复核。
 
 负债 fixture 使用 18085/5602，在 `liabilities.mjs` 后运行 `refactor_settlement.mjs`，验证改字段后的预览失效、失败草稿、防重和重试标识。后者在 finally 关闭整个 18085 临时账本，不与其他负债脚本并行；重新运行会改变时钟的负债原始验收时应重新启动 fixture。`refactor_plan_retry.mjs` 使用新启动的负债 fixture，覆盖调整与退款核对的已提交响应丢失、后台更新后的完整请求重放，以及改值 409；也会在 finally 销毁账本，可用 `LIABILITY_FIXTURE_API` 指定对应本机 fixture 地址。`refactor_repairs.mjs` 验证记账/周期新草稿不被旧成功或旧失败关闭，以及侧栏首次/后台错误与重试。`refactor_keyboard` 模拟 visualViewport 收缩，实体手机键盘可另作人工复核。
 
