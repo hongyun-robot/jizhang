@@ -1,13 +1,9 @@
+import { formatMoney as fmtMoney, parseCents, money } from '../lib/money';
 import { useLayoutEffect, useRef } from 'react';
 
 /** 金额展示：CNY 两位小数；支出红、收入绿（仅语义用色，界面主色保持青绿）。 */
 
-export function fmtMoney(v: string | number | null | undefined): string {
-  if (v === null || v === undefined) return '0.00';
-  const n = typeof v === 'string' ? Number(v) : v;
-  if (Number.isNaN(n)) return String(v);
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+export { formatMoney as fmtMoney } from '../lib/money';
 
 export default function Money({
   value,
@@ -24,13 +20,19 @@ export default function Money({
   /** 数字滚动入场（首页快照卡等关键数字用；默认关闭） */
   animate?: boolean;
 }) {
+  const exact = typeof value === 'string' ? parseCents(value) : null;
   const n = Number(value ?? 0);
   // 零值不着语义色（0.00 显示红/绿会误导）
   const finalTone = Number.isNaN(n) || n === 0 ? 'plain' : tone;
-  const cls = ['money', `money-${finalTone}`, className].filter(Boolean).join(' ');
+  const cls = ['money', `money-${finalTone}`, className]
+    .filter(Boolean)
+    .join(' ');
   const sign = n < 0 ? '-' : '';
   const target = Number.isNaN(n) ? 0 : Math.abs(n);
-  const body = fmtMoney(target);
+  const body =
+    exact === null
+      ? fmtMoney(typeof value === 'string' ? value : target)
+      : fmtMoney(money(exact < 0n ? -exact : exact));
 
   const numRef = useRef<HTMLSpanElement>(null);
   const shownRef = useRef(0);
@@ -50,7 +52,9 @@ export default function Money({
       el.textContent = body;
       return;
     }
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduced = window.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    ).matches;
     if (reduced) {
       shownRef.current = target;
       el.textContent = body;

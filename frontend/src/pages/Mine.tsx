@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { lazy, Suspense, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Avatar, Button, Card, Segmented, Tag } from 'antd';
+import { Avatar, Button, Card, Segmented, Skeleton, Tag } from 'antd';
 import {
   AppstoreOutlined,
   CalendarOutlined,
@@ -16,11 +16,11 @@ import {
   CreditCardOutlined,
 } from '@ant-design/icons';
 
-import { api } from '../api/client';
+import { session } from '../auth/session';
 import { ROLE_LABEL } from '../labels';
 import { useAuth, canRecord } from '../stores/auth';
 import { useTheme, type ThemeMode } from '../stores/theme';
-import UserManager from '../components/UserManager';
+const UserManager = lazy(() => import('../components/UserManager'));
 
 /** 角色徽标：不走 antd 预设蓝，统一到墨绿系（styles.css .role-tag）。 */
 const ROLE_TONE: Record<string, string> = {
@@ -61,18 +61,16 @@ function Tile({
 export default function Mine() {
   const navigate = useNavigate();
   const user = useAuth((s) => s.user);
-  const clear = useAuth((s) => s.clear);
   const themeMode = useTheme((s) => s.mode);
   const setThemeMode = useTheme((s) => s.setMode);
   const [userMgmt, setUserMgmt] = useState(false);
 
   const logout = async () => {
     try {
-      await api.post('/auth/logout');
+      await session.logout();
     } catch {
       // 即使 refresh 已失效也照常清理本地会话
     }
-    clear();
     navigate('/login', { replace: true });
   };
 
@@ -91,7 +89,9 @@ export default function Mine() {
           <div className="mine-name">{user?.username ?? '—'}</div>
           <div className="mine-meta">
             {user && (
-              <Tag className={`role-tag role-${ROLE_TONE[user.role] ?? 'member'}`}>
+              <Tag
+                className={`role-tag role-${ROLE_TONE[user.role] ?? 'member'}`}
+              >
                 {ROLE_LABEL[user.role] ?? user.role}
               </Tag>
             )}
@@ -102,13 +102,31 @@ export default function Mine() {
 
       {/* 记账入口：管理员/记账员/普通成员可见（specs/recurring-entries 归属隔离） */}
       <Card size="small" className="panel panel--measure" title="券">
-        <div className="mine-menu"><Tile icon={<GiftOutlined />} label="我的券" onClick={() => navigate('/vouchers')} /></div>
+        <div className="mine-menu">
+          <Tile
+            icon={<GiftOutlined />}
+            label="我的券"
+            onClick={() => navigate('/vouchers')}
+          />
+        </div>
       </Card>
-      <Card size="small" className="panel panel--measure" title="资金"><div className="mine-menu"><Tile icon={<CreditCardOutlined />} label="负债账户" onClick={() => navigate('/liabilities')} /></div></Card>
+      <Card size="small" className="panel panel--measure" title="资金">
+        <div className="mine-menu">
+          <Tile
+            icon={<CreditCardOutlined />}
+            label="负债账户"
+            onClick={() => navigate('/liabilities')}
+          />
+        </div>
+      </Card>
       {canRecord(user?.role) && (
         <Card size="small" className="panel panel--measure" title="记账">
           <div className="mine-menu">
-            <Tile icon={<SyncOutlined />} label="周期记账" onClick={() => navigate('/recurring')} />
+            <Tile
+              icon={<SyncOutlined />}
+              label="周期记账"
+              onClick={() => navigate('/recurring')}
+            />
           </div>
         </Card>
       )}
@@ -122,17 +140,47 @@ export default function Mine() {
               active={userMgmt}
               onClick={() => setUserMgmt((v) => !v)}
             />
-            <Tile icon={<AppstoreOutlined />} label="账户管理" onClick={() => navigate('/accounts')} />
-            <Tile icon={<TagsOutlined />} label="分类管理" onClick={() => navigate('/categories')} />
-            <Tile icon={<CalendarOutlined />} label="账期设置" onClick={() => navigate('/settings')} />
-            <Tile icon={<FundOutlined />} label="预算管理" onClick={() => navigate('/budgets')} />
-            <Tile icon={<HistoryOutlined />} label="审计日志" onClick={() => navigate('/audit')} />
+            <Tile
+              icon={<AppstoreOutlined />}
+              label="账户管理"
+              onClick={() => navigate('/accounts')}
+            />
+            <Tile
+              icon={<TagsOutlined />}
+              label="分类管理"
+              onClick={() => navigate('/categories')}
+            />
+            <Tile
+              icon={<CalendarOutlined />}
+              label="账期设置"
+              onClick={() => navigate('/settings')}
+            />
+            <Tile
+              icon={<FundOutlined />}
+              label="预算管理"
+              onClick={() => navigate('/budgets')}
+            />
+            <Tile
+              icon={<HistoryOutlined />}
+              label="审计日志"
+              onClick={() => navigate('/audit')}
+            />
           </div>
         </Card>
       )}
 
       {/* 用户管理（原地展开，不新增路由；见 components/UserManager） */}
-      {user?.role === 'admin' && userMgmt && <UserManager />}
+      {user?.role === 'admin' && userMgmt && (
+        <Suspense
+          fallback={
+            <div role="status">
+              <Skeleton active />
+            </div>
+          }
+        >
+          <UserManager />
+        </Suspense>
+      )}
 
       <Card size="small" className="panel panel--measure" title="外观">
         <div className="seg-wrap">
@@ -150,7 +198,13 @@ export default function Mine() {
       </Card>
 
       <Card size="small" className="panel panel--measure mine-foot">
-        <Button block danger className="logout-btn" icon={<LogoutOutlined />} onClick={logout}>
+        <Button
+          block
+          danger
+          className="logout-btn"
+          icon={<LogoutOutlined />}
+          onClick={logout}
+        >
           退出登录
         </Button>
       </Card>

@@ -13,7 +13,7 @@ import VoucherPlatformInput from './VoucherPlatformInput';
 import { useNavigate } from 'react-router-dom';
 import { useLiabilityDetail } from '../api/liability';
 import { plannedBills } from '../lib/liability';
-import { cents, money } from '../lib/money';
+import { previewCents as cents, money } from '../lib/money';
 import { popupInParent } from '../lib/popup';
 
 const KIND_OPTIONS = [

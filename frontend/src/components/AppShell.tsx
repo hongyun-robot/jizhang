@@ -1,3 +1,6 @@
+import { useBackgroundReconciliation } from '../hooks/useBackgroundReconciliation';
+import { navItems as navigationItems, activeKey } from '../navigation/routes';
+import { navTarget, rememberSearch } from '../navigation/memory';
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Grid, Layout, Menu } from 'antd';
@@ -10,10 +13,10 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 
-import { useBudgets, useEnsureRecurring, useEnsureVouchers, useStatsCompare } from '../api/hooks';
-import { useEnsureLiabilities } from '../api/liability';
+import { useBudgets } from '../api/budgets';
+import { useStatsCompare } from '../api/statistics';
 import { ROLE_LABEL } from '../labels';
-import { canRecord, useAuth } from '../stores/auth';
+import { useAuth } from '../stores/auth';
 import { resolve, useTheme } from '../stores/theme';
 import Brand from './Brand';
 import Money, { fmtMoney } from './Money';
@@ -21,43 +24,16 @@ import NotifBell from './NotifBell';
 
 const { Sider } = Layout;
 
-export interface NavItem {
-  key: string;
-  path: string;
-  label: string;
-  icon: React.ReactNode;
-}
-
-/** 全局导航：移动底部 Tab（记一笔/流水/统计/我的），桌面侧栏（同一目标不同形态）。 */
-export const navItems: NavItem[] = [
-  { key: 'dash', path: '/', label: '记一笔', icon: <HomeOutlined /> },
-  { key: 'records', path: '/records', label: '流水', icon: <UnorderedListOutlined /> },
-  { key: 'stats', path: '/stats', label: '统计', icon: <PieChartOutlined /> },
-  { key: 'mine', path: '/mine', label: '我的', icon: <UserOutlined /> },
-];
-
-function activeKey(pathname: string): string {
-  if (pathname.startsWith('/vouchers') || pathname.startsWith('/liabilities')) return 'mine';
-  if (pathname === '/') return 'dash';
-  return navItems.find((i) => i.path !== '/' && pathname.startsWith(i.path))?.key ?? 'dash';
-}
-
-/**
- * 各路径最近一次的查询串：切 Tab 返回时带上（specs/transactions 筛选状态跨路由保留）。
- * URL 仍是唯一事实来源——这里只记住「离开时该路径长什么样」，由 AppShell 在每次导航后回填。
- */
-const lastSearch = new Map<string, string>();
-
-/** 导航目标 = 路径 + 该路径最近一次查询串；已是当前地址则不重复压栈。 */
-function navTarget(path: string, current: string): string | null {
-  const target = path + (lastSearch.get(path) ?? '');
-  return target === current ? null : target;
-}
-
-/** 路径最近一次的查询串：首页 locateId 跳转等非 Tab 导航复用（specs/transactions 筛选跨路由保留）。 */
-export function lastSearchOf(pathname: string): string {
-  return lastSearch.get(pathname) ?? '';
-}
+const icons = {
+  dash: <HomeOutlined />,
+  records: <UnorderedListOutlined />,
+  stats: <PieChartOutlined />,
+  mine: <UserOutlined />,
+};
+const navItems = navigationItems.map((item) => ({
+  ...item,
+  icon: icons[item.key],
+}));
 
 /** 侧栏「本期」速览：结余 + 预算水位，把导航下方的留白变成可扫读的信息位。 */
 function SiderBrief() {
@@ -119,7 +95,13 @@ export function DesktopShell({ children }: { children?: React.ReactNode }) {
 
   return (
     <Layout style={{ minHeight: '100dvh' }}>
-      <Sider width={236} breakpoint="lg" collapsedWidth={0} theme="light" className="app-sider">
+      <Sider
+        width={236}
+        breakpoint="lg"
+        collapsedWidth={0}
+        theme="light"
+        className="app-sider"
+      >
         <div className="brand">
           <Brand />
           <NotifBell />
@@ -127,11 +109,15 @@ export function DesktopShell({ children }: { children?: React.ReactNode }) {
         <Menu
           mode="inline"
           selectedKeys={[activeKey(location.pathname)]}
-          items={navItems.map((i) => ({ key: i.key, icon: i.icon, label: i.label }))}
+          items={navItems.map((i) => ({
+            key: i.key,
+            icon: i.icon,
+            label: i.label,
+          }))}
           onClick={({ key }) => {
             const target = navTarget(
               navItems.find((i) => i.key === key)!.path,
-              location.pathname + location.search,
+              location.pathname + location.search
             );
             if (target) navigate(target);
           }}
@@ -144,7 +130,7 @@ export function DesktopShell({ children }: { children?: React.ReactNode }) {
             </span>
             <span className="who">
               <b>{user?.username ?? '—'}</b>
-              <span>{user ? ROLE_LABEL[user.role] ?? user.role : ''}</span>
+              <span>{user ? (ROLE_LABEL[user.role] ?? user.role) : ''}</span>
             </span>
           </span>
           <button
@@ -158,7 +144,9 @@ export function DesktopShell({ children }: { children?: React.ReactNode }) {
           </button>
         </div>
       </Sider>
-      <Layout.Content className="app-content">{children ?? <Outlet />}</Layout.Content>
+      <Layout.Content className="app-content">
+        {children ?? <Outlet />}
+      </Layout.Content>
     </Layout>
   );
 }
@@ -179,7 +167,10 @@ export function MobileShell({ children }: { children?: React.ReactNode }) {
             className={current === i.key ? 'tab active' : 'tab'}
             aria-current={current === i.key ? 'page' : undefined}
             onClick={() => {
-              const target = navTarget(i.path, location.pathname + location.search);
+              const target = navTarget(
+                i.path,
+                location.pathname + location.search
+              );
               if (target) navigate(target);
             }}
           >
@@ -204,23 +195,7 @@ export default function AppShell() {
   const screens = Grid.useBreakpoint();
   const isMobile = screens.lg === false;
   const location = useLocation();
-  // 懒补齐（任务 9.3 / specs「打开页面懒补齐」）：应用打开时触发一次到期生成，
-  // 兜底 cron 停摆；生成幂等，失败静默（下一次打开重试）。
-  const ensure = useEnsureRecurring();
-  const ensureVouchers = useEnsureVouchers();
-  const ensureLiabilities=useEnsureLiabilities();
-  useEffect(()=>{ensureLiabilities.mutate();const timer=window.setInterval(()=>ensureLiabilities.mutate(),60_000);return()=>window.clearInterval(timer);},[ensureLiabilities.mutate]);
-  const voucherWriter = canRecord(useAuth((s) => s.user?.role));
-  useEffect(() => {
-    ensure.mutate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => {
-    if (!voucherWriter) return;
-    ensureVouchers.mutate();
-    const timer = window.setInterval(() => ensureVouchers.mutate(), 60_000);
-    return () => window.clearInterval(timer);
-  }, [voucherWriter, ensureVouchers.mutate]);
+  useBackgroundReconciliation();
   // 路由切换回到顶部：SPA 换页不会重置滚动位置，长列表翻页后跳统计页会停在半截。
   // 定位高亮跳转（首页 → 流水页 locateId）由流水页自己 scrollIntoView，这里必须让行；
   // 依赖只挂 pathname：清掉 locateId 的 replace 导航不触发复位，避免把刚定位的行又滚走。
@@ -234,7 +209,7 @@ export default function AppShell() {
   }, [location.pathname]);
   // 记住每个路径最近一次的查询串：流水页切走再切回时恢复筛选（specs/transactions 跨路由保留）
   useEffect(() => {
-    lastSearch.set(location.pathname, location.search);
+    rememberSearch(location.pathname, location.search);
   }, [location.pathname, location.search]);
   return isMobile ? <MobileShell /> : <DesktopShell />;
 }

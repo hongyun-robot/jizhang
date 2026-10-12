@@ -6,7 +6,9 @@ import { errMsg } from '../api/client';
 interface Props {
   loading?: boolean;
   /** truthy（react-query 的 error 对象 / 字符串）即进入错误态 */
-  error?: unknown;
+  error?: Error | string | null;
+  /** Successfully loaded content remains visible if background updates fail. */
+  hasData?: boolean;
   isEmpty?: boolean;
   onRetry?: () => void;
   emptyDescription?: ReactNode;
@@ -23,22 +25,27 @@ interface Props {
 export default function QueryState({
   loading,
   error,
+  hasData = false,
   isEmpty,
   onRetry,
   emptyDescription = '暂无数据',
   skeleton,
   children,
 }: Props) {
-  if (loading) {
-    return <>{skeleton ?? <Skeleton active paragraph={{ rows: 3 }} title={false} />}</>;
+  if (loading && !hasData) {
+    return (
+      <>
+        {skeleton ?? <Skeleton active paragraph={{ rows: 3 }} title={false} />}
+      </>
+    );
   }
   if (error) {
-    return (
+    const notice = (
       <div className="query-state" role="alert">
         <Alert
           type="error"
           showIcon
-          message="数据加载失败"
+          title={hasData ? '数据更新失败' : '数据加载失败'}
           description={errMsg(error)}
           action={
             onRetry ? (
@@ -50,9 +57,53 @@ export default function QueryState({
         />
       </div>
     );
+    return hasData ? (
+      <>
+        {notice}
+        {isEmpty ? (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={emptyDescription}
+          />
+        ) : (
+          children
+        )}
+      </>
+    ) : (
+      notice
+    );
   }
   if (isEmpty) {
-    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyDescription} />;
+    return (
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description={emptyDescription}
+      />
+    );
   }
   return <>{children}</>;
+}
+
+export function QueryBoundary({
+  query,
+  children,
+}: {
+  query: {
+    data: unknown;
+    error: Error | null;
+    isLoading: boolean;
+    refetch: () => unknown;
+  };
+  children: ReactNode;
+}) {
+  return (
+    <QueryState
+      loading={query.isLoading}
+      error={query.error}
+      hasData={query.data !== undefined}
+      onRetry={() => void query.refetch()}
+    >
+      {children}
+    </QueryState>
+  );
 }

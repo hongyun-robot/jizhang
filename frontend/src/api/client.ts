@@ -1,92 +1,63 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-
-import { API_BASE, LOGIN_PATH } from '../base';
+import axios, { CanceledError, type InternalAxiosRequestConfig } from 'axios';
+import { API_BASE } from '../base';
 import { useAuth } from '../stores/auth';
-import type { User } from '../stores/auth';
+import { session } from '../auth/session';
+import { isUnauthorized, normalizeError } from './errors';
 
-/** 统一响应体类型。 */
-export interface ApiBody<T = unknown> {
-  code: number;
-  message: string;
-  data?: T;
-}
+export { errMsg } from './errors';
+export type { ApiBody } from './errors';
 
-interface TokenResp {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-  user?: User;
-}
-
-/** 统一 API 客户端：baseURL 指向 API_BASE（开发期 /api/v1 由 Vite 代理转发；子路径部署为 /jizhang/api/v1）。 */
-export const api = axios.create({
-  baseURL: API_BASE,
-  timeout: 10000,
-});
-
-api.interceptors.request.use((config) => {
-  const token = useAuth.getState().token;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+type SessionConfig = InternalAxiosRequestConfig & {
+  _epoch?: number;
+  _token?: string | null;
+  _retried?: boolean;
+};
+export const api = axios.create({ baseURL: API_BASE, timeout: 10000 });
+api.interceptors.request.use((input) => {
+  const config = input as SessionConfig;
+  const state = useAuth.getState();
+  if (config._epoch !== undefined && config._epoch !== state.epoch)
+    throw new CanceledError('会话已结束');
+  config._epoch = state.epoch;
+  config._token = state.token;
+  if (state.token) config.headers.Authorization = `Bearer ${state.token}`;
   return config;
 });
-
-/** 单飞刷新：并发 401 只发一次 refresh。 */
-let refreshing: Promise<string> | null = null;
-
-async function refreshAccessToken(): Promise<string> {
-  const { data } = await axios.post<ApiBody<TokenResp>>(`${API_BASE}/auth/refresh`, null, {
-    withCredentials: true,
-  });
-  if (data.code !== 0 || !data.data?.access_token) {
-    throw new Error(data.message || 'refresh failed');
-  }
-  useAuth.getState().setToken(data.data.access_token);
-  return data.data.access_token;
-}
-
-export async function ensureFreshToken(): Promise<string> {
-  const existing = useAuth.getState().token;
-  if (existing) return existing;
-  if (!refreshing) {
-    refreshing = refreshAccessToken().finally(() => {
-      refreshing = null;
-    });
-  }
-  return refreshing;
-}
-
-type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
-
 api.interceptors.response.use(
-  (res) => res,
-  async (error: AxiosError<ApiBody>) => {
-    const config = error.config as RetriableConfig | undefined;
-    const isAuthRoute = config?.url?.includes('/auth/');
-    const is401 = error.response?.status === 401;
-
-    if (is401 && config && !config._retried && !isAuthRoute) {
+  (response) => {
+    const config = response.config as SessionConfig;
+    if (config._epoch !== useAuth.getState().epoch)
+      throw new CanceledError('会话已结束');
+    return response;
+  },
+  async (error: unknown) => {
+    const config = axios.isAxiosError(error)
+      ? (error.config as SessionConfig | undefined)
+      : undefined;
+    if (
+      config?._epoch !== undefined &&
+      config._epoch !== useAuth.getState().epoch
+    )
+      throw new CanceledError('会话已结束');
+    if (config && isUnauthorized(error) && !config.url?.startsWith('/auth/')) {
+      if (config._retried) {
+        session.end();
+        throw normalizeError(error);
+      }
       config._retried = true;
       try {
-        const token = await ensureFreshToken();
+        const token = await session.refreshAfter401(config._token ?? null);
         config.headers.Authorization = `Bearer ${token}`;
-        return api(config);
-      } catch {
-        useAuth.getState().clear();
-        if (!window.location.pathname.startsWith(LOGIN_PATH)) {
-          window.location.assign(LOGIN_PATH);
-        }
+        return await api(config);
+      } catch (caught) {
+        if (
+          isUnauthorized(caught) &&
+          config._epoch === useAuth.getState().epoch
+        )
+          session.end();
+        throw normalizeError(caught);
       }
     }
-    return Promise.reject(error);
-  },
-);
-
-/** 从响应体中取业务消息。 */
-export function errMsg(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    return err.response?.data?.message || err.message;
+    throw normalizeError(error);
   }
-  return err instanceof Error ? err.message : '未知错误';
-}
+);

@@ -1,8 +1,9 @@
 /** 后端 DTO 类型（与 Go model JSON 一一对应；金额恒为字符串）。 */
 
-export type Role = 'admin' | 'recorder' | 'member' | 'viewer';
+export type { Role } from '../domain/identity';
+import type { SessionUser, UserStatus } from '../domain/identity';
 export type AccountType = 'asset' | 'liability';
-export type Status = 'active' | 'disabled';
+export type Status = UserStatus;
 export type TxnKind = 'expense' | 'income' | 'transfer' | 'refund';
 export type TxnPurpose =
   | 'regular'
@@ -16,7 +17,7 @@ export interface Account {
   id: number;
   name: string;
   type: AccountType;
-	owner_id?: number | null;
+  owner_id?: number | null;
   opening_balance: string;
   repayment_day?: number | null;
   liability_type?: string;
@@ -29,11 +30,7 @@ export interface Account {
 }
 
 /** 系统用户（单账本共享，不开放注册；无物理删除，spec identity/user-management）。 */
-export interface User {
-  id: number;
-  username: string;
-  role: Role;
-  status: Status;
+export interface User extends SessionUser {
   created_at: string;
   updated_at: string;
 }

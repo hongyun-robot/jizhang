@@ -248,7 +248,7 @@ export default function Stats() {
           {/* 三态统一走 QueryState：请求失败显示错误态 + 重试，不落入「区间内无数据」空态 */}
           <QueryState
             loading={category.isLoading}
-            error={category.isError}
+            error={category.error}
             isEmpty={!share?.items.length}
             onRetry={() => void category.refetch()}
             emptyDescription="区间内无数据"
@@ -292,7 +292,7 @@ export default function Stats() {
         >
           <QueryState
             loading={trend.isLoading}
-            error={trend.isError}
+            error={trend.error}
             onRetry={() => void trend.refetch()}
             skeleton={<Spin />}
           >
@@ -314,7 +314,7 @@ export default function Stats() {
         <Card size="small" className="panel" title="本期环比">
           <QueryState
             loading={compare.isLoading}
-            error={compare.isError}
+            error={compare.error}
             onRetry={() => void compare.refetch()}
             skeleton={<Spin />}
           >
@@ -370,7 +370,7 @@ export default function Stats() {
         >
           <QueryState
             loading={periods.isLoading}
-            error={periods.isError}
+            error={periods.error}
             isEmpty={(periods.data?.periods ?? []).length === 0}
             onRetry={() => void periods.refetch()}
             emptyDescription="该年度暂无账期汇总"
@@ -412,7 +412,7 @@ export default function Stats() {
         <Card size="small" className="panel stats-wide" title="资产走势">
           <QueryState
             loading={assets.isLoading}
-            error={assets.isError}
+            error={assets.error}
             isEmpty={(assets.data?.points.length ?? 0) === 0}
             onRetry={() => void assets.refetch()}
             emptyDescription="区间内无数据"

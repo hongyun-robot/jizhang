@@ -1,17 +1,23 @@
+import { cents, money, sumMoney } from '../lib/money';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Grid, Skeleton } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 
-import { useAccounts, useBudgets, useStatsCompare, useTxnList, useVouchers } from '../api/hooks';
+import { useAccounts } from '../api/accounts';
+import { useBudgets } from '../api/budgets';
+import { useStatsCompare } from '../api/statistics';
+import { useTxnList } from '../api/transactions';
+import { useVouchers } from '../api/vouchers';
 import type { Transaction } from '../api/types';
 import { ROLE_LABEL, VOUCHER_PURPOSE_LABEL } from '../labels';
 import { useAuth } from '../stores/auth';
+import { canRecord } from '../domain/permissions';
 import Money, { fmtMoney } from '../components/Money';
 import BudgetProgress from '../components/BudgetProgress';
-import QueryState from '../components/QueryState';
+import QueryState, { QueryBoundary } from '../components/QueryState';
 import TxnFormModal from '../components/TxnFormModal';
-import { lastSearchOf } from '../components/AppShell';
+import { lastSearchOf } from '../navigation/memory';
 
 /** 指针柔光：把坐标写进 CSS 变量，只在精确指针设备上出现。 */
 function trackPointer(e: React.PointerEvent<HTMLElement>) {
@@ -60,13 +66,14 @@ export default function Dashboard() {
   const isAdmin = user?.role === 'admin';
 
   const totalAssets = useMemo(
-    () => (accounts.data ?? []).reduce((s, a) => s + Number(a.balance ?? 0), 0),
-    [accounts.data],
+    () =>
+      sumMoney((accounts.data ?? []).map((account) => account.balance ?? '0')),
+    [accounts.data]
   );
 
   const activeAccounts = useMemo(
     () => (accounts.data ?? []).filter((a) => a.status === 'active').length,
-    [accounts.data],
+    [accounts.data]
   );
 
   const acctName = useMemo(() => {
@@ -79,14 +86,14 @@ export default function Dashboard() {
   const total = budgets.data?.total;
   const budgetLeft =
     total?.budget !== null && total?.budget !== undefined
-      ? Number(total.budget) - Number(total.consumed)
+      ? money(cents(total.budget) - cents(total.consumed))
       : null;
 
   const eyebrow = compare.data
     ? `${compare.data.start.replace(/-/g, '.')} – ${compare.data.end.replace(/-/g, '.')}`
     : '账期载入中';
 
-  const heroText = fmtMoney(Number(cur?.balance ?? 0));
+  const heroText = fmtMoney(cur?.balance ?? '0');
   const heroSize = heroFontSize(heroText, vw);
 
   return (
@@ -97,94 +104,129 @@ export default function Dashboard() {
           <h2>首页</h2>
         </div>
         <div className="head-actions">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setFormOpen(true)}>
-            快捷记账
-          </Button>
+          {canRecord(user?.role) && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setFormOpen(true)}
+            >
+              快捷记账
+            </Button>
+          )}
         </div>
       </div>
 
       {/* 本期结余 hero：一个主数字 + 收支拆解 + 资产/预算侧栏，取代四张同款卡片 */}
       <section className="hero panel" onPointerMove={trackPointer}>
-        <div className="hero-main">
-          <div className="hero-label">
-            本期结余
-            {budgets.data && <span className="hero-range">账期 {budgets.data.period_key}</span>}
-          </div>
-          {/* 窄屏按位数缩放字号 + title 兜底，金额完整可读不被静默裁切 */}
-          <div
-            className="hero-value"
-            style={heroSize ? { fontSize: `${heroSize}px` } : undefined}
-            title={heroSize ? `本期结余 ¥${heroText}` : undefined}
-          >
-            {!compare.data && !compare.isError ? (
-              <Skeleton.Input active size="large" style={{ width: 220 }} />
-            ) : (
-              <Money
-                value={cur?.balance ?? '0'}
-                tone={Number(cur?.balance ?? 0) < 0 ? 'expense' : 'income'}
-                animate
-              />
-            )}
-          </div>
-          <div className="hero-split">
-            <span className="cell">
-              <i className="dot income" />
-              本期收入
-              <Money value={cur?.income ?? '0'} tone="income" animate />
-            </span>
-            <span className="cell">
-              <i className="dot expense" />
-              本期支出
-              <Money value={cur?.expense ?? '0'} tone="expense" animate />
-            </span>
-          </div>
-        </div>
-
-        <div className="hero-side">
-          <div className="hero-stat">
-            <div className="k">未用券金额</div><div className="v"><Money value={vouchers.data?.unused_amount ?? '0'} animate /></div>
-            <div className="s"><Button type="link" size="small" onClick={() => navigate('/vouchers')}>查看我的券</Button></div>
-          </div>
-          <div className="hero-stat">
-            <div className="k">总资产</div>
-            <div className="v">
-              {accounts.data ? <Money value={totalAssets} animate /> : <span className="muted">—</span>}
+        <QueryBoundary query={compare}>
+          <div className="hero-main">
+            <div className="hero-label">
+              本期结余
+              {budgets.data && (
+                <span className="hero-range">
+                  账期 {budgets.data.period_key}
+                </span>
+              )}
             </div>
-            <div className="s">{activeAccounts} 个启用账户</div>
-          </div>
-          <div className="hero-stat">
-            <div className="k">预算剩余</div>
-            <div className="v">
-              {budgetLeft === null ? (
-                <span className="muted">—</span>
+            {/* 窄屏按位数缩放字号 + title 兜底，金额完整可读不被静默裁切 */}
+            <div
+              className="hero-value"
+              style={heroSize ? { fontSize: `${heroSize}px` } : undefined}
+              title={heroSize ? `本期结余 ¥${heroText}` : undefined}
+            >
+              {!compare.data && !compare.isError ? (
+                <Skeleton.Input active size="large" style={{ width: 220 }} />
               ) : (
                 <Money
-                  value={budgetLeft}
-                  tone={budgetLeft < 0 ? 'expense' : 'plain'}
+                  value={cur?.balance ?? '0'}
+                  tone={Number(cur?.balance ?? 0) < 0 ? 'expense' : 'income'}
                   animate
                 />
               )}
             </div>
-            <div className="s">
-              {budgetLeft !== null && budgetLeft < 0
-                ? '已超支，建议调整'
-                : total?.budget
-                  ? `已用 ${total.percent}%`
-                  : '本期尚未配置预算'}
+            <div className="hero-split">
+              <span className="cell">
+                <i className="dot income" />
+                本期收入
+                <Money value={cur?.income ?? '0'} tone="income" animate />
+              </span>
+              <span className="cell">
+                <i className="dot expense" />
+                本期支出
+                <Money value={cur?.expense ?? '0'} tone="expense" animate />
+              </span>
             </div>
           </div>
+        </QueryBoundary>
+
+        <div className="hero-side">
+          <QueryBoundary query={vouchers}>
+            <div className="hero-stat">
+              <div className="k">未用券金额</div>
+              <div className="v">
+                <Money value={vouchers.data?.unused_amount ?? '0'} animate />
+              </div>
+              <div className="s">
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => navigate('/vouchers')}
+                >
+                  查看我的券
+                </Button>
+              </div>
+            </div>
+          </QueryBoundary>
+          <QueryBoundary query={accounts}>
+            <div className="hero-stat">
+              <div className="k">总资产</div>
+              <div className="v">
+                {accounts.data ? (
+                  <Money value={totalAssets} animate />
+                ) : (
+                  <span className="muted">—</span>
+                )}
+              </div>
+              <div className="s">{activeAccounts} 个启用账户</div>
+            </div>
+          </QueryBoundary>
+          <QueryBoundary query={budgets}>
+            <div className="hero-stat">
+              <div className="k">预算剩余</div>
+              <div className="v">
+                {budgetLeft === null ? (
+                  <span className="muted">—</span>
+                ) : (
+                  <Money
+                    value={budgetLeft}
+                    tone={cents(budgetLeft) < 0n ? 'expense' : 'plain'}
+                    animate
+                  />
+                )}
+              </div>
+              <div className="s">
+                {budgetLeft !== null && cents(budgetLeft) < 0n
+                  ? '已超支，建议调整'
+                  : total?.budget
+                    ? `已用 ${total.percent}%`
+                    : '本期尚未配置预算'}
+              </div>
+            </div>
+          </QueryBoundary>
         </div>
       </section>
 
       <div className={`dash-grid${isMobile ? '' : ' two'}`}>
         {/* 预算进度（8.3 接入真实值：超支标红显示超出金额，specs/budgets） */}
         <Card size="small" className="panel" title="预算进度">
-          <BudgetProgress
-            view={budgets.data}
-            loading={budgets.isLoading}
-            showPeriod
-            configLink={isAdmin}
-          />
+          <QueryBoundary query={budgets}>
+            <BudgetProgress
+              view={budgets.data}
+              loading={budgets.isLoading}
+              showPeriod
+              configLink={isAdmin}
+            />
+          </QueryBoundary>
         </Card>
 
         {/* 最近 10 笔（归属日期倒序） */}
@@ -193,7 +235,11 @@ export default function Dashboard() {
           className="panel"
           title="最近流水"
           extra={
-            <Button type="link" size="small" onClick={() => navigate('/records')}>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => navigate('/records')}
+            >
               查看全部
             </Button>
           }
@@ -201,45 +247,56 @@ export default function Dashboard() {
           <div className="recent-list">
             <QueryState
               loading={!recent.data && !recent.isError}
-              error={recent.isError}
+              error={recent.error}
+              hasData={recent.data !== undefined}
               isEmpty={!!recent.data && recent.data.items.length === 0}
               onRetry={() => void recent.refetch()}
               emptyDescription="还没有流水，记一笔吧"
-              skeleton={<Skeleton active paragraph={{ rows: 5 }} title={false} />}
+              skeleton={
+                <Skeleton active paragraph={{ rows: 5 }} title={false} />
+              }
             >
               <>
                 {(recent.data?.items ?? []).map((t: Transaction) => (
-                <div
-                  className="recent-row clickable"
-                  key={t.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => navigate(`/records${lastSearchOf('/records')}`, { state: { locateId: t.id } })}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      navigate(`/records${lastSearchOf('/records')}`, { state: { locateId: t.id } });
+                  <div
+                    className="recent-row clickable"
+                    key={t.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() =>
+                      navigate(`/records${lastSearchOf('/records')}`, {
+                        state: { locateId: t.id },
+                      })
                     }
-                  }}
-                >
-                  <span className="recent-note">
-                    {t.kind === 'transfer'
-                      ? `转账 ${acctName.get(t.account_id) ?? ''}→${acctName.get(t.transfer_account_id ?? 0) ?? ''}`
-                      : `${t.purpose && VOUCHER_PURPOSE_LABEL[t.purpose] ? `${VOUCHER_PURPOSE_LABEL[t.purpose]} · ` : ''}${t.note || acctName.get(t.account_id) || '—'}`}
-                  </span>
-                  <Money
-                    value={
-                      t.kind === 'income' || t.kind === 'refund' ? t.amount : `-${t.amount}`
-                    }
-                    tone={
-                      t.kind === 'income' || t.kind === 'refund'
-                        ? 'income'
-                        : t.kind === 'expense'
-                          ? 'expense'
-                          : 'plain'
-                    }
-                  />
-                </div>
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(`/records${lastSearchOf('/records')}`, {
+                          state: { locateId: t.id },
+                        });
+                      }
+                    }}
+                  >
+                    <span className="recent-note">
+                      {t.kind === 'transfer'
+                        ? `转账 ${acctName.get(t.account_id) ?? ''}→${acctName.get(t.transfer_account_id ?? 0) ?? ''}`
+                        : `${t.purpose && VOUCHER_PURPOSE_LABEL[t.purpose] ? `${VOUCHER_PURPOSE_LABEL[t.purpose]} · ` : ''}${t.note || acctName.get(t.account_id) || '—'}`}
+                    </span>
+                    <Money
+                      value={
+                        t.kind === 'income' || t.kind === 'refund'
+                          ? t.amount
+                          : `-${t.amount}`
+                      }
+                      tone={
+                        t.kind === 'income' || t.kind === 'refund'
+                          ? 'income'
+                          : t.kind === 'expense'
+                            ? 'expense'
+                            : 'plain'
+                      }
+                    />
+                  </div>
                 ))}
               </>
             </QueryState>
@@ -251,7 +308,9 @@ export default function Dashboard() {
       {user && isMobile && (
         <div className="greeting">
           你好，<b>{user.username}</b> · {ROLE_LABEL[user.role] ?? user.role}
-          {recent.data ? ` · 累计 ${recent.data.total.toLocaleString('zh-CN')} 笔` : ''}
+          {recent.data
+            ? ` · 累计 ${recent.data.total.toLocaleString('zh-CN')} 笔`
+            : ''}
         </div>
       )}
 

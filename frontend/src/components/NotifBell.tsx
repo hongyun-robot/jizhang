@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Badge } from 'antd';
 import { BellOutlined } from '@ant-design/icons';
 
-import { useNotifications } from '../api/hooks';
+import { useNotifications } from '../api/notifications';
 
 /**
  * 提醒铃铛（specs/notifications「铃铛与未读红点」）：

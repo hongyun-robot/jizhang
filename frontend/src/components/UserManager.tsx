@@ -1,3 +1,4 @@
+import { QueryBoundary } from './QueryState';
 import { useState } from 'react';
 import {
   App,
@@ -16,22 +17,42 @@ import type { TableColumnsType } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 
 import { errMsg } from '../api/client';
-import { useUserMutations, useUsers } from '../api/hooks';
+import { useUserMutations, useUsers } from '../api/users';
 import type { Role, User } from '../api/types';
 import { useAuth } from '../stores/auth';
 
 /** 四档角色（与后端 model.Role 一一对应）。 */
-const ROLE_OPTIONS: { value: Role; label: string; desc: string; color?: string }[] = [
+const ROLE_OPTIONS: {
+  value: Role;
+  label: string;
+  desc: string;
+  color?: string;
+}[] = [
   { value: 'admin', label: '管理员', desc: '全部权限', color: 'geekblue' },
-  { value: 'recorder', label: '记账员', desc: '记账并可改删全部流水', color: 'cyan' },
-  { value: 'member', label: '普通成员', desc: '记账，仅改删自己创建的', color: 'default' },
-  { value: 'viewer', label: '只读成员', desc: '仅查看与统计', color: 'default' },
+  {
+    value: 'recorder',
+    label: '记账员',
+    desc: '记账并可改删全部流水',
+    color: 'cyan',
+  },
+  {
+    value: 'member',
+    label: '普通成员',
+    desc: '记账，仅改删自己创建的',
+    color: 'default',
+  },
+  {
+    value: 'viewer',
+    label: '只读成员',
+    desc: '仅查看与统计',
+    color: 'default',
+  },
 ];
 const ROLE_LABEL: Record<string, string> = Object.fromEntries(
-  ROLE_OPTIONS.map((r) => [r.value, r.label]),
+  ROLE_OPTIONS.map((r) => [r.value, r.label])
 );
 const ROLE_COLOR: Record<string, string | undefined> = Object.fromEntries(
-  ROLE_OPTIONS.map((r) => [r.value, r.color]),
+  ROLE_OPTIONS.map((r) => [r.value, r.color])
 );
 
 interface CreateValues {
@@ -64,7 +85,9 @@ export default function UserManager() {
   const [resetForm] = Form.useForm<ResetValues>();
 
   const list = users.data ?? [];
-  const activeAdmins = list.filter((u) => u.role === 'admin' && u.status === 'active').length;
+  const activeAdmins = list.filter(
+    (u) => u.role === 'admin' && u.status === 'active'
+  ).length;
 
   /** 最后一个启用管理员：降级或停用都会让系统无人可管，前后端双重拦截。 */
   const isLastAdmin = (u: User) =>
@@ -83,7 +106,11 @@ export default function UserManager() {
   const doSetStatus = async (u: User, status: 'active' | 'disabled') => {
     try {
       await setStatus.mutateAsync({ id: u.id, status });
-      message.success(status === 'disabled' ? `已停用「${u.username}」` : `已恢复「${u.username}」`);
+      message.success(
+        status === 'disabled'
+          ? `已停用「${u.username}」`
+          : `已恢复「${u.username}」`
+      );
     } catch (e) {
       message.error(errMsg(e));
     }
@@ -92,7 +119,11 @@ export default function UserManager() {
   const submitCreate = async () => {
     const v = await createForm.validateFields();
     try {
-      await create.mutateAsync({ username: v.username, password: v.password, role: v.role });
+      await create.mutateAsync({
+        username: v.username,
+        password: v.password,
+        role: v.role,
+      });
       message.success(`已创建「${v.username}」，可立即登录`);
       setCreateOpen(false);
     } catch (e) {
@@ -104,7 +135,10 @@ export default function UserManager() {
     if (!resetTarget) return;
     const v = await resetForm.validateFields();
     try {
-      await resetPassword.mutateAsync({ id: resetTarget.id, password: v.password });
+      await resetPassword.mutateAsync({
+        id: resetTarget.id,
+        password: v.password,
+      });
       message.success(`「${resetTarget.username}」密码已重置，请转告新密码`);
       setResetTarget(null);
     } catch (e) {
@@ -152,7 +186,11 @@ export default function UserManager() {
             </Popconfirm>
           )
         ) : (
-          <Button type="link" size="small" onClick={() => doSetStatus(u, 'active')}>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => doSetStatus(u, 'active')}
+          >
             恢复
           </Button>
         )}
@@ -181,7 +219,10 @@ export default function UserManager() {
           value={role}
           disabled={isLastAdmin(u) || setRole.isPending}
           style={{ width: '100%' }}
-          options={ROLE_OPTIONS.map((r) => ({ value: r.value, label: r.label }))}
+          options={ROLE_OPTIONS.map((r) => ({
+            value: r.value,
+            label: r.label,
+          }))}
           onChange={(v) => void doSetRole(u, v)}
         />
       ),
@@ -190,7 +231,8 @@ export default function UserManager() {
       title: '状态',
       dataIndex: 'status',
       width: 80,
-      render: (s: string) => (s === 'active' ? <Tag color="success">启用</Tag> : <Tag>停用</Tag>),
+      render: (s: string) =>
+        s === 'active' ? <Tag color="success">启用</Tag> : <Tag>停用</Tag>,
     },
     {
       title: '创建时间',
@@ -209,58 +251,62 @@ export default function UserManager() {
 
   return (
     <>
-      <Card
-        size="small"
-        className="panel panel--measure"
-        title="用户管理"
-        extra={
-          <Button
-            type="primary"
-            size="small"
-            icon={<PlusOutlined />}
-            onClick={() => {
-              createForm.resetFields();
-              createForm.setFieldsValue({ role: 'member' });
-              setCreateOpen(true);
-            }}
-          >
-            新建用户
-          </Button>
-        }
-      >
-        {isMobile ? (
-          <div className="acct-list">
-            {list.map((u) => (
-              <div className="acct-row" key={u.id}>
-                <div className="acct-main">
-                  <div className="acct-name">
-                    {u.username}
-                    <Tag color={ROLE_COLOR[u.role]} style={{ marginLeft: 8 }}>
-                      {ROLE_LABEL[u.role] ?? u.role}
-                    </Tag>
-                    {u.status === 'disabled' && <Tag>停用</Tag>}
-                    {u.id === me?.id && <Tag>我</Tag>}
+      <QueryBoundary query={users}>
+        <Card
+          size="small"
+          className="panel panel--measure"
+          title="用户管理"
+          extra={
+            <Button
+              type="primary"
+              size="small"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                createForm.resetFields();
+                createForm.setFieldsValue({ role: 'member' });
+                setCreateOpen(true);
+              }}
+            >
+              新建用户
+            </Button>
+          }
+        >
+          {isMobile ? (
+            <div className="acct-list">
+              {list.map((u) => (
+                <div className="acct-row" key={u.id}>
+                  <div className="acct-main">
+                    <div className="acct-name">
+                      {u.username}
+                      <Tag color={ROLE_COLOR[u.role]} style={{ marginLeft: 8 }}>
+                        {ROLE_LABEL[u.role] ?? u.role}
+                      </Tag>
+                      {u.status === 'disabled' && <Tag>停用</Tag>}
+                      {u.id === me?.id && <Tag>我</Tag>}
+                    </div>
+                    <div className="acct-meta">
+                      创建于 {u.created_at.slice(0, 10)}
+                    </div>
                   </div>
-                  <div className="acct-meta">创建于 {u.created_at.slice(0, 10)}</div>
+                  <div className="acct-right">{renderActions(u)}</div>
                 </div>
-                <div className="acct-right">{renderActions(u)}</div>
-              </div>
-            ))}
+              ))}
+            </div>
+          ) : (
+            <Table<User>
+              rowKey="id"
+              size="small"
+              loading={users.isLoading}
+              dataSource={list}
+              columns={columns}
+              pagination={false}
+            />
+          )}
+          <div className="muted small" style={{ marginTop: 12 }}>
+            系统不提供删除用户：历史流水需保留创建人，如需移除请用「停用」。重置密码会使该用户已登录的会话全部失效。
           </div>
-        ) : (
-          <Table<User>
-            rowKey="id"
-            size="small"
-            loading={users.isLoading}
-            dataSource={list}
-            columns={columns}
-            pagination={false}
-          />
-        )}
-        <div className="muted small" style={{ marginTop: 12 }}>
-          系统不提供删除用户：历史流水需保留创建人，如需移除请用「停用」。重置密码会使该用户已登录的会话全部失效。
-        </div>
-      </Card>
+        </Card>
+      </QueryBoundary>
 
       {/* 新建用户 */}
       <Modal
@@ -288,10 +334,18 @@ export default function UserManager() {
             label="初始密码"
             rules={[{ required: true, min: 6, max: 128, message: '至少 6 位' }]}
           >
-            <Input.Password placeholder="至少 6 位，首次登录后可重置" autoComplete="new-password" />
+            <Input.Password
+              placeholder="至少 6 位，首次登录后可重置"
+              autoComplete="new-password"
+            />
           </Form.Item>
           <Form.Item name="role" label="角色" rules={[{ required: true }]}>
-            <Select options={ROLE_OPTIONS.map((r) => ({ value: r.value, label: r.label }))} />
+            <Select
+              options={ROLE_OPTIONS.map((r) => ({
+                value: r.value,
+                label: r.label,
+              }))}
+            />
           </Form.Item>
         </Form>
         <div className="muted small">
@@ -319,7 +373,10 @@ export default function UserManager() {
             label="新密码"
             rules={[{ required: true, min: 6, max: 128, message: '至少 6 位' }]}
           >
-            <Input.Password placeholder="至少 6 位" autoComplete="new-password" />
+            <Input.Password
+              placeholder="至少 6 位"
+              autoComplete="new-password"
+            />
           </Form.Item>
           <Form.Item
             name="confirm"
@@ -329,13 +386,17 @@ export default function UserManager() {
               { required: true, message: '请再次输入' },
               ({ getFieldValue }) => ({
                 validator(_, v) {
-                  if (!v || getFieldValue('password') === v) return Promise.resolve();
+                  if (!v || getFieldValue('password') === v)
+                    return Promise.resolve();
                   return Promise.reject(new Error('两次输入不一致'));
                 },
               }),
             ]}
           >
-            <Input.Password placeholder="再输一次" autoComplete="new-password" />
+            <Input.Password
+              placeholder="再输一次"
+              autoComplete="new-password"
+            />
           </Form.Item>
         </Form>
         <div className="muted small">

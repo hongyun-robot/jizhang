@@ -12,10 +12,21 @@ interface RequireRoleProps {
 }
 
 /** 角色门禁：不符角色回首页（入口本身也按角色隐藏）。 */
-export default function RequireRole({ role, roles, children }: RequireRoleProps) {
+export default function RequireRole({
+  role,
+  roles,
+  children,
+}: RequireRoleProps) {
   const user = useAuth((s) => s.user);
   const location = useLocation();
-  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (!user)
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: location.pathname + location.search + location.hash }}
+        replace
+      />
+    );
   const allowed = roles ?? (role ? [role] : []);
   if (!allowed.includes(user.role)) return <Navigate to="/" replace />;
   return <>{children}</>;

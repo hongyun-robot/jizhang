@@ -6,7 +6,7 @@ import { rootsOfKind } from '../api/category';
 import { liabilityWrite, useLiabilityWrite, useFeeTransactions, type LiabilityDetail, type SettlementPreview } from '../api/liability';
 import { errMsg } from '../api/client';
 import { useAuth } from '../stores/auth';
-import { cents, money, spreadMoney, sumMoney } from '../lib/money';
+import { previewCents as cents, money, spreadMoney, previewSum as sumMoney } from '../lib/money';
 import { plannedBills } from '../lib/liability';
 import Money from './Money';
 

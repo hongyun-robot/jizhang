@@ -3,14 +3,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { App, Button, Form, Input } from 'antd';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 
-import { api, errMsg, type ApiBody } from '../api/client';
-import { useAuth, type User } from '../stores/auth';
+import { errMsg } from '../api/client';
+import { useAuth } from '../stores/auth';
+import { session } from '../auth/session';
+import { returnTarget } from '../navigation/routes';
+import { BASENAME } from '../base';
 import Brand from '../components/Brand';
-
-interface LoginResp {
-  access_token: string;
-  user: User;
-}
 
 /** 登录页左侧「账页」样张：装饰性账目行（aria-hidden），说明产品本身长什么样。 */
 const SAMPLE_ROWS = [
@@ -23,7 +21,6 @@ const SAMPLE_ROWS = [
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const setSession = useAuth((s) => s.setSession);
   // 静态 message 改走 AntApp 容器（与全站一致，暗色主题下样式正确）
   const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
@@ -31,10 +28,11 @@ export default function Login() {
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true);
     try {
-      const { data } = await api.post<ApiBody<LoginResp>>('/auth/login', values);
-      setSession(data.data!.access_token, data.data!.user);
-      const from = (location.state as { from?: string } | null)?.from;
-      navigate(from && from !== '/login' ? from : '/', { replace: true });
+      await session.login(values);
+      const from = (location.state as { from?: unknown } | null)?.from;
+      navigate(returnTarget(from, useAuth.getState().user?.role, BASENAME), {
+        replace: true,
+      });
     } catch (err) {
       message.error(errMsg(err));
     } finally {
@@ -80,13 +78,22 @@ export default function Login() {
           <h1>登录</h1>
           <p className="login-note">账号由管理员统一创建，未开放注册。</p>
 
-          <Form layout="vertical" onFinish={onFinish} size="large" requiredMark={false}>
+          <Form
+            layout="vertical"
+            onFinish={onFinish}
+            size="large"
+            requiredMark={false}
+          >
             <Form.Item
               label="用户名"
               name="username"
               rules={[{ required: true, message: '请输入用户名' }]}
             >
-              <Input prefix={<UserOutlined />} placeholder="用户名" autoComplete="username" />
+              <Input
+                prefix={<UserOutlined />}
+                placeholder="用户名"
+                autoComplete="username"
+              />
             </Form.Item>
             <Form.Item
               label="密码"

@@ -1,8 +1,12 @@
+import { cents, money, formatMoney } from '../lib/money';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Progress, Spin } from 'antd';
 
-import type { BudgetProgress as BudgetProgressDto, BudgetView } from '../api/types';
+import type {
+  BudgetProgress as BudgetProgressDto,
+  BudgetView,
+} from '../api/types';
 
 /**
  * 预算进度（specs/budgets「进度与超支展示」）：
@@ -27,7 +31,11 @@ export default function BudgetProgress({
 }) {
   if (!view) return loading ? <Spin size="small" /> : null;
 
-  const rows: Array<{ scope: 'total' | number; name: string; p: BudgetProgressDto }> = [];
+  const rows: Array<{
+    scope: 'total' | number;
+    name: string;
+    p: BudgetProgressDto;
+  }> = [];
   if (view.total.budget || showUnset) {
     rows.push({ scope: 'total', name: '总预算', p: view.total });
   }
@@ -59,13 +67,10 @@ export default function BudgetProgress({
           <span className="budget-name">{r.name}</span>
           {inputFor?.(r.scope)}
           <div className="budget-bar">
-            {Number(r.p.consumed) < 0 ? (
+            {cents(r.p.consumed) < 0n ? (
               // 净消耗为负（退款回吐超过支出）：以退回文案替代进度条，不出现负宽度
               <div className="budget-refund">
-                本月已退回 ¥
-                {Math.abs(Number(r.p.consumed)).toLocaleString('zh-CN', {
-                  minimumFractionDigits: 2,
-                })}
+                本月已退回 ¥{formatMoney(money(-cents(r.p.consumed)))}
               </div>
             ) : r.p.budget ? (
               <>
@@ -78,7 +83,11 @@ export default function BudgetProgress({
                   <span>
                     ¥{r.p.consumed} / {r.p.budget}
                   </span>
-                  {r.p.over && <span className="budget-over">已超支 ¥{r.p.over_amount}</span>}
+                  {r.p.over && (
+                    <span className="budget-over">
+                      已超支 ¥{r.p.over_amount}
+                    </span>
+                  )}
                 </div>
               </>
             ) : (
