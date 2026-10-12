@@ -1,16 +1,10 @@
-import {
-  Button,
-  Cascader,
-  Input,
-  InputNumber,
-  Segmented,
-  Select,
-  Tag,
-} from 'antd';
+import ResponsiveSelect from '../../components/ResponsiveSelect';
+import { Button, Input, InputNumber, Segmented, Tag } from 'antd';
 import type { TxnKind } from '../../api/types';
 import type { FilterState } from './filters';
 import { categoryPath as catPathOf } from '../../domain/categories';
 import PeriodPicker from '../../components/PeriodPicker';
+import ResponsiveCategorySelect from '../../components/ResponsiveCategorySelect';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigationType } from 'react-router-dom';
 interface FilterControlsProps {
@@ -24,6 +18,7 @@ interface FilterControlsProps {
   }[];
   /** 传入即渲染「清除」按钮（移动端抽屉用；桌面 filter-bar 保持既有布局不加按钮）。 */
   onClear?: () => void;
+  active?: boolean;
 }
 export default function FilterControls({
   filters,
@@ -31,6 +26,7 @@ export default function FilterControls({
   accountOptions,
   catOptions,
   onClear,
+  active = true,
 }: FilterControlsProps) {
   const [keyword, setKeyword] = useState(filters.keyword);
   const navigation = useNavigationType();
@@ -71,7 +67,9 @@ export default function FilterControls({
           关联退款 #{filters.related_txn_id}
         </Tag>
       ) : null}
-      <Select
+      <ResponsiveSelect
+        sheetTitle="账户"
+        active={active}
         size="small"
         allowClear
         placeholder="账户"
@@ -80,11 +78,8 @@ export default function FilterControls({
         options={accountOptions}
         onChange={(v) => patch({ account_id: v })}
       />
-      <Cascader
-        size="small"
-        allowClear
-        placeholder="分类"
-        style={{ minWidth: 130 }}
+      <ResponsiveCategorySelect
+        active={active}
         value={catPathOf(catOptions, filters.category_id)}
         options={catOptions}
         onChange={(v) =>

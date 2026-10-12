@@ -1,3 +1,5 @@
+import SelectionScope from '../../components/SelectionScope';
+import ResponsiveSelect from '../../components/ResponsiveSelect';
 import { submissionGate } from '../../lib/submission';
 import { useEditorSession } from '../../hooks/useEditorSession';
 import { useRef as submissionRef } from 'react';
@@ -9,16 +11,7 @@ import { amountError } from '../../lib/money';
 
 import { useEffect, useMemo, useRef } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
-import {
-  App,
-  Button,
-  DatePicker,
-  Grid,
-  Input,
-  Modal,
-  Segmented,
-  Select,
-} from 'antd';
+import { App, Button, DatePicker, Grid, Input, Modal, Segmented } from 'antd';
 
 import { errMsg } from '../../api/client';
 import { rootsOfKind } from '../../api/category';
@@ -197,108 +190,112 @@ export default function RecurringFormModal({
   }, [open, editing, forest.data]);
 
   return (
-    <Modal
-      open={open}
-      onCancel={close}
-      title={editing ? '编辑周期模板' : '新建周期模板'}
-      width={isMobile ? '100%' : 520}
-      style={
-        isMobile ? { top: 0, maxWidth: '100%', paddingBottom: 0 } : undefined
-      }
-      footer={[
-        <Button key="cancel" onClick={close}>
-          取消
-        </Button>,
-        <Button
-          key="ok"
-          type="primary"
-          loading={create.isPending || update.isPending}
-          onClick={submit}
-        >
-          保存
-        </Button>,
-      ]}
-    >
-      <div className="txn-form">
-        {/* 金额 */}
-        <div className="amount-row">
-          <span className="amount-symbol">¥</span>
-          <Input
-            value={form.amount}
-            onChange={(e) =>
-              patch({ amount: e.target.value.replace(/[^\d.]/g, '') })
-            }
-            inputMode="decimal"
-            placeholder="0.00"
-            size="large"
-            className="amount-input"
-            autoFocus={!editing}
+    <SelectionScope active={open}>
+      <Modal
+        open={open}
+        onCancel={close}
+        title={editing ? '编辑周期模板' : '新建周期模板'}
+        width={isMobile ? '100%' : 520}
+        style={
+          isMobile ? { top: 0, maxWidth: '100%', paddingBottom: 0 } : undefined
+        }
+        footer={[
+          <Button key="cancel" onClick={close}>
+            取消
+          </Button>,
+          <Button
+            key="ok"
+            type="primary"
+            loading={create.isPending || update.isPending}
+            onClick={submit}
+          >
+            保存
+          </Button>,
+        ]}
+      >
+        <div className="txn-form">
+          {/* 金额 */}
+          <div className="amount-row">
+            <span className="amount-symbol">¥</span>
+            <Input
+              value={form.amount}
+              onChange={(e) =>
+                patch({ amount: e.target.value.replace(/[^\d.]/g, '') })
+              }
+              inputMode="decimal"
+              placeholder="0.00"
+              size="large"
+              className="amount-input"
+              autoFocus={!editing}
+            />
+          </div>
+
+          {/* 频率 */}
+          <Segmented
+            block
+            value={form.freq}
+            options={FREQ_OPTIONS}
+            onChange={(v) => patch({ freq: v as RuleFreq })}
           />
+
+          {/* 收支方向：只用于筛选分类，生成方向由分类决定 */}
+          <Segmented
+            block
+            value={form.kind}
+            options={KIND_OPTIONS}
+            onChange={(v) =>
+              patch({
+                kind: v as CategoryKind,
+                categoryId: undefined,
+                activeRootId: undefined,
+              })
+            }
+          />
+
+          {/* 分类 */}
+          <CategoryPicker
+            key={String(open) + String(editing?.id) + form.kind}
+            roots={roots}
+            value={form.categoryId}
+            onChange={(categoryId) => patch({ categoryId })}
+            heading="分类"
+          />
+
+          {/* 账户 */}
+          <ResponsiveSelect
+            sheetTitle="账户"
+            active={open}
+            placeholder="账户"
+            options={accountOptions}
+            value={form.accountId}
+            onChange={(v) => patch({ accountId: v })}
+            style={{ width: '100%' }}
+            getPopupContainer={popupInParent}
+          />
+
+          {/* 首次生成日期 */}
+          <DatePicker
+            value={form.start}
+            onChange={(v) => v && patch({ start: v })}
+            style={{ width: '100%' }}
+            allowClear={false}
+            placeholder="首次生成日期"
+            disabledDate={(d) => d.year() < 2000 || d.year() > 2100}
+            getPopupContainer={popupInParent}
+          />
+
+          <Input
+            value={form.note}
+            onChange={(e) => patch({ note: e.target.value })}
+            placeholder="备注（可选），将写入生成的流水"
+            maxLength={255}
+          />
+
+          <div className="rule-form-hint">
+            频率与首次生成日期决定生成节奏（日期超前时到期即生成）；修改金额/账户/分类/备注只影响后续生成。
+          </div>
         </div>
-
-        {/* 频率 */}
-        <Segmented
-          block
-          value={form.freq}
-          options={FREQ_OPTIONS}
-          onChange={(v) => patch({ freq: v as RuleFreq })}
-        />
-
-        {/* 收支方向：只用于筛选分类，生成方向由分类决定 */}
-        <Segmented
-          block
-          value={form.kind}
-          options={KIND_OPTIONS}
-          onChange={(v) =>
-            patch({
-              kind: v as CategoryKind,
-              categoryId: undefined,
-              activeRootId: undefined,
-            })
-          }
-        />
-
-        {/* 分类 */}
-        <CategoryPicker
-          key={String(open) + String(editing?.id) + form.kind}
-          roots={roots}
-          value={form.categoryId}
-          onChange={(categoryId) => patch({ categoryId })}
-          heading="分类"
-        />
-
-        {/* 账户 */}
-        <Select
-          placeholder="账户"
-          options={accountOptions}
-          value={form.accountId}
-          onChange={(v) => patch({ accountId: v })}
-          style={{ width: '100%' }}
-          getPopupContainer={popupInParent}
-        />
-
-        {/* 首次生成日期 */}
-        <DatePicker
-          value={form.start}
-          onChange={(v) => v && patch({ start: v })}
-          style={{ width: '100%' }}
-          allowClear={false}
-          placeholder="首次生成日期"
-          disabledDate={(d) => d.year() < 2000 || d.year() > 2100}
-          getPopupContainer={popupInParent}
-        />
-
-        <Input
-          value={form.note}
-          onChange={(e) => patch({ note: e.target.value })}
-          placeholder="备注（可选），将写入生成的流水"
-          maxLength={255}
-        />
-
-        <div className="rule-form-hint">
-          频率与首次生成日期决定生成节奏（日期超前时到期即生成）；修改金额/账户/分类/备注只影响后续生成。
-        </div>
-      </div>
-    </Modal>
+      </Modal>
+    </SelectionScope>
   );
 }

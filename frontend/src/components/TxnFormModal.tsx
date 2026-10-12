@@ -1,3 +1,5 @@
+import SelectionScope from './SelectionScope';
+import ResponsiveSelect from './ResponsiveSelect';
 import { submissionGate } from '../lib/submission';
 import { useEditorSession } from '../hooks/useEditorSession';
 import { useRef as submissionRef } from 'react';
@@ -15,7 +17,6 @@ import {
   Input,
   Modal,
   Segmented,
-  Select,
 } from 'antd';
 
 import { useAccounts } from '../api/accounts';
@@ -324,266 +325,278 @@ export default function TxnFormModal({
 
   return (
     <>
-      <Modal
-        open={open}
-        onCancel={close}
-        title={editing ? '编辑流水' : '记一笔'}
-        width={isMobile ? '100%' : 520}
-        style={
-          isMobile ? { top: 0, maxWidth: '100%', paddingBottom: 0 } : undefined
-        }
-        styles={{
-          body: {
-            maxHeight: `calc(100dvh - ${isMobile ? 160 : 240}px)`,
-            overflowY: 'auto',
-          },
-        }}
-        footer={[
-          <Button key="cancel" onClick={close}>
-            取消
-          </Button>,
-          <Button
-            key="ok"
-            type="primary"
-            loading={saving}
-            disabled={creatingPlatform || managed}
-            onClick={submit}
-          >
-            {editing ? '保存' : '记账'}
-          </Button>,
-        ]}
-      >
-        <div className="txn-form">
-          {/* body 顶部受控错误 Alert：提交未通过 validate() 时出现，修好后自动消失，Modal 不关闭 */}
-          {fieldErr && (
-            <Alert
-              type="error"
-              showIcon
-              message={fieldErr}
-              className="txn-form-error"
-            />
-          )}
-          {managed && (
-            <Alert
-              type="info"
-              title="此流水由负债计划管理"
-              description={
-                <Button
-                  type="link"
-                  onClick={() => {
-                    close();
-                    navigate(
-                      `/liabilities/${editing!.liability_account_id ?? editing!.account_id}`
-                    );
-                  }}
-                >
-                  查看计划、费用与修正入口
-                </Button>
-              }
-            />
-          )}
-          {!editing && user?.role !== 'viewer' && (
+      <SelectionScope active={open}>
+        <Modal
+          open={open}
+          onCancel={close}
+          title={editing ? '编辑流水' : '记一笔'}
+          width={isMobile ? '100%' : 520}
+          style={
+            isMobile
+              ? { top: 0, maxWidth: '100%', paddingBottom: 0 }
+              : undefined
+          }
+          styles={{
+            body: {
+              maxHeight: `calc(100dvh - ${isMobile ? 160 : 240}px)`,
+              overflowY: 'auto',
+            },
+          }}
+          footer={[
+            <Button key="cancel" onClick={close}>
+              取消
+            </Button>,
             <Button
-              onClick={() => {
-                setVoucherOpen(true);
-                close();
-              }}
+              key="ok"
+              type="primary"
+              loading={saving}
+              disabled={creatingPlatform || managed}
+              onClick={submit}
             >
-              购券：先付款，使用时计消费
-            </Button>
-          )}
-          <Segmented
-            block
-            value={kind}
-            options={kindOptions}
-            onChange={(v) => {
-              setKind(v as TxnKind);
-              setCategoryId(undefined);
-              setOverAck(false);
-              if (v !== 'refund') {
-                setRelatedId(undefined);
-                setRelatedAmount(undefined);
-                setRefundedBase('0');
-              }
-            }}
-          />
-
-          {/* 金额：大字 + 系统数字键盘 + 常用金额快捷键 */}
-          <div
-            className={`amount-row${showErrors && amountInvalid ? ' amount-error' : ''}`}
-          >
-            <span className="amount-symbol">¥</span>
-            <Input
-              value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
-              inputMode="decimal"
-              placeholder="0.00"
-              size="large"
-              className="amount-input"
-              status={showErrors && amountInvalid ? 'error' : undefined}
-              autoFocus
-              // 金额框回车即记账：桌面端免去一次「再找按钮」的视线跳跃
-              onPressEnter={submit}
-            />
-          </div>
-          <div className="quick-amounts">
-            {QUICK_AMOUNTS.map((v) => (
-              <Button key={v} size="small" onClick={() => setQuick(v)}>
-                +{v}
-              </Button>
-            ))}
-            <Button size="small" onClick={() => setAmount('')}>
-              清零
-            </Button>
-          </div>
-
-          {/* 分类（转账无分类；退款分类可留空） */}
-          {kind !== 'transfer' && roots.length > 0 && (
-            <CategoryPicker
-              key={String(open) + String(editing?.id) + kind}
-              roots={roots}
-              value={categoryId}
-              onChange={setCategoryId}
-              allowEmpty={kind === 'refund'}
-              error={showErrors && kind !== 'refund' && !categoryId}
-              heading={kind === 'refund' ? '分类（可留空）' : '分类'}
-            />
-          )}
-
-          {creditAccount && (
-            <Alert
-              type={creditAccount.billing_enabled ? 'info' : 'warning'}
-              title={
-                creditAccount.billing_enabled
-                  ? kind === 'transfer'
-                    ? '转入负债账户会记录还款'
-                    : kind === 'refund'
-                      ? '同账户退款优先抵扣原未还本金'
-                      : '消费时计支出，下月还款记转账'
-                  : '此账户尚未配置账单规则'
-              }
-              description={
-                <>
-                  {cycle && kind === 'expense' && (
-                    <p>
-                      归属 {cycle.close} 账单，{cycle.due}{' '}
-                      到期。还款本金不会再计支出。
-                    </p>
-                  )}
-                  {kind === 'transfer' && (
-                    <p>
-                      先还最早到期账单，超额保留待抵扣，可在负债详情调整分配。
-                    </p>
-                  )}
-                  {!managed &&
-                    kind === 'expense' &&
-                    creditAccount.billing_enabled &&
-                    user?.role !== 'viewer' && (
-                      <Button onClick={startPlan}>
-                        {editing
-                          ? '将这笔消费转为固定分期'
-                          : '填写期次和手续费，记固定分期'}
-                      </Button>
-                    )}
-                </>
-              }
-            />
-          )}
-
-          <div className="txn-platform-field">
-            <label className="pick-label" htmlFor="txn-platform">
-              平台 / 商家
-            </label>
-            <PlatformInput
-              key={editing?.id ?? 'new'}
-              id="txn-platform"
-              value={platform}
-              onChange={setPlatform}
-              active={open}
-              disabled={saving}
-              onCreatingChange={setCreatingPlatform}
-            />
-          </div>
-
-          {/* 账户 */}
-          {kind === 'transfer' ? (
-            <div className="transfer-row">
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="转出账户"
-                options={accountOptions}
-                value={accountId}
-                onChange={setAccountId}
-                style={{ flex: 1 }}
-                status={showErrors && !accountId ? 'error' : undefined}
-                getPopupContainer={popupInParent}
-              />
-              <span className="transfer-arrow">→</span>
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="转入账户"
-                options={accountOptions.filter((o) => o.value !== accountId)}
-                value={transferId}
-                onChange={setTransferId}
-                style={{ flex: 1 }}
-                status={showErrors && !transferId ? 'error' : undefined}
-                getPopupContainer={popupInParent}
-              />
-            </div>
-          ) : (
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder="账户"
-              options={accountOptions}
-              value={accountId}
-              onChange={setAccountId}
-              style={{ width: '100%' }}
-              status={showErrors && !accountId ? 'error' : undefined}
-              getPopupContainer={popupInParent}
-            />
-          )}
-
-          {/* 退款关联信息 + 超额黄条（累计可超原支出，仅提示需二次确认） */}
-          {kind === 'refund' && relatedId && (
-            <div className="refund-related">
-              已关联原支出 #{relatedId}
-              {relatedAmount
-                ? `（原 ¥${relatedAmount}，已退 ¥${refundedBase}）`
-                : ''}
-            </div>
-          )}
-          {kind === 'refund' &&
-            isOver &&
-            relatedAmount !== undefined &&
-            overTotal !== null && (
+              {editing ? '保存' : '记账'}
+            </Button>,
+          ]}
+        >
+          <div className="txn-form">
+            {/* body 顶部受控错误 Alert：提交未通过 validate() 时出现，修好后自动消失，Modal 不关闭 */}
+            {fieldErr && (
               <Alert
-                type="warning"
+                type="error"
                 showIcon
-                className="refund-over"
-                message={`累计退款 ¥${money(overTotal)} 超过原支出 ¥${relatedAmount}（本次 ¥${amount}），如确认请再次点击「${editing ? '保存' : '记账'}」`}
+                message={fieldErr}
+                className="txn-form-error"
+              />
+            )}
+            {managed && (
+              <Alert
+                type="info"
+                title="此流水由负债计划管理"
+                description={
+                  <Button
+                    type="link"
+                    onClick={() => {
+                      close();
+                      navigate(
+                        `/liabilities/${editing!.liability_account_id ?? editing!.account_id}`
+                      );
+                    }}
+                  >
+                    查看计划、费用与修正入口
+                  </Button>
+                }
+              />
+            )}
+            {!editing && user?.role !== 'viewer' && (
+              <Button
+                onClick={() => {
+                  setVoucherOpen(true);
+                  close();
+                }}
+              >
+                购券：先付款，使用时计消费
+              </Button>
+            )}
+            <Segmented
+              block
+              value={kind}
+              options={kindOptions}
+              onChange={(v) => {
+                setKind(v as TxnKind);
+                setCategoryId(undefined);
+                setOverAck(false);
+                if (v !== 'refund') {
+                  setRelatedId(undefined);
+                  setRelatedAmount(undefined);
+                  setRefundedBase('0');
+                }
+              }}
+            />
+
+            {/* 金额：大字 + 系统数字键盘 + 常用金额快捷键 */}
+            <div
+              className={`amount-row${showErrors && amountInvalid ? ' amount-error' : ''}`}
+            >
+              <span className="amount-symbol">¥</span>
+              <Input
+                value={amount}
+                onChange={(e) =>
+                  setAmount(e.target.value.replace(/[^\d.]/g, ''))
+                }
+                inputMode="decimal"
+                placeholder="0.00"
+                size="large"
+                className="amount-input"
+                status={showErrors && amountInvalid ? 'error' : undefined}
+                autoFocus
+                // 金额框回车即记账：桌面端免去一次「再找按钮」的视线跳跃
+                onPressEnter={submit}
+              />
+            </div>
+            <div className="quick-amounts">
+              {QUICK_AMOUNTS.map((v) => (
+                <Button key={v} size="small" onClick={() => setQuick(v)}>
+                  +{v}
+                </Button>
+              ))}
+              <Button size="small" onClick={() => setAmount('')}>
+                清零
+              </Button>
+            </div>
+
+            {/* 分类（转账无分类；退款分类可留空） */}
+            {kind !== 'transfer' && roots.length > 0 && (
+              <CategoryPicker
+                key={String(open) + String(editing?.id) + kind}
+                roots={roots}
+                value={categoryId}
+                onChange={setCategoryId}
+                allowEmpty={kind === 'refund'}
+                error={showErrors && kind !== 'refund' && !categoryId}
+                heading={kind === 'refund' ? '分类（可留空）' : '分类'}
               />
             )}
 
-          <DatePicker
-            value={date}
-            onChange={(v) => v && setDate(v)}
-            style={{ width: '100%' }}
-            allowClear={false}
-            getPopupContainer={popupInParent}
-          />
+            {creditAccount && (
+              <Alert
+                type={creditAccount.billing_enabled ? 'info' : 'warning'}
+                title={
+                  creditAccount.billing_enabled
+                    ? kind === 'transfer'
+                      ? '转入负债账户会记录还款'
+                      : kind === 'refund'
+                        ? '同账户退款优先抵扣原未还本金'
+                        : '消费时计支出，下月还款记转账'
+                    : '此账户尚未配置账单规则'
+                }
+                description={
+                  <>
+                    {cycle && kind === 'expense' && (
+                      <p>
+                        归属 {cycle.close} 账单，{cycle.due}{' '}
+                        到期。还款本金不会再计支出。
+                      </p>
+                    )}
+                    {kind === 'transfer' && (
+                      <p>
+                        先还最早到期账单，超额保留待抵扣，可在负债详情调整分配。
+                      </p>
+                    )}
+                    {!managed &&
+                      kind === 'expense' &&
+                      creditAccount.billing_enabled &&
+                      user?.role !== 'viewer' && (
+                        <Button onClick={startPlan}>
+                          {editing
+                            ? '将这笔消费转为固定分期'
+                            : '填写期次和手续费，记固定分期'}
+                        </Button>
+                      )}
+                  </>
+                }
+              />
+            )}
 
-          <Input.TextArea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="备注（可选）"
-            maxLength={255}
-            rows={2}
-          />
-        </div>
-      </Modal>
+            <div className="txn-platform-field">
+              <label className="pick-label" htmlFor="txn-platform">
+                平台 / 商家
+              </label>
+              <PlatformInput
+                key={editing?.id ?? 'new'}
+                id="txn-platform"
+                value={platform}
+                onChange={setPlatform}
+                active={open}
+                disabled={saving}
+                onCreatingChange={setCreatingPlatform}
+              />
+            </div>
+
+            {/* 账户 */}
+            {kind === 'transfer' ? (
+              <div className="transfer-row">
+                <ResponsiveSelect
+                  sheetTitle="转出账户"
+                  active={open}
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="转出账户"
+                  options={accountOptions}
+                  value={accountId}
+                  onChange={setAccountId}
+                  style={{ flex: 1 }}
+                  status={showErrors && !accountId ? 'error' : undefined}
+                  getPopupContainer={popupInParent}
+                />
+                <span className="transfer-arrow">→</span>
+                <ResponsiveSelect
+                  sheetTitle="转入账户"
+                  active={open}
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="转入账户"
+                  options={accountOptions.filter((o) => o.value !== accountId)}
+                  value={transferId}
+                  onChange={setTransferId}
+                  style={{ flex: 1 }}
+                  status={showErrors && !transferId ? 'error' : undefined}
+                  getPopupContainer={popupInParent}
+                />
+              </div>
+            ) : (
+              <ResponsiveSelect
+                sheetTitle="账户"
+                active={open}
+                showSearch
+                optionFilterProp="label"
+                placeholder="账户"
+                options={accountOptions}
+                value={accountId}
+                onChange={setAccountId}
+                style={{ width: '100%' }}
+                status={showErrors && !accountId ? 'error' : undefined}
+                getPopupContainer={popupInParent}
+              />
+            )}
+
+            {/* 退款关联信息 + 超额黄条（累计可超原支出，仅提示需二次确认） */}
+            {kind === 'refund' && relatedId && (
+              <div className="refund-related">
+                已关联原支出 #{relatedId}
+                {relatedAmount
+                  ? `（原 ¥${relatedAmount}，已退 ¥${refundedBase}）`
+                  : ''}
+              </div>
+            )}
+            {kind === 'refund' &&
+              isOver &&
+              relatedAmount !== undefined &&
+              overTotal !== null && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  className="refund-over"
+                  message={`累计退款 ¥${money(overTotal)} 超过原支出 ¥${relatedAmount}（本次 ¥${amount}），如确认请再次点击「${editing ? '保存' : '记账'}」`}
+                />
+              )}
+
+            <DatePicker
+              value={date}
+              onChange={(v) => v && setDate(v)}
+              style={{ width: '100%' }}
+              allowClear={false}
+              getPopupContainer={popupInParent}
+            />
+
+            <Input.TextArea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="备注（可选）"
+              maxLength={255}
+              rows={2}
+            />
+          </div>
+        </Modal>
+      </SelectionScope>
       <VoucherFormModal
         open={voucherOpen}
         onClose={() => setVoucherOpen(false)}

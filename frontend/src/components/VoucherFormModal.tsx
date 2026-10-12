@@ -1,3 +1,5 @@
+import SelectionScope from './SelectionScope';
+import ResponsiveSelect from './ResponsiveSelect';
 import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 import { submissionGate } from '../lib/submission';
 import { useRef as submissionRef } from 'react';
@@ -16,7 +18,6 @@ import {
   Input,
   InputNumber,
   Modal,
-  Select,
   Switch,
   theme,
 } from 'antd';
@@ -182,195 +183,203 @@ export default function VoucherFormModal({
   const saving = mutations.create.isPending || mutations.update.isPending;
 
   return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      title={editing ? '编辑券' : '登记购券'}
-      zIndex={token.zIndexPopupBase + 200}
-      width={screens.md ? 560 : '100%'}
-      style={
-        screens.md ? undefined : { top: 16, maxWidth: 'calc(100% - 24px)' }
-      }
-      styles={{
-        body: { maxHeight: 'calc(100dvh - 160px)', overflowY: 'auto' },
-      }}
-      onOk={submit}
-      confirmLoading={saving}
-      okButtonProps={{ disabled: creatingPlatform }}
-      okText={editing ? '保存' : '登记购券'}
-      cancelText="取消"
-      forceRender
-    >
-      <Form
-        form={form}
-        layout="vertical"
-        onSubmitCapture={(event) => {
-          event.preventDefault();
-          void submit();
+    <SelectionScope active={open}>
+      <Modal
+        open={open}
+        onCancel={onClose}
+        title={editing ? '编辑券' : '登记购券'}
+        zIndex={token.zIndexPopupBase + 200}
+        width={screens.md ? 560 : '100%'}
+        style={
+          screens.md ? undefined : { top: 16, maxWidth: 'calc(100% - 24px)' }
+        }
+        styles={{
+          body: { maxHeight: 'calc(100dvh - 160px)', overflowY: 'auto' },
         }}
-        onValuesChange={(changed) => {
-          if ('expires_on' in changed) {
-            if (!changed.expires_on)
-              form.setFieldsValue({
-                auto_refund_enabled: false,
-                resume_auto_refund: false,
-              });
-            else if (!hadExpiry.current)
-              form.setFieldValue('auto_refund_enabled', true);
-            hadExpiry.current = !!changed.expires_on;
-          }
-          if (changed.auto_refund_enabled === false)
-            form.setFieldValue('resume_auto_refund', false);
-        }}
-        className="voucher-form"
+        onOk={submit}
+        confirmLoading={saving}
+        okButtonProps={{ disabled: creatingPlatform }}
+        okText={editing ? '保存' : '登记购券'}
+        cancelText="取消"
+        forceRender
       >
-        <Form.Item
-          name="name"
-          label="券名称"
-          rules={[
-            { required: true, whitespace: true, message: '请填写券名称' },
-          ]}
+        <Form
+          form={form}
+          layout="vertical"
+          onSubmitCapture={(event) => {
+            event.preventDefault();
+            void submit();
+          }}
+          onValuesChange={(changed) => {
+            if ('expires_on' in changed) {
+              if (!changed.expires_on)
+                form.setFieldsValue({
+                  auto_refund_enabled: false,
+                  resume_auto_refund: false,
+                });
+              else if (!hadExpiry.current)
+                form.setFieldValue('auto_refund_enabled', true);
+              hadExpiry.current = !!changed.expires_on;
+            }
+            if (changed.auto_refund_enabled === false)
+              form.setFieldValue('resume_auto_refund', false);
+          }}
+          className="voucher-form"
         >
-          <Input placeholder="例如：双人餐券 / 5 次洗车券" maxLength={128} />
-        </Form.Item>
-        <Form.Item
-          name="platform"
-          label="平台 / 商家"
-          rules={[
-            {
-              validator: (_, value?: string) =>
-                Array.from((value ?? '').trim()).length <= 128
-                  ? Promise.resolve()
-                  : Promise.reject(new Error('平台 / 商家名称最多 128 字')),
-            },
-          ]}
-        >
-          <PlatformInput
-            key={editing?.id ?? 'new'}
-            active={open}
-            disabled={saving}
-            onCreatingChange={setCreatingPlatform}
-          />
-        </Form.Item>
-        {financialLocked && (
-          <Alert
-            type="info"
-            showIcon
-            title="已有核销记录或购买期已封账，购买金额等信息暂不可修改。有效期和自动退款设置仍可调整。"
-          />
-        )}
-        <div className="voucher-form-grid">
           <Form.Item
-            name="paid_amount"
-            label="实付金额"
+            name="name"
+            label="券名称"
             rules={[
-              { required: true, message: '请填写实付金额' },
+              { required: true, whitespace: true, message: '请填写券名称' },
+            ]}
+          >
+            <Input placeholder="例如：双人餐券 / 5 次洗车券" maxLength={128} />
+          </Form.Item>
+          <Form.Item
+            name="platform"
+            label="平台 / 商家"
+            rules={[
               {
-                validator: (_, value) =>
-                  !amountError(String(value))
+                validator: (_, value?: string) =>
+                  Array.from((value ?? '').trim()).length <= 128
                     ? Promise.resolve()
-                    : Promise.reject(new Error('金额须大于 0，最多两位小数')),
+                    : Promise.reject(new Error('平台 / 商家名称最多 128 字')),
               },
             ]}
           >
-            <Input
-              prefix="¥"
-              inputMode="decimal"
-              placeholder="0.00"
-              disabled={financialLocked}
+            <PlatformInput
+              key={editing?.id ?? 'new'}
+              active={open}
+              disabled={saving}
+              onCreatingChange={setCreatingPlatform}
             />
           </Form.Item>
+          {financialLocked && (
+            <Alert
+              type="info"
+              showIcon
+              title="已有核销记录或购买期已封账，购买金额等信息暂不可修改。有效期和自动退款设置仍可调整。"
+            />
+          )}
+          <div className="voucher-form-grid">
+            <Form.Item
+              name="paid_amount"
+              label="实付金额"
+              rules={[
+                { required: true, message: '请填写实付金额' },
+                {
+                  validator: (_, value) =>
+                    !amountError(String(value))
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('金额须大于 0，最多两位小数')),
+                },
+              ]}
+            >
+              <Input
+                prefix="¥"
+                inputMode="decimal"
+                placeholder="0.00"
+                disabled={financialLocked}
+              />
+            </Form.Item>
+            <Form.Item
+              name="total_units"
+              label="可用次数"
+              rules={[{ required: true, message: '请填写次数' }]}
+            >
+              <InputNumber
+                min={1}
+                max={2147483647}
+                precision={0}
+                style={{ width: '100%' }}
+                disabled={financialLocked}
+              />
+            </Form.Item>
+            <Form.Item
+              name="purchase_date"
+              label="购买日期"
+              rules={[{ required: true, message: '请选择购买日期' }]}
+            >
+              <DatePicker
+                allowClear={false}
+                style={{ width: '100%' }}
+                disabled={financialLocked}
+                getPopupContainer={popupInParent}
+              />
+            </Form.Item>
+            <Form.Item
+              name="account_id"
+              label="支付账户"
+              rules={[{ required: true, message: '请选择支付账户' }]}
+            >
+              <ResponsiveSelect
+                sheetTitle="支付账户"
+                active={open}
+                options={accountOptions}
+                placeholder="选择账户"
+                disabled={financialLocked}
+                getPopupContainer={popupInParent}
+              />
+            </Form.Item>
+          </div>
           <Form.Item
-            name="total_units"
-            label="可用次数"
-            rules={[{ required: true, message: '请填写次数' }]}
+            name="category_id"
+            label="消费分类"
+            rules={[{ required: true, message: '请选择消费分类' }]}
           >
-            <InputNumber
-              min={1}
-              max={2147483647}
-              precision={0}
-              style={{ width: '100%' }}
-              disabled={financialLocked}
-            />
+            <CategoryPicker roots={categoryRoots} disabled={financialLocked} />
           </Form.Item>
           <Form.Item
-            name="purchase_date"
-            label="购买日期"
-            rules={[{ required: true, message: '请选择购买日期' }]}
+            name="expires_on"
+            label="有效期至（可选）"
+            dependencies={['purchase_date']}
+            rules={[
+              {
+                validator: (_, value: Dayjs | null) =>
+                  value &&
+                  value.isBefore(form.getFieldValue('purchase_date'), 'day')
+                    ? Promise.reject(new Error('有效期不能早于购买日'))
+                    : Promise.resolve(),
+              },
+            ]}
+            extra="有效期当天仍可使用，按北京时间次日零点后处理。"
           >
             <DatePicker
-              allowClear={false}
               style={{ width: '100%' }}
-              disabled={financialLocked}
               getPopupContainer={popupInParent}
             />
           </Form.Item>
-          <Form.Item
-            name="account_id"
-            label="支付账户"
-            rules={[{ required: true, message: '请选择支付账户' }]}
-          >
-            <Select
-              options={accountOptions}
-              placeholder="选择账户"
-              disabled={financialLocked}
-              getPopupContainer={popupInParent}
+          <Form.Item label="到期自动退款" className="voucher-switch">
+            <Form.Item
+              name="auto_refund_enabled"
+              valuePropName="checked"
+              noStyle
+            >
+              <Switch disabled={!expires} />
+            </Form.Item>
+            <span className="muted">只退未用部分，并自动恢复支付账户余额</span>
+          </Form.Item>
+          {editing?.auto_refund_suspended && (
+            <Alert
+              type="info"
+              showIcon
+              title="自动退款已暂停"
+              description="撤销后会保持暂停，确认后可重新启用。"
             />
+          )}
+          {editing?.auto_refund_suspended && autoEnabled && (
+            <Form.Item name="resume_auto_refund" valuePropName="checked">
+              <Checkbox>确认重新启用到期自动退款</Checkbox>
+            </Form.Item>
+          )}
+          <Form.Item name="note" label="备注">
+            <Input.TextArea rows={2} maxLength={255} />
           </Form.Item>
-        </div>
-        <Form.Item
-          name="category_id"
-          label="消费分类"
-          rules={[{ required: true, message: '请选择消费分类' }]}
-        >
-          <CategoryPicker roots={categoryRoots} disabled={financialLocked} />
-        </Form.Item>
-        <Form.Item
-          name="expires_on"
-          label="有效期至（可选）"
-          dependencies={['purchase_date']}
-          rules={[
-            {
-              validator: (_, value: Dayjs | null) =>
-                value &&
-                value.isBefore(form.getFieldValue('purchase_date'), 'day')
-                  ? Promise.reject(new Error('有效期不能早于购买日'))
-                  : Promise.resolve(),
-            },
-          ]}
-          extra="有效期当天仍可使用，按北京时间次日零点后处理。"
-        >
-          <DatePicker
-            style={{ width: '100%' }}
-            getPopupContainer={popupInParent}
-          />
-        </Form.Item>
-        <Form.Item label="到期自动退款" className="voucher-switch">
-          <Form.Item name="auto_refund_enabled" valuePropName="checked" noStyle>
-            <Switch disabled={!expires} />
-          </Form.Item>
-          <span className="muted">只退未用部分，并自动恢复支付账户余额</span>
-        </Form.Item>
-        {editing?.auto_refund_suspended && (
-          <Alert
-            type="info"
-            showIcon
-            title="自动退款已暂停"
-            description="撤销后会保持暂停，确认后可重新启用。"
-          />
-        )}
-        {editing?.auto_refund_suspended && autoEnabled && (
-          <Form.Item name="resume_auto_refund" valuePropName="checked">
-            <Checkbox>确认重新启用到期自动退款</Checkbox>
-          </Form.Item>
-        )}
-        <Form.Item name="note" label="备注">
-          <Input.TextArea rows={2} maxLength={255} />
-        </Form.Item>
-        <div className="muted">
-          购买时只扣余额；核销按实付成本计消费。自动退款按填写的规则记账。
-        </div>
-      </Form>
-    </Modal>
+          <div className="muted">
+            购买时只扣余额；核销按实付成本计消费。自动退款按填写的规则记账。
+          </div>
+        </Form>
+      </Modal>
+    </SelectionScope>
   );
 }

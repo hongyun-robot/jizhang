@@ -1,3 +1,5 @@
+import SelectionScope from './SelectionScope';
+import ResponsiveSelect from './ResponsiveSelect';
 import { QueryBoundary } from './QueryState';
 import { useState } from 'react';
 import {
@@ -9,7 +11,6 @@ import {
   Input,
   Modal,
   Popconfirm,
-  Select,
   Table,
   Tag,
 } from 'antd';
@@ -198,6 +199,22 @@ export default function UserManager() {
     );
   };
 
+  const renderRole = (u: User) => (
+    <ResponsiveSelect<Role>
+      sheetTitle="角色"
+      mobileSearch={false}
+      size="small"
+      value={u.role}
+      disabled={isLastAdmin(u) || setRole.isPending}
+      style={{ width: isMobile ? 140 : '100%' }}
+      options={ROLE_OPTIONS.map((r) => ({
+        value: r.value,
+        label: r.label,
+      }))}
+      onChange={(v) => void doSetRole(u, v)}
+    />
+  );
+
   const columns: TableColumnsType<User> = [
     {
       title: '用户名',
@@ -213,19 +230,7 @@ export default function UserManager() {
       title: '角色',
       dataIndex: 'role',
       width: 140,
-      render: (role: Role, u) => (
-        <Select<Role>
-          size="small"
-          value={role}
-          disabled={isLastAdmin(u) || setRole.isPending}
-          style={{ width: '100%' }}
-          options={ROLE_OPTIONS.map((r) => ({
-            value: r.value,
-            label: r.label,
-          }))}
-          onChange={(v) => void doSetRole(u, v)}
-        />
-      ),
+      render: (_role: Role, u) => renderRole(u),
     },
     {
       title: '状态',
@@ -288,7 +293,10 @@ export default function UserManager() {
                       创建于 {u.created_at.slice(0, 10)}
                     </div>
                   </div>
-                  <div className="acct-right">{renderActions(u)}</div>
+                  <div className="acct-right">
+                    {renderRole(u)}
+                    {renderActions(u)}
+                  </div>
                 </div>
               ))}
             </div>
@@ -309,53 +317,60 @@ export default function UserManager() {
       </QueryBoundary>
 
       {/* 新建用户 */}
-      <Modal
-        open={createOpen}
-        onCancel={() => setCreateOpen(false)}
-        onOk={submitCreate}
-        title="新建用户"
-        okText="创建"
-        confirmLoading={create.isPending}
-        destroyOnHidden
-      >
-        <Form form={createForm} layout="vertical">
-          <Form.Item
-            name="username"
-            label="用户名"
-            rules={[
-              { required: true, message: '请输入用户名' },
-              { min: 2, max: 64, message: '2-64 个字符' },
-            ]}
-          >
-            <Input placeholder="登录用，如：xiaoming" autoComplete="off" />
-          </Form.Item>
-          <Form.Item
-            name="password"
-            label="初始密码"
-            rules={[{ required: true, min: 6, max: 128, message: '至少 6 位' }]}
-          >
-            <Input.Password
-              placeholder="至少 6 位，首次登录后可重置"
-              autoComplete="new-password"
-            />
-          </Form.Item>
-          <Form.Item name="role" label="角色" rules={[{ required: true }]}>
-            <Select
-              options={ROLE_OPTIONS.map((r) => ({
-                value: r.value,
-                label: r.label,
-              }))}
-            />
-          </Form.Item>
-        </Form>
-        <div className="muted small">
-          {ROLE_OPTIONS.map((r) => (
-            <div key={r.value}>
-              {r.label}：{r.desc}
-            </div>
-          ))}
-        </div>
-      </Modal>
+      <SelectionScope active={createOpen}>
+        <Modal
+          open={createOpen}
+          onCancel={() => setCreateOpen(false)}
+          onOk={submitCreate}
+          title="新建用户"
+          okText="创建"
+          confirmLoading={create.isPending}
+          destroyOnHidden
+        >
+          <Form form={createForm} layout="vertical">
+            <Form.Item
+              name="username"
+              label="用户名"
+              rules={[
+                { required: true, message: '请输入用户名' },
+                { min: 2, max: 64, message: '2-64 个字符' },
+              ]}
+            >
+              <Input placeholder="登录用，如：xiaoming" autoComplete="off" />
+            </Form.Item>
+            <Form.Item
+              name="password"
+              label="初始密码"
+              rules={[
+                { required: true, min: 6, max: 128, message: '至少 6 位' },
+              ]}
+            >
+              <Input.Password
+                placeholder="至少 6 位，首次登录后可重置"
+                autoComplete="new-password"
+              />
+            </Form.Item>
+            <Form.Item name="role" label="角色" rules={[{ required: true }]}>
+              <ResponsiveSelect
+                sheetTitle="角色"
+                mobileSearch={false}
+                active={createOpen}
+                options={ROLE_OPTIONS.map((r) => ({
+                  value: r.value,
+                  label: r.label,
+                }))}
+              />
+            </Form.Item>
+          </Form>
+          <div className="muted small">
+            {ROLE_OPTIONS.map((r) => (
+              <div key={r.value}>
+                {r.label}：{r.desc}
+              </div>
+            ))}
+          </div>
+        </Modal>
+      </SelectionScope>
 
       {/* 重置密码 */}
       <Modal

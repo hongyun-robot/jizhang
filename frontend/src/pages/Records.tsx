@@ -1,3 +1,4 @@
+import SelectionScope from '../components/SelectionScope';
 import RecordActions from '../features/records/RecordActions';
 import { RecordRows, recordColumns } from '../features/records/RecordViews';
 import FilterControls from '../features/records/FilterControls';
@@ -245,23 +246,26 @@ export default function Records() {
           />
         </div>
       )}
-      <Drawer
-        title="筛选"
-        placement="bottom"
-        size="60vh"
-        open={isMobile && filterOpen}
-        onClose={() => setFilterOpen(false)}
-      >
-        <div className="filter-drawer-controls">
-          <FilterControls
-            filters={filters}
-            patch={patch}
-            accountOptions={accountOptions}
-            catOptions={catOptions}
-            onClear={clearFilters}
-          />
-        </div>
-      </Drawer>
+      <SelectionScope active={isMobile && filterOpen}>
+        <Drawer
+          title="筛选"
+          placement="bottom"
+          size="60vh"
+          open={isMobile && filterOpen}
+          onClose={() => setFilterOpen(false)}
+        >
+          <div className="filter-drawer-controls">
+            <FilterControls
+              filters={filters}
+              patch={patch}
+              accountOptions={accountOptions}
+              catOptions={catOptions}
+              onClear={clearFilters}
+              active={isMobile && filterOpen}
+            />
+          </div>
+        </Drawer>
+      </SelectionScope>
 
       {isMobile ? (
         <div

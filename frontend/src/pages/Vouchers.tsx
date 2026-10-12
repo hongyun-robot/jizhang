@@ -1,3 +1,4 @@
+import ResponsiveSelect from '../components/ResponsiveSelect';
 import VoucherList from '../features/vouchers/VoucherList';
 import VoucherDetail from '../features/vouchers/VoucherDetail';
 import VoucherOperation from '../features/vouchers/VoucherOperation';
@@ -7,7 +8,7 @@ import QueryState, { QueryBoundary } from '../components/QueryState';
 import { useEffect, useRef, useState } from 'react';
 import { type Dayjs } from 'dayjs';
 import { useSearchParams } from 'react-router-dom';
-import { App, Button, Drawer, Grid, Input, Pagination, Select } from 'antd';
+import { App, Button, Drawer, Grid, Input, Pagination } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { errMsg } from '../api/client';
 import { useAccounts } from '../api/accounts';
@@ -189,7 +190,9 @@ export default function Vouchers() {
           }}
           style={{ maxWidth: 260 }}
         />
-        <Select
+        <ResponsiveSelect
+          sheetTitle="券状态"
+          mobileSearch={false}
           value={status}
           onChange={(v) => {
             setStatus(v);
