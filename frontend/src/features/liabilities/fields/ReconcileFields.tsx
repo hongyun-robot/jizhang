@@ -1,6 +1,7 @@
+import ResponsiveSelect from '../../../components/ResponsiveSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
-import { Button, Checkbox, Form, Input, Select, Space } from 'antd';
+import { Button, Checkbox, Form, Input, Space } from 'antd';
 
 import Money from '../../../components/Money';
 import { previewCents as cents, money } from '../../../lib/money';
@@ -66,7 +67,8 @@ export default function ReconcileFields({
                   name={[f.name, 'item_id']}
                   rules={[{ required: true }]}
                 >
-                  <Select
+                  <ResponsiveSelect
+                    sheetTitle="消费"
                     placeholder="选择消费"
                     options={d.items
                       .filter(
@@ -89,7 +91,8 @@ export default function ReconcileFields({
                   name={[f.name, 'statement_id']}
                   rules={[{ required: true }]}
                 >
-                  <Select
+                  <ResponsiveSelect
+                    sheetTitle="实际归属账单"
                     placeholder="实际归属账单"
                     options={bills.filter(
                       (b) =>

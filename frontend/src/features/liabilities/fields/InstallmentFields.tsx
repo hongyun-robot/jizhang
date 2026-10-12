@@ -1,3 +1,4 @@
+import ResponsiveSelect from '../../../components/ResponsiveSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
 import {
@@ -6,7 +7,6 @@ import {
   Form,
   Input,
   InputNumber,
-  Select,
   Space,
   Table,
 } from 'antd';
@@ -38,7 +38,8 @@ export default function InstallmentFields({
   return (
     <>
       <Form.Item name="source_txn_id" label="消费来源">
-        <Select
+        <ResponsiveSelect
+          sheetTitle="消费来源"
           allowClear
           placeholder="新消费（记录一次本金支出）"
           options={availableExpenses.map((t) => ({
@@ -90,7 +91,8 @@ export default function InstallmentFields({
               label="消费分类"
               rules={[{ required: true }]}
             >
-              <Select
+              <ResponsiveSelect
+                sheetTitle="消费分类"
                 options={categories}
                 style={{ minWidth: 190 }}
                 getPopupContainer={popupInParent}
@@ -122,7 +124,9 @@ export default function InstallmentFields({
         </Form.Item>
       </Space>
       <Form.Item name="fee_mode" label="手填手续费方式">
-        <Select
+        <ResponsiveSelect
+          sheetTitle="手填手续费方式"
+          mobileSearch={false}
           options={[
             { value: 'per_term', label: '每期固定手续费' },
             { value: 'total_spread', label: '总手续费按期分摊' },
@@ -144,7 +148,8 @@ export default function InstallmentFields({
           label="费用支付账户"
           rules={[{ required: true }]}
         >
-          <Select
+          <ResponsiveSelect
+            sheetTitle="费用支付账户"
             options={feeAccounts}
             style={{ minWidth: 190 }}
             getPopupContainer={popupInParent}
@@ -156,7 +161,11 @@ export default function InstallmentFields({
         label="手续费支出分类"
         rules={[{ required: true }]}
       >
-        <Select options={categories} getPopupContainer={popupInParent} />
+        <ResponsiveSelect
+          sheetTitle="手续费支出分类"
+          options={categories}
+          getPopupContainer={popupInParent}
+        />
       </Form.Item>
       {feeMode === 'upfront' && (
         <Form.Item

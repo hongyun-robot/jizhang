@@ -1,6 +1,7 @@
+import ResponsiveSelect from '../../../components/ResponsiveSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
-import { Button, DatePicker, Form, Input, Select, Space } from 'antd';
+import { Button, DatePicker, Form, Input, Space } from 'antd';
 
 import Money from '../../../components/Money';
 
@@ -33,7 +34,11 @@ export default function SettlementFields({
         label="本金还款账户"
         rules={[{ required: true }]}
       >
-        <Select options={assets} getPopupContainer={popupInParent} />
+        <ResponsiveSelect
+          sheetTitle="本金还款账户"
+          options={assets}
+          getPopupContainer={popupInParent}
+        />
       </Form.Item>
       <Space className="liability-form-row">
         <Form.Item
@@ -48,7 +53,8 @@ export default function SettlementFields({
           label="结清费支付账户"
           rules={[{ required: true }]}
         >
-          <Select
+          <ResponsiveSelect
+            sheetTitle="结清费支付账户"
             options={feeAccounts}
             style={{ minWidth: 190 }}
             getPopupContainer={popupInParent}
@@ -60,7 +66,11 @@ export default function SettlementFields({
         label="手续费支出分类"
         rules={[{ required: true }]}
       >
-        <Select options={categories} getPopupContainer={popupInParent} />
+        <ResponsiveSelect
+          sheetTitle="手续费支出分类"
+          options={categories}
+          getPopupContainer={popupInParent}
+        />
       </Form.Item>
       <Form.Item
         name="entry_date"

@@ -1,3 +1,4 @@
+import ResponsiveSelect from './ResponsiveSelect';
 import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 import { submissionGate } from '../lib/submission';
 import { useRef as submissionRef } from 'react';
@@ -29,7 +30,6 @@ import {
   Input,
   InputNumber,
   Modal,
-  Select,
   Space,
   Table,
 } from 'antd';
@@ -373,7 +373,9 @@ export default function LiabilityDialogs({
   const allocationFields = (
     <>
       <Form.Item name="mode" label="还款分配">
-        <Select
+        <ResponsiveSelect
+          sheetTitle="还款分配"
+          mobileSearch={false}
           options={[
             { value: 'auto', label: '先还最早到期账单' },
             { value: 'manual', label: '手动指定账单' },
@@ -395,7 +397,8 @@ export default function LiabilityDialogs({
                     name={[f.name, 'statement_id']}
                     rules={[{ required: true }]}
                   >
-                    <Select
+                    <ResponsiveSelect
+                      sheetTitle="指定账单"
                       aria-label="指定账单"
                       placeholder="指定账单"
                       options={payableBills}

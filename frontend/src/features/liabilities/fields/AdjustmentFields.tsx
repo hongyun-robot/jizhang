@@ -1,14 +1,7 @@
+import ResponsiveSelect from '../../../components/ResponsiveSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
-import {
-  Alert,
-  DatePicker,
-  Form,
-  Input,
-  InputNumber,
-  Select,
-  Space,
-} from 'antd';
+import { Alert, DatePicker, Form, Input, InputNumber, Space } from 'antd';
 import dayjs from 'dayjs';
 import Money from '../../../components/Money';
 import { previewSum as sumMoney } from '../../../lib/money';
@@ -29,7 +22,8 @@ export default function AdjustmentFields({
           label="已到账的本金退款记录"
           rules={[{ required: true }]}
         >
-          <Select
+          <ResponsiveSelect
+            sheetTitle="已到账的本金退款记录"
             options={d.transactions
               .filter(
                 (t) =>
@@ -84,7 +78,8 @@ export default function AdjustmentFields({
                       />
                     </Form.Item>
                     <Form.Item name={[f.name, 'statement_id']} label="归属账单">
-                      <Select
+                      <ResponsiveSelect
+                        sheetTitle="归属账单"
                         options={bills}
                         disabled={issued}
                         style={{ minWidth: 210 }}
@@ -112,7 +107,8 @@ export default function AdjustmentFields({
                       name={[f.name, 'fee_txn_id']}
                       label="如已手工记账，关联已有费用流水"
                     >
-                      <Select
+                      <ResponsiveSelect
+                        sheetTitle="已有费用流水"
                         allowClear
                         onChange={(id: number | undefined) => {
                           const t = (

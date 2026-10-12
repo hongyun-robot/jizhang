@@ -1,3 +1,5 @@
+import SelectionScope from '../components/SelectionScope';
+import ResponsiveSelect from '../components/ResponsiveSelect';
 import { submissionGate } from '../lib/submission';
 import { useRef as submissionRef } from 'react';
 import { cents, money } from '../lib/money';
@@ -15,7 +17,6 @@ import {
   Popconfirm,
   Segmented,
   Switch,
-  Select,
   Alert,
   Table,
   Tag,
@@ -437,194 +438,208 @@ export default function Accounts() {
         </Card>
       </QueryBoundary>
 
-      <Modal
-        open={open}
-        onCancel={() => setOpen(false)}
-        onOk={submit}
-        title={editing ? '编辑账户' : '新建账户'}
-        confirmLoading={create.isPending || update.isPending}
-        destroyOnHidden
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          onValuesChange={(changed) => {
-            Object.keys(changed).forEach((key) =>
-              touchedFields.current.add(key)
-            );
-          }}
+      <SelectionScope active={open}>
+        <Modal
+          open={open}
+          onCancel={() => setOpen(false)}
+          onOk={submit}
+          title={editing ? '编辑账户' : '新建账户'}
+          confirmLoading={create.isPending || update.isPending}
+          destroyOnHidden
         >
-          <Form.Item
-            name="name"
-            label="名称"
-            rules={[{ required: true, max: 64 }]}
+          <Form
+            form={form}
+            layout="vertical"
+            onValuesChange={(changed) => {
+              Object.keys(changed).forEach((key) =>
+                touchedFields.current.add(key)
+              );
+            }}
           >
-            <Input placeholder="如：银行卡 / 信用卡 / 花呗 / 抖音月付" />
-          </Form.Item>
-          <Form.Item name="type" label="类型">
-            <Segmented
-              disabled={!!editing?.has_financial_history}
-              onChange={(value) => {
-                if (value === 'liability')
-                  form.setFieldsValue({
-                    opening_balance: '0',
-                    liability_type: defaultType,
-                    statement_day: 31,
-                    repayment_day: 10,
-                    repayment_month_offset: 1,
-                  });
-              }}
-              options={[
-                { value: 'asset', label: '资产' },
-                { value: 'liability', label: '负债' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item
-            name="opening_balance"
-            label="期初余额（新负债账户从零开始）"
-          >
-            <Input
-              placeholder="0.00"
-              inputMode="decimal"
-              disabled={
-                !!editing?.has_financial_history ||
-                editing?.type === 'liability'
-              }
-            />
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate={(a, b) => a.type !== b.type}>
-            {({ getFieldValue }) =>
-              getFieldValue('type') === 'liability' ? (
-                <>
-                  <Alert
-                    type="info"
-                    title="各平台规则由你填写"
-                    description="消费计支出、还款记转账。日期支持 1–31 日，短月份取月底；已有账单保留，修改规则从下一周期生效。"
-                  />
-                  <Form.Item
-                    name="liability_type"
-                    label="消费信用类型"
-                    rules={[{ required: true }]}
-                  >
-                    <Select
-                      getPopupContainer={popupInParent}
-                      loading={types.isLoading}
-                      options={(types.data ?? []).map((t) => ({
-                        value: t.code,
-                        label: t.name,
-                      }))}
-                    />
-                  </Form.Item>
-                  {types.isError && (
-                    <Alert
-                      type="error"
-                      title="消费信用类型查询失败"
-                      description={
-                        <Button onClick={() => void types.refetch()}>
-                          重新查询
-                        </Button>
-                      }
-                    />
-                  )}
-                  {types.data?.length === 0 && (
-                    <Alert type="warning" title="尚未配置消费信用类型" />
-                  )}
-                  <Form.Item
-                    name="statement_day"
-                    label="账单日（1–31）"
-                    rules={[{ required: true }]}
-                  >
-                    <InputNumber min={1} max={31} style={{ width: '100%' }} />
-                  </Form.Item>
-                  <Form.Item
-                    name="repayment_month_offset"
-                    label="还款月份"
-                    rules={[{ required: true }]}
-                  >
-                    <Select
-                      getPopupContainer={popupInParent}
-                      options={[
-                        { value: 0, label: '出账当月' },
-                        { value: 1, label: '出账次月' },
-                      ]}
-                    />
-                  </Form.Item>
-                  <Form.Item
-                    name="repayment_day"
-                    label="还款日（1–31）"
-                    rules={[{ required: true }]}
-                  >
-                    <InputNumber
-                      min={1}
-                      max={31}
-                      style={{ width: '100%' }}
-                      placeholder="如：10"
-                    />
-                  </Form.Item>
-                  {ruleError(
-                    values?.statement_day,
-                    values?.repayment_day,
-                    values?.repayment_month_offset
-                  ) ? (
-                    <Alert
-                      type="warning"
-                      title={ruleError(
-                        values?.statement_day,
-                        values?.repayment_day,
-                        values?.repayment_month_offset
-                      )}
-                    />
-                  ) : (
-                    <p className="small muted">
-                      周期预览：
-                      {plannedBills(
-                        [
-                          {
-                            id: 0,
-                            version: 1,
-                            effective_from: '2000-01-01',
-                            statement_day: values!.statement_day!,
-                            repayment_day: values!.repayment_day!,
-                            repayment_month_offset:
-                              values!.repayment_month_offset!,
-                          },
-                        ],
-                        dayjs().startOf('month').format('YYYY-MM-DD'),
-                        3
-                      )
-                        .map((b) => `${b.close} 出账 → ${b.due} 还款`)
-                        .join('；')}
-                      。已有账单保持原规则。
-                    </p>
-                  )}
-                  {ruleValid && editing?.billing_enabled && (
-                    <p className="small muted">
-                      新规则自 {boundary} 生效。
-                      {futureChanges
-                        .map(({ old, preview }) =>
-                          preview
-                            ? `未出账 ${old.cycle_end} → ${preview.close}（到期 ${old.due_date} → ${preview.due}）`
-                            : ''
-                        )
-                        .join('；')}
-                      。期次本金保持原金额，实际费用日期需要按平台情况核对。
-                    </p>
-                  )}
-                </>
-              ) : null
-            }
-          </Form.Item>
-          <Form.Item name="sort" label="排序（小在前）">
-            <InputNumber style={{ width: '100%' }} />
-          </Form.Item>
-          {editing && (
-            <Form.Item name="status" label="启用" valuePropName="checked">
-              <Switch />
+            <Form.Item
+              name="name"
+              label="名称"
+              rules={[{ required: true, max: 64 }]}
+            >
+              <Input placeholder="如：银行卡 / 信用卡 / 花呗 / 抖音月付" />
             </Form.Item>
-          )}
-        </Form>
-      </Modal>
+            <Form.Item name="type" label="类型">
+              <Segmented
+                disabled={!!editing?.has_financial_history}
+                onChange={(value) => {
+                  if (value === 'liability')
+                    form.setFieldsValue({
+                      opening_balance: '0',
+                      liability_type: defaultType,
+                      statement_day: 31,
+                      repayment_day: 10,
+                      repayment_month_offset: 1,
+                    });
+                }}
+                options={[
+                  { value: 'asset', label: '资产' },
+                  { value: 'liability', label: '负债' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item
+              name="opening_balance"
+              label="期初余额（新负债账户从零开始）"
+            >
+              <Input
+                placeholder="0.00"
+                inputMode="decimal"
+                disabled={
+                  !!editing?.has_financial_history ||
+                  editing?.type === 'liability'
+                }
+              />
+            </Form.Item>
+            <Form.Item noStyle shouldUpdate={(a, b) => a.type !== b.type}>
+              {({ getFieldValue }) =>
+                getFieldValue('type') === 'liability' ? (
+                  <>
+                    <Alert
+                      type="info"
+                      title="各平台规则由你填写"
+                      description="消费计支出、还款记转账。日期支持 1–31 日，短月份取月底；已有账单保留，修改规则从下一周期生效。"
+                    />
+                    <Form.Item
+                      name="liability_type"
+                      label="消费信用类型"
+                      rules={[{ required: true }]}
+                    >
+                      <ResponsiveSelect
+                        sheetTitle="消费信用类型"
+                        mobileSearch={false}
+                        active={open}
+                        errorMessage={
+                          types.isError ? errMsg(types.error) : undefined
+                        }
+                        onRetry={() => {
+                          void types.refetch();
+                        }}
+                        getPopupContainer={popupInParent}
+                        loading={types.isLoading}
+                        options={(types.data ?? []).map((t) => ({
+                          value: t.code,
+                          label: t.name,
+                        }))}
+                      />
+                    </Form.Item>
+                    {types.isError && (
+                      <Alert
+                        type="error"
+                        title="消费信用类型查询失败"
+                        description={
+                          <Button onClick={() => void types.refetch()}>
+                            重新查询
+                          </Button>
+                        }
+                      />
+                    )}
+                    {types.data?.length === 0 && (
+                      <Alert type="warning" title="尚未配置消费信用类型" />
+                    )}
+                    <Form.Item
+                      name="statement_day"
+                      label="账单日（1–31）"
+                      rules={[{ required: true }]}
+                    >
+                      <InputNumber min={1} max={31} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item
+                      name="repayment_month_offset"
+                      label="还款月份"
+                      rules={[{ required: true }]}
+                    >
+                      <ResponsiveSelect
+                        sheetTitle="还款月份"
+                        mobileSearch={false}
+                        active={open}
+                        getPopupContainer={popupInParent}
+                        options={[
+                          { value: 0, label: '出账当月' },
+                          { value: 1, label: '出账次月' },
+                        ]}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      name="repayment_day"
+                      label="还款日（1–31）"
+                      rules={[{ required: true }]}
+                    >
+                      <InputNumber
+                        min={1}
+                        max={31}
+                        style={{ width: '100%' }}
+                        placeholder="如：10"
+                      />
+                    </Form.Item>
+                    {ruleError(
+                      values?.statement_day,
+                      values?.repayment_day,
+                      values?.repayment_month_offset
+                    ) ? (
+                      <Alert
+                        type="warning"
+                        title={ruleError(
+                          values?.statement_day,
+                          values?.repayment_day,
+                          values?.repayment_month_offset
+                        )}
+                      />
+                    ) : (
+                      <p className="small muted">
+                        周期预览：
+                        {plannedBills(
+                          [
+                            {
+                              id: 0,
+                              version: 1,
+                              effective_from: '2000-01-01',
+                              statement_day: values!.statement_day!,
+                              repayment_day: values!.repayment_day!,
+                              repayment_month_offset:
+                                values!.repayment_month_offset!,
+                            },
+                          ],
+                          dayjs().startOf('month').format('YYYY-MM-DD'),
+                          3
+                        )
+                          .map((b) => `${b.close} 出账 → ${b.due} 还款`)
+                          .join('；')}
+                        。已有账单保持原规则。
+                      </p>
+                    )}
+                    {ruleValid && editing?.billing_enabled && (
+                      <p className="small muted">
+                        新规则自 {boundary} 生效。
+                        {futureChanges
+                          .map(({ old, preview }) =>
+                            preview
+                              ? `未出账 ${old.cycle_end} → ${preview.close}（到期 ${old.due_date} → ${preview.due}）`
+                              : ''
+                          )
+                          .join('；')}
+                        。期次本金保持原金额，实际费用日期需要按平台情况核对。
+                      </p>
+                    )}
+                  </>
+                ) : null
+              }
+            </Form.Item>
+            <Form.Item name="sort" label="排序（小在前）">
+              <InputNumber style={{ width: '100%' }} />
+            </Form.Item>
+            {editing && (
+              <Form.Item name="status" label="启用" valuePropName="checked">
+                <Switch />
+              </Form.Item>
+            )}
+          </Form>
+        </Modal>
+      </SelectionScope>
     </div>
   );
 }

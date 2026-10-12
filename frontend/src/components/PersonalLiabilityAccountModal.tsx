@@ -1,19 +1,11 @@
+import ResponsiveSelect from './ResponsiveSelect';
 import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 import { popupInParent } from '../lib/popup';
 import { submissionGate } from '../lib/submission';
 import { useRef as submissionRef } from 'react';
 import { useEffect, useRef } from 'react';
 import dayjs from 'dayjs';
-import {
-  Alert,
-  App,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Select,
-  Switch,
-} from 'antd';
+import { Alert, App, Form, Input, InputNumber, Modal, Switch } from 'antd';
 import { useAccountMutations } from '../api/accounts';
 import { useLiabilityTypes, type LiabilityDetail } from '../api/liability';
 import { errMsg } from '../api/client';
@@ -178,7 +170,13 @@ export default function PersonalLiabilityAccountModal({
           label="消费信用类型"
           rules={[{ required: true }]}
         >
-          <Select
+          <ResponsiveSelect
+            sheetTitle="消费信用类型"
+            mobileSearch={false}
+            errorMessage={types.isError ? errMsg(types.error) : undefined}
+            onRetry={() => {
+              void types.refetch();
+            }}
             loading={types.isLoading}
             options={(types.data ?? []).map((t) => ({
               value: t.code,
@@ -199,7 +197,9 @@ export default function PersonalLiabilityAccountModal({
           label="还款月份"
           rules={[{ required: true }]}
         >
-          <Select
+          <ResponsiveSelect
+            sheetTitle="还款月份"
+            mobileSearch={false}
             options={[
               { value: 0, label: '出账当月' },
               { value: 1, label: '出账次月' },

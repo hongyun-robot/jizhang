@@ -1,6 +1,7 @@
+import ResponsiveSelect from '../../../components/ResponsiveSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
-import { DatePicker, Form, Input, Select } from 'antd';
+import { DatePicker, Form, Input } from 'antd';
 
 import type { FieldContext } from './context';
 export default function RepaymentFields({
@@ -16,7 +17,11 @@ export default function RepaymentFields({
         label="还款资金账户"
         rules={[{ required: true }]}
       >
-        <Select options={assets} getPopupContainer={popupInParent} />
+        <ResponsiveSelect
+          sheetTitle="还款资金账户"
+          options={assets}
+          getPopupContainer={popupInParent}
+        />
       </Form.Item>
       <Form.Item
         name="amount"
