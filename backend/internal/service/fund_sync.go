@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"gorm.io/gorm/clause"
 	"jizhang/internal/fuyao"
 	"jizhang/internal/model"
 	"time"
@@ -129,7 +128,7 @@ func (s *FundService) syncFundInstrument(ctx context.Context, id int64, cold boo
 	if divErr == nil {
 		for _, d := range divs {
 			row := model.FundDividend{InstrumentID: id, SourceKey: d.Key, RegistrationDate: fundDay(d.RegistrationDate), ExDate: fundDay(d.ExDate), PaymentDate: d.PaymentDate, PerTenCash: d.PerTenCash}
-			if e = s.repo.DB().Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "instrument_id"}, {Name: "source_key"}}, DoUpdates: clause.AssignmentColumns([]string{"registration_date", "ex_date", "payment_date", "per_ten_cash"})}).Create(&row).Error; e != nil {
+			if e = s.repo.SaveDividend(&row); e != nil {
 				divErr = e
 				break
 			}
@@ -200,6 +199,9 @@ func (s *FundService) Ensure(ctx context.Context) FundSyncResult {
 		return result
 	}
 	rows, e := s.repo.Tracked()
+	if run.Morning {
+		rows, e = s.repo.TrackedMorning(run.TargetDate)
+	}
 	if e != nil {
 		result.Failed++
 		return result

@@ -234,3 +234,38 @@ func TestFundEveningStopsOnlyAfterValuationCompletes(t *testing.T) {
 		t.Fatal("cached calculation recovery required another quote fetch", item, rows)
 	}
 }
+
+func TestFundFullyRedeemedStillCompletesFinalIntervalAndMorning(t *testing.T) {
+	e := newFundEnv(t)
+	e.now = fundClock("2026-10-13 10:00:00")
+	r := e.opening(t, 0, "100", "1", "2026-10-09")
+	_, err := e.svc.Operate(context.Background(), e.users[0], r.PositionID, FundInput{RequestKey: "final-sale", Kind: "redeem", Shares: "100", Amount: "120", TradeNAV: "1.2", EffectiveDate: "2026-10-13", CashDate: "2026-10-13", CashAccountID: e.banks[0]})
+	mustOK(t, err)
+	rows, err := e.svc.repo.Tracked()
+	mustOK(t, err)
+	if len(rows) != 1 {
+		t.Fatal("final interval unsubscribed before its NAV", rows)
+	}
+	e.market.quotes = append(e.market.quotes, fuyao.NAV{Date: fday("2026-10-13"), Value: dec("1.2")})
+	e.now = fundClock("2026-10-13 19:00:00")
+	calls := e.market.calls.Load()
+	e.svc.Ensure(context.Background())
+	history, err := e.svc.Valuations(e.users[0], r.PositionID, "", "")
+	mustOK(t, err)
+	if e.market.calls.Load() != calls+1 || history[0].NAVDate.Format("2006-01-02") != "2026-10-13" || history[0].DailyPnL == nil || history[0].DailyPnL.String() != "0.54" {
+		t.Fatal("final sale interval missing or wrong", history)
+	}
+	e.now = fundClock("2026-10-14 04:00:00")
+	e.svc.Ensure(context.Background())
+	if e.market.calls.Load() != calls+2 {
+		t.Fatal("closed holding missed independent morning check")
+	}
+	rows, err = e.svc.repo.TrackedMorning(fday("2026-10-13"))
+	mustOK(t, err)
+	if len(rows) != 0 {
+		t.Fatal("fully settled history did not unsubscribe after morning", rows)
+	}
+	if e.bank(t, 0) != "5120.00" {
+		t.Fatal("quote completion changed cash")
+	}
+}

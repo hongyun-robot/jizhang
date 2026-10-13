@@ -549,17 +549,20 @@ func (s *FundService) record(ctx context.Context, actor *model.User, accountID, 
 				return e
 			}
 		}
-		if _, e = replayFund(checkRows, fundToday(s.Now())); e != nil {
-			return e
-		}
-		for _, v := range checkRows {
-			if _, e = replayFund(checkRows, fundDay(v.EffectiveDate)); e != nil {
-				return e
-			}
-		}
 		state, e := replayFund(checkRows, fundToday(s.Now()))
 		if e != nil {
 			return e
+		}
+		checkedDates := map[string]bool{}
+		for _, v := range checkRows {
+			date := fundDay(v.EffectiveDate)
+			key := date.Format("2006-01-02")
+			if !checkedDates[key] {
+				if _, e = replayFund(checkRows, date); e != nil {
+					return e
+				}
+				checkedDates[key] = true
+			}
 		}
 		price, e := r.NAVAt(item.ID, fundToday(s.Now()))
 		if e != nil || price == nil {
@@ -783,7 +786,5 @@ func (s *FundService) Audits(actor *model.User, id int64) ([]model.FundAudit, er
 	if _, e := s.position(s.repo.DB(), actor, id, false); e != nil {
 		return nil, e
 	}
-	rows := []model.FundAudit{}
-	e := s.repo.DB().Where("position_id = ? AND owner_id = ?", id, actor.ID).Order("id DESC").Find(&rows).Error
-	return rows, e
+	return s.repo.Audits(actor.ID, id)
 }

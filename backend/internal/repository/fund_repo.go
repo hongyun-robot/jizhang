@@ -127,11 +127,75 @@ func (r *FundRepo) ClaimScheduled(instrumentID int64, now, target, slot time.Tim
 	return result.RowsAffected == 1, result.Error
 }
 func (r *FundRepo) Tracked() ([]model.FundInstrument, error) {
+	return r.tracked(nil)
+}
+
+func (r *FundRepo) TrackedMorning(target time.Time) ([]model.FundInstrument, error) {
+	return r.tracked(&target)
+}
+
+func (r *FundRepo) tracked(morning *time.Time) ([]model.FundInstrument, error) {
 	rows := []model.FundInstrument{}
-	e := r.db.Raw(`SELECT DISTINCT i.* FROM fund_instruments i JOIN fund_positions p ON p.instrument_id=i.id
+	query := `SELECT DISTINCT i.* FROM fund_instruments i JOIN fund_positions p ON p.instrument_id=i.id
 	 WHERE i.history_loaded=FALSE OR EXISTS (SELECT 1 FROM fund_events e WHERE e.position_id=p.id AND e.voided_at IS NULL
 	 GROUP BY e.position_id HAVING SUM(CASE WHEN e.kind='redeem' THEN -e.shares WHEN e.kind IN ('opening','buy','reinvest') THEN e.shares ELSE 0 END)>0)
-	 ORDER BY i.last_attempt ASC,i.id ASC`).Scan(&rows).Error
+	 OR EXISTS (SELECT 1 FROM fund_events e WHERE e.position_id=p.id AND e.voided_at IS NULL
+	 AND e.kind IN ('opening','buy','redeem','cash_dividend','reinvest')
+	 AND NOT EXISTS (SELECT 1 FROM fund_navs n WHERE n.instrument_id=i.id
+	 AND n.nav_date >= CASE WHEN e.rights_date > e.effective_date THEN e.rights_date ELSE e.effective_date END))`
+	args := []any{}
+	if morning != nil {
+		query += ` OR (i.evening_completed_for=? AND (i.morning_attempted_for IS NULL OR i.morning_attempted_for<?))`
+		args = append(args, *morning, *morning)
+	}
+	query += ` ORDER BY i.last_attempt ASC,i.id ASC`
+	e := r.db.Raw(query, args...).Scan(&rows).Error
+	return rows, e
+}
+
+func (r *FundRepo) Accounts(owner int64) ([]model.Account, error) {
+	rows := []model.Account{}
+	e := r.db.Where("owner_id = ? AND type = ? AND asset_class = ?", owner, model.AccountAsset, "fund").Order("sort,id").Find(&rows).Error
+	return rows, e
+}
+
+func (r *FundRepo) Audits(owner, position int64) ([]model.FundAudit, error) {
+	rows := []model.FundAudit{}
+	e := r.db.Where("position_id = ? AND owner_id = ?", position, owner).Order("id DESC").Find(&rows).Error
+	return rows, e
+}
+
+func (r *FundRepo) Valuations(position int64, start, end time.Time) ([]model.FundValuation, error) {
+	q := r.db.Where("position_id = ?", position)
+	if !start.IsZero() {
+		q = q.Where("nav_date >= ?", start)
+	}
+	if !end.IsZero() {
+		q = q.Where("nav_date <= ?", end)
+	}
+	rows := []model.FundValuation{}
+	e := q.Order("nav_date DESC").Limit(2000).Find(&rows).Error
+	return rows, e
+}
+
+func (r *FundRepo) SaveDividend(row *model.FundDividend) error {
+	return r.db.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "instrument_id"}, {Name: "source_key"}}, DoUpdates: clause.AssignmentColumns([]string{"registration_date", "ex_date", "payment_date", "per_ten_cash"})}).Create(row).Error
+}
+
+type FundCashLink struct {
+	EventID    int64
+	PositionID int64
+	THSCode    string
+}
+
+func (r *FundRepo) CashLinks(ids []int64) ([]FundCashLink, error) {
+	rows := []FundCashLink{}
+	if len(ids) == 0 {
+		return rows, nil
+	}
+	e := r.db.Table("fund_events e").Select("e.id AS event_id,e.position_id,i.ths_code").
+		Joins("JOIN fund_positions p ON p.id=e.position_id").Joins("JOIN fund_instruments i ON i.id=p.instrument_id").
+		Where("e.id IN ?", ids).Scan(&rows).Error
 	return rows, e
 }
 

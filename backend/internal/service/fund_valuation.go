@@ -188,8 +188,7 @@ func (s *FundService) Accounts(actor *model.User) ([]FundAccountView, error) {
 	if e := fundActor(actor); e != nil {
 		return nil, e
 	}
-	accounts := []model.Account{}
-	e := s.repo.DB().Where("owner_id = ? AND type = ? AND asset_class = ?", actor.ID, model.AccountAsset, "fund").Order("sort,id").Find(&accounts).Error
+	accounts, e := s.repo.Accounts(actor.ID)
 	if e != nil {
 		return nil, e
 	}
@@ -245,7 +244,6 @@ func (s *FundService) Valuations(actor *model.User, id int64, start, end string)
 	if _, e := s.position(s.repo.DB(), actor, id, false); e != nil {
 		return nil, e
 	}
-	q := s.repo.DB().Where("position_id = ?", id)
 	var st, en time.Time
 	var e error
 	if start != "" {
@@ -253,21 +251,17 @@ func (s *FundService) Valuations(actor *model.User, id int64, start, end string)
 		if e != nil {
 			return nil, e
 		}
-		q = q.Where("nav_date >= ?", st)
 	}
 	if end != "" {
 		en, e = fundDate(end, s.Now())
 		if e != nil {
 			return nil, e
 		}
-		q = q.Where("nav_date <= ?", en)
 	}
 	if !st.IsZero() && !en.IsZero() && st.After(en) {
 		return nil, ErrFundInvalid
 	}
-	rows := []model.FundValuation{}
-	e = q.Order("nav_date DESC").Limit(2000).Find(&rows).Error
-	return rows, e
+	return s.repo.Valuations(id, st, en)
 }
 func (s *FundService) RebuildPosition(id int64) error {
 	return s.repo.DB().Transaction(func(tx *gorm.DB) error {
