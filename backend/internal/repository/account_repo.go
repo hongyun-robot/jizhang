@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"time"
 
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -11,14 +12,25 @@ import (
 
 // AccountRepo accounts 表数据访问。
 type AccountRepo struct {
-	db      *gorm.DB
-	ownerID int64
+	db         *gorm.DB
+	ownerID    int64
+	FundValues func(*gorm.DB, []int64, []time.Time) (map[string]map[int64]FundAccountValue, error)
+	Now        func() time.Time
+}
+
+type FundAccountValue struct {
+	Value    decimal.Decimal
+	Complete bool
+	Status   string
+	NAVDate  string
 }
 
 func NewAccountRepo(db *gorm.DB) *AccountRepo { return &AccountRepo{db: db} }
 
-func (r *AccountRepo) DB() *gorm.DB                   { return r.db }
-func (r *AccountRepo) ForOwner(id int64) *AccountRepo { return &AccountRepo{db: r.db, ownerID: id} }
+func (r *AccountRepo) DB() *gorm.DB { return r.db }
+func (r *AccountRepo) ForOwner(id int64) *AccountRepo {
+	return &AccountRepo{db: r.db, ownerID: id, FundValues: r.FundValues, Now: r.Now}
+}
 
 // netRow 中间聚合结果。
 type netRow struct {
@@ -28,6 +40,16 @@ type netRow struct {
 
 // List 返回全部账户并附余额：opening + 收入 + 退款 − 支出 − 转出 + 转入。
 func (r *AccountRepo) List() ([]model.Account, error) {
+	var rows []model.Account
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		bound := &AccountRepo{db: tx, ownerID: r.ownerID, FundValues: r.FundValues, Now: r.Now}
+		var e error
+		rows, e = bound.list()
+		return e
+	})
+	return rows, err
+}
+func (r *AccountRepo) list() ([]model.Account, error) {
 	var accounts []model.Account
 	q := r.db
 	if r.ownerID > 0 {
@@ -66,6 +88,9 @@ func (r *AccountRepo) List() ([]model.Account, error) {
 		historySQL += ` UNION ALL SELECT account_id AS aid FROM liability_statements UNION ALL SELECT account_id AS aid FROM liability_operations WHERE kind <> 'settings'`
 	}
 	historySQL += `) h`
+	if r.db.Migrator().HasTable(&model.FundPosition{}) {
+		historySQL = `SELECT DISTINCT aid FROM (` + historySQL + ` UNION ALL SELECT account_id AS aid FROM fund_positions) fh`
+	}
 	var history []struct{ Aid int64 }
 	if e := r.db.Raw(historySQL).Scan(&history).Error; e != nil {
 		return nil, e
@@ -76,6 +101,34 @@ func (r *AccountRepo) List() ([]model.Account, error) {
 	}
 	for i := range accounts {
 		accounts[i].HasFinancialHistory = seen[accounts[i].ID]
+	}
+	fundIDs := []int64{}
+	for _, a := range accounts {
+		if a.IsFund() {
+			fundIDs = append(fundIDs, a.ID)
+		}
+	}
+	if len(fundIDs) > 0 {
+		if r.FundValues == nil {
+			return nil, errors.New("基金估值服务未初始化")
+		}
+		now := time.Now()
+		if r.Now != nil {
+			now = r.Now()
+		}
+		values, e := r.FundValues(r.db, fundIDs, []time.Time{now})
+		if e != nil {
+			return nil, e
+		}
+		key := now.Format("2006-01-02")
+		for i := range accounts {
+			if accounts[i].IsFund() {
+				v := values[key][accounts[i].ID]
+				accounts[i].Balance = v.Value.Round(2)
+				accounts[i].ValuationStatus = v.Status
+				accounts[i].NAVDate = v.NAVDate
+			}
+		}
 	}
 	return accounts, nil
 }
@@ -101,6 +154,9 @@ func (r *AccountRepo) HasTransactions(id int64) (bool, error) {
 	var n int64
 	err := r.db.Table("transactions").
 		Where("account_id = ? OR transfer_account_id = ?", id, id).Count(&n).Error
+	if err == nil && n == 0 && r.db.Migrator().HasTable(&model.FundPosition{}) {
+		err = r.db.Model(&model.FundPosition{}).Where("account_id = ?", id).Count(&n).Error
+	}
 	return n > 0, err
 }
 

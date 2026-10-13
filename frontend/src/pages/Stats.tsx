@@ -340,19 +340,15 @@ export default function Stats() {
                 ]}
                 rows={(assets.data?.points ?? []).map((point) => [
                   point.date,
-                  fmtMoney(point.total),
+                  point.total == null ? '报价不完整' : fmtMoney(point.total),
                   ...(assets.data?.points.at(-1)?.accounts ?? []).map(
                     (account) =>
-                      fmtMoney(
-                        point.accounts.find(
-                          (entry) => entry.account_id === account.account_id
-                        )?.balance ?? '0'
-                      )
+                      point.accounts.find((entry) => entry.account_id === account.account_id)?.balance == null ? '报价不完整' : fmtMoney(point.accounts.find((entry) => entry.account_id === account.account_id)?.balance)
                   ),
                 ])}
               />
               <div className="muted small">
-                期末总资产 <Money value={assets.data?.ending_total ?? '0'} />
+                期末总资产 {assets.data?.ending_total == null ? '报价不完整，暂无法完整估值' : <Money value={assets.data.ending_total} />}
               </div>
             </>
           </QueryState>

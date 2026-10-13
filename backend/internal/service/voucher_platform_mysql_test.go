@@ -54,7 +54,10 @@ func TestVoucherPlatformMySQL(t *testing.T) {
 		migration(file)
 	}
 	migration("000008_liability_billing.up.sql")
-	mustOK(t, db.Exec("ALTER TABLE accounts ADD COLUMN owner_id BIGINT NULL").Error)
+	migration("000013_installment_principal_remainder.up.sql")
+	// Keep this legacy migration fixture compatible with current cash models.
+	mustOK(t, db.Exec("ALTER TABLE accounts ADD COLUMN owner_id BIGINT NULL, ADD COLUMN asset_class VARCHAR(16) NULL").Error)
+	mustOK(t, db.Exec("ALTER TABLE transactions ADD COLUMN fund_event_id BIGINT NULL").Error)
 	mustOK(t, db.Exec("INSERT INTO users (id,username,password_hash,role,status) VALUES (1,'platform-test','test','admin','active')").Error)
 	mustOK(t, db.AutoMigrate(&model.Category{}))
 	e := seedVoucherEnv(t, db)

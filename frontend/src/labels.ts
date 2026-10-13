@@ -13,4 +13,7 @@ export const VOUCHER_PURPOSE_LABEL: Partial<Record<TxnPurpose, string>> = {
   voucher_redemption: '券核销',
   voucher_refund: '券退款',
   voucher_writeoff: '券作废',
+  fund_purchase: '基金买入付款',
+  fund_redemption: '基金赎回到账',
+  fund_dividend: '基金分红到账',
 };

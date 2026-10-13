@@ -54,7 +54,7 @@ export default function RecordActions({
         >
           查看负债记录
         </Button>
-      ) : t.voucher_id ? (
+      ) : t.fund_position_id ? <Button type="link" size="small" onClick={() => navigate(`/fund-positions/${t.fund_position_id}`)}>查看基金</Button> : t.voucher_id ? (
         <Button
           type="link"
           size="small"

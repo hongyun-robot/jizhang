@@ -169,7 +169,7 @@ export function assetOptions(
     {
       name: '总资产',
       type: 'line',
-      data: pts.map((p) => Number(p.total)),
+      data: pts.map((p) => p.total == null ? null : Number(p.total)),
       lineStyle: { width: 2.5 },
       itemStyle: { color: TEAL },
       areaStyle: { opacity: 0.12 },
@@ -181,9 +181,7 @@ export function assetOptions(
     series.push({
       name: names.get(id) ?? `账户${id}`,
       type: 'line',
-      data: pts.map((p) =>
-        Number(p.accounts.find((a) => a.account_id === id)?.balance ?? 0)
-      ),
+      data: pts.map((p) => { const value = p.accounts.find((a) => a.account_id === id)?.balance; return value == null ? null : Number(value); }),
       lineStyle: { width: 1.2 },
       itemStyle: { color: PALETTE[(idx + 1) % PALETTE.length] },
       showSymbol: false,

@@ -13,6 +13,8 @@ const Records = lazy(() => import('./pages/Records'));
 const Stats = lazy(() => import('./pages/Stats'));
 const Mine = lazy(() => import('./pages/Mine'));
 const Accounts = lazy(() => import('./pages/Accounts'));
+const Funds = lazy(() => import('./pages/Funds'));
+const FundPositionDetail = lazy(() => import('./pages/FundPositionDetail'));
 const Liabilities = lazy(() => import('./pages/Liabilities'));
 const LiabilityDetail = lazy(() => import('./pages/LiabilityDetail'));
 const Categories = lazy(() => import('./pages/Categories'));
@@ -40,6 +42,9 @@ export default function App() {
             <Route path="/records" element={<Records />} />
             <Route path="/stats" element={<Stats />} />
             <Route path="/mine" element={<Mine />} />
+            <Route path="/funds" element={<Funds />} />
+            <Route path="/funds/:id" element={<Funds />} />
+            <Route path="/fund-positions/:id" element={<FundPositionDetail />} />
             <Route path="/vouchers" element={<Vouchers />} />
             <Route path="/liabilities" element={<Liabilities />} />
             <Route path="/liabilities/:id" element={<LiabilityDetail />} />

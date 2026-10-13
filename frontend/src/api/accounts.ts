@@ -12,6 +12,8 @@ export function useAccounts() {
   return useQuery({
     queryKey: queryKeys.key('accounts', scope),
     queryFn: ({ signal }) => unwrap<Account[]>('/accounts', signal),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -21,6 +23,7 @@ export interface AccountInput {
   request_key?: string;
   name: string;
   type: 'asset' | 'liability';
+  asset_class?: 'cash' | 'fund';
   opening_balance?: string;
   repayment_day?: number;
   liability_type?: string;

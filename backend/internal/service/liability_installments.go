@@ -126,7 +126,7 @@ func (s *LiabilityService) CreatePlan(actor *model.User, in InstallmentInput) (L
 		if e := tx.First(&fa, feeAccount).Error; e != nil {
 			return result, e
 		}
-		if fa.Status != model.StatusActive || (fa.Type != model.AccountAsset && fa.ID != in.AccountID) {
+		if fa.Status != model.StatusActive || (!fa.IsCash() && fa.ID != in.AccountID) {
 			return result, ErrTxnAccountInvalid
 		}
 		if e := tx.First(&fc, feeCategory).Error; e != nil {
@@ -248,7 +248,7 @@ func (s *LiabilityService) postFee(tx *gorm.DB, p *model.InstallmentPlan, term *
 	if a.Status != model.StatusActive && a.ID != p.AccountID {
 		return 0, ErrTxnAccountInvalid
 	}
-	if a.Type != model.AccountAsset && a.ID != p.AccountID {
+	if !a.IsCash() && a.ID != p.AccountID {
 		return 0, ErrTxnAccountInvalid
 	}
 	if e := tx.First(&cat, p.FeeCategoryID).Error; e != nil {
@@ -418,7 +418,7 @@ func (s *LiabilityService) UpdatePlan(actor *model.User, id int64, in Installmen
 			if e := tx.First(&account, p.FeeAccountID).Error; e != nil {
 				return result, e
 			}
-			if account.Status != model.StatusActive || (account.Type != model.AccountAsset && account.ID != p.AccountID) {
+			if account.Status != model.StatusActive || (!account.IsCash() && account.ID != p.AccountID) {
 				return result, ErrTxnAccountInvalid
 			}
 			if e := tx.First(&category, p.FeeCategoryID).Error; e != nil {

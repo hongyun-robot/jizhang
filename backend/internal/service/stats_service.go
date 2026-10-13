@@ -473,23 +473,25 @@ func (s *StatsService) PeriodSummary(yearStr string) (json.RawMessage, bool, err
 // ---------- 资产走势 ----------
 
 type assetAcct struct {
-	ID      int64             `json:"account_id"`
-	Name    string            `json:"name"`
-	Type    model.AccountType `json:"type"`
-	Balance decimal.Decimal   `json:"balance"`
+	ID         int64             `json:"account_id"`
+	Name       string            `json:"name"`
+	Type       model.AccountType `json:"type"`
+	Balance    *decimal.Decimal  `json:"balance"`
+	AssetClass string            `json:"asset_class,omitempty"`
+	NAVDate    string            `json:"nav_date,omitempty"`
 }
 
 type assetPoint struct {
-	Date     string          `json:"date"`
-	Total    decimal.Decimal `json:"total"`
-	Accounts []assetAcct     `json:"accounts"`
+	Date     string           `json:"date"`
+	Total    *decimal.Decimal `json:"total"`
+	Accounts []assetAcct      `json:"accounts"`
 }
 
 type assetResponse struct {
-	Start       string          `json:"start"`
-	End         string          `json:"end"`
-	Points      []assetPoint    `json:"points"`
-	EndingTotal decimal.Decimal `json:"ending_total"`
+	Start       string           `json:"start"`
+	End         string           `json:"end"`
+	Points      []assetPoint     `json:"points"`
+	EndingTotal *decimal.Decimal `json:"ending_total"`
 }
 
 // Assets 逐日总资产与各账户余额（负债以负值贡献）。
@@ -518,6 +520,26 @@ func (s *StatsService) Assets(start, end string) (json.RawMessage, bool, error) 
 		if err != nil {
 			return nil, err
 		}
+		fundIDs := []int64{}
+		for _, account := range accounts {
+			if account.IsFund() {
+				fundIDs = append(fundIDs, account.ID)
+			}
+		}
+		fundValues := map[string]map[int64]repository.FundAccountValue{}
+		if len(fundIDs) > 0 {
+			if s.accts.FundValues == nil {
+				return nil, ErrFundPrice
+			}
+			dates := []time.Time{}
+			for d := st; !d.After(en); d = d.AddDate(0, 0, 1) {
+				dates = append(dates, d)
+			}
+			fundValues, err = s.accts.FundValues(s.accts.DB(), fundIDs, dates)
+			if err != nil {
+				return nil, err
+			}
+		}
 
 		balance := make(map[int64]decimal.Decimal, len(accounts))
 		for _, a := range accounts {
@@ -540,7 +562,7 @@ func (s *StatsService) Assets(start, end string) (json.RawMessage, bool, error) 
 		}
 
 		points := make([]assetPoint, 0, int(en.Sub(st).Hours()/24)+1)
-		ending := decimal.Zero
+		var ending *decimal.Decimal
 		for d := st; !d.After(en); d = d.AddDate(0, 0, 1) {
 			dk := d.Format("2006-01-02")
 			if m := dayNets[dk]; m != nil {
@@ -549,14 +571,32 @@ func (s *StatsService) Assets(start, end string) (json.RawMessage, bool, error) 
 				}
 			}
 			total := decimal.Zero
+			complete := true
 			acctOut := make([]assetAcct, 0, len(accounts))
 			for _, a := range accounts {
 				b := balance[a.ID]
+				known := true
+				navDate := ""
+				if a.IsFund() {
+					value := fundValues[dk][a.ID]
+					b = value.Value
+					known = value.Complete
+					navDate = value.NAVDate
+				}
 				total = total.Add(b)
-				acctOut = append(acctOut, assetAcct{ID: a.ID, Name: a.Name, Type: a.Type, Balance: b})
+				var shown *decimal.Decimal
+				if known {
+					shown = decimalPointer(b.Round(2))
+				} else {
+					complete = false
+				}
+				acctOut = append(acctOut, assetAcct{ID: a.ID, Name: a.Name, Type: a.Type, Balance: shown, AssetClass: a.AssetClass, NAVDate: navDate})
 			}
-			ending = total
-			points = append(points, assetPoint{Date: dk, Total: total, Accounts: acctOut})
+			ending = nil
+			if complete {
+				ending = decimalPointer(total.Round(2))
+			}
+			points = append(points, assetPoint{Date: dk, Total: ending, Accounts: acctOut})
 		}
 		return assetResponse{
 			Start: st.Format("2006-01-02"), End: en.Format("2006-01-02"),

@@ -14,6 +14,7 @@ import (
 	"jizhang/internal/cache"
 	"jizhang/internal/config"
 	"jizhang/internal/database"
+	"jizhang/internal/fuyao"
 	"jizhang/internal/logger"
 	"jizhang/internal/repository"
 	"jizhang/internal/router"
@@ -71,6 +72,9 @@ func main() {
 		periodSvc,
 		cache.NewStatsCache(rdb),
 	)
+	fundSvc := service.NewFundService(db, txnSvc, fuyao.New(cfg.FuyaoAPIKey))
+	fundSvc.BindAccounts(accountRepo)
+	fundSvc.OnWrite = statsSvc.InvalidateAll
 	closingSvc := service.NewClosingService(service.ClosingDeps{
 		Closings: repository.NewClosingRepo(db),
 		Audits:   repository.NewAuditRepo(db),
@@ -133,13 +137,30 @@ func main() {
 		NotifSvc:     notifSvc,
 		VoucherSvc:   voucherSvc,
 		LiabilitySvc: liabilitySvc,
+		FundSvc:      fundSvc,
 
 		BackupStatusFile: cfg.BackupStatusFile,
 	})
 
 	// 周期记账：进程内 cron 每 5 分钟生成到期流水（设计 D7；
 	// 前端每次打开应用还会调 POST /recurring/ensure 懒补齐，两者共用幂等生成）
-	recurringCron := cron.New()
+	recurringCron := cron.New(cron.WithLocation(fuyao.Shanghai))
+	fundCtx, stopFundSync := context.WithCancel(context.Background())
+	defer stopFundSync()
+	ensureFunds := func() {
+		ctx, cancel := context.WithTimeout(fundCtx, 2*time.Minute)
+		defer cancel()
+		result := fundSvc.Ensure(ctx)
+		if result.Failed > 0 {
+			logger.L().Warn("fund quote sync incomplete", zap.Int("failed", result.Failed))
+		}
+	}
+	for _, schedule := range []string{service.FundEveningCron, service.FundLastEveningCron, service.FundMorningCron} {
+		if _, err := recurringCron.AddFunc(schedule, ensureFunds); err != nil {
+			logger.L().Fatal("fund cron schedule failed", zap.Error(err))
+		}
+	}
+	go ensureFunds()
 	ensureVouchers := func() {
 		result, err := voucherSvc.EnsureDue(time.Now())
 		if err != nil {

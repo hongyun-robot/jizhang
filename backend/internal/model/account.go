@@ -19,6 +19,7 @@ type Account struct {
 	ID                  int64           `gorm:"primaryKey" json:"id"`
 	Name                string          `gorm:"size:64" json:"name"`
 	Type                AccountType     `json:"type"`
+	AssetClass          string          `gorm:"size:16" json:"asset_class,omitempty"`
 	OwnerID             *int64          `gorm:"index" json:"owner_id"`
 	OpeningBalance      decimal.Decimal `gorm:"type:decimal(12,2)" json:"opening_balance"`
 	RepaymentDay        *int            `gorm:"type:tinyint" json:"repayment_day"` // 信用卡还款日 1-28
@@ -28,9 +29,16 @@ type Account struct {
 	Status              UserStatus      `json:"status"`
 	Sort                int             `json:"sort"`
 	Balance             decimal.Decimal `gorm:"-" json:"balance"` // 聚合计算，见 repository
+	ValuationStatus     string          `gorm:"-" json:"valuation_status,omitempty"`
+	NAVDate             string          `gorm:"-" json:"nav_date,omitempty"`
 	HasFinancialHistory bool            `gorm:"-" json:"has_financial_history"`
 	CreatedAt           time.Time       `json:"created_at"`
 	UpdatedAt           time.Time       `json:"updated_at"`
 }
 
 func (Account) TableName() string { return "accounts" }
+
+func (a Account) IsFund() bool { return a.Type == AccountAsset && a.AssetClass == "fund" }
+func (a Account) IsCash() bool {
+	return a.Type == AccountAsset && (a.AssetClass == "" || a.AssetClass == "cash")
+}

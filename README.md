@@ -248,3 +248,55 @@ curl http://127.0.0.1:8084/api/v1/health
 docker exec jizhang-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS jizhang_restore"'
 gunzip -c backups/jizhang-<时间戳>.sql.gz | docker exec -i jizhang-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" jizhang_restore'
 ```
+
+## 个人基金账户
+
+从“我的 → 基金账户”创建账户，同一账户可添加多只基金。也可在账户管理选择基金资产并进入详情。每个登录账号管理自己的持仓；管理员不能跨账号操作，只读成员可以创建账户、录入或合法更正期初，买入、赎回、分红和撤销沿用既有记账权限。
+
+首次录入已有持仓时填写基金代码、确认份额、平均成本价和生效日期，确认“人民币场外净值型基金”。支持股票、混合、债券、ETF 联接等按人民币单位净值计算的场外持仓；货币基金、场内市场价格及外币份额另需估值方式。上游资料不能可靠判定细分类别和真实币种，须由录入者核对适用口径。源简称与完整基金代码均保留，可填写个人显示名称。
+
+期初不会再次扣银行卡。历史从生效日期开始，没有对应历史份额时显示“暂无可核对的日盈亏”；不会把今天的份额套用到过去。要补录期初之前的交易，先核对基准并合法更正期初，有后续交易时需先处理后续记录。023564、5028.62 份和 1.4119 成本价仅是测试向量，迁移和启动均不创建实际持仓。
+
+买入记录实际总投入、费用、确认份额、成交净值、生效日期和实际付款日期。总投入含费用并计入加权成本；部分赎回按比例结转成本，全部赎回清零尾差。现金分红不降低剩余成本；再投资增加实际份额和成本，没有额外银行卡扣款。费用已在成本或赎回净额中体现，页面费用是说明项，不再次扣除。收益、分红和费用都单独统计，不进入生活收支、结余或预算。
+
+赎回或现金分红未到账时关闭“资金已到账”，应收仍计入基金资产；实际到账后在事件记录中“登记到账”，生成一次受基金管理的转账。买入付款和份额生效跨日时也保留对应待结算资金。账户总资产等于各持仓市值与待结算资金合计，首页和资产曲线采用相同口径。关联流水可查看和导出，到基金详情撤销末笔有效事件，不能在普通流水直接改删。
+
+净值按各基金实际公布日期展示。最近区间盈亏会列出两端净值日期；周末、延迟披露或接口故障时保留最近有效报价。未核对的公开分红只提示核对，相关日盈亏保持待核对。后台按代码共享同步，不需要打开页面；基金、账户、首页及资产曲线在页面可见时约一分钟检查一次，聚焦窗口也会刷新。
+
+### 行情配置与迁移
+
+基金行情由服务端使用 `FUYAO_API_KEY` 获取。自动检查采用北京时间：周一至周五 19:00 起每半小时检查，23:00 最后一次；每只基金获得更新的最新报价并完成估值后，当晚停止该代码的检查，其他基金继续等待。没有更新也在 23:00 结束。次日 04:00 独立补查前一工作日一次，周五对应周六凌晨；无新数据或失败也不追加凌晨重试。完成/尝试状态持久化，多 worker 和重启不重复调用，04:00–04:29 重启可恢复尚未尝试的凌晨补查。
+
+工作日按周一至周五处理；节假日没有新净值时按上述截止时间结束。启动在对应时段恢复检查，白天或周末夜间不自动拉取；首次持仓缺缓存时的冷取价和用户手动刷新仍保留原限频规则。旧 `FUND_SYNC_MINUTES` 配置已移除，不再影响调度。Key 缺失不会阻止普通记账启动，已有有效净值仍可展示。容器通过 Compose 的 API environment 显式读取配置。
+
+Windows 用户环境变量在配置前已启动的终端或应用进程中可能不可见。在启动 API 或 Docker Compose 的 PowerShell 终端读取已配置的用户变量，然后启动服务；此命令不输出密钥：
+
+```powershell
+$env:FUYAO_API_KEY = [Environment]::GetEnvironmentVariable('FUYAO_API_KEY', 'User')
+```
+
+也可将 Key 保存在已忽略的 `.env` 中。不要将密钥写进源码、浏览器环境变量、日志或测试产物。
+
+迁移为 `000014_personal_fund_accounts`，旧资产回填为现金子类，原余额与负债保留。生产升级前备份财务数据并暂停写入。down 在存在任何个人基金账户、持仓、事件或关联资金时明确拒绝，不自动删除财务数据；仅公共报价缓存且没有个人基金资源时可安全回滚。本变更的开发测试不迁移真实开发库或生产库。
+
+### 隔离基金验收
+
+在 backend 设置 `FUND_MYSQL_DSN` 后运行 `go test ./internal/service -run '^TestFundMySQL' -count=1 -v`。DSN 须有创建和删除临时库权限，测试忽略指定库名，使用随机数据库并在结束后清理。基金、券、负债和个人目录的原生集成分别支持 `FUND_MYSQL_DSN`、`VOUCHER_MYSQL_DSN`、`LIABILITY_MYSQL_DSN`、`PERSONAL_CATALOG_MYSQL_DSN`。
+
+浏览器验收使用独立内存账本、假行情和 18086/5603 端口，避免干扰既有 fixture：
+
+```powershell
+# 终端一：backend
+$env:FUND_BROWSER_SERVER='1'
+$env:BROWSER_FIXTURE_TTL='2h'
+go test ./internal/router -run '^TestFundBrowserServer$' -count=1 -v -timeout=2h
+
+# 终端二：frontend
+npm run build
+node e2e/support/preview.mjs --dist=dist --port=5603 --api=http://127.0.0.1:18086
+
+# 终端三：frontend；每轮重新启动终端一以恢复初始行情
+node e2e/funds.mjs
+```
+
+脚本校验 localhost 和 `fund-browser` 标识后才写数据；桌面和 360px 截图保存在 `frontend/e2e/shots/refactor-frontend/funds-*.png`。真实接口 smoke 只读取公开资料，不建持仓：配置运行进程 Key 与 `FUYAO_LIVE_SMOKE=1` 后执行 `go test ./internal/fuyao -run '^TestFundLiveSmoke$' -count=1 -v`。

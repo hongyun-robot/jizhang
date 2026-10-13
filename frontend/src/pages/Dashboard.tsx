@@ -182,7 +182,7 @@ export default function Dashboard() {
               <div className="k">总资产</div>
               <div className="v">
                 {accounts.data ? (
-                  <Money value={totalAssets} animate />
+                  accounts.data.some((a) => a.asset_class === 'fund' && a.valuation_status === 'no_price') ? <span className="muted">报价不完整</span> : <Money value={totalAssets} animate />
                 ) : (
                   <span className="muted">—</span>
                 )}

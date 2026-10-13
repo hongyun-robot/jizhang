@@ -117,6 +117,7 @@ export default function Mine() {
             label="负债账户"
             onClick={() => navigate('/liabilities')}
           />
+          <Tile icon={<FundOutlined />} label="基金账户" onClick={() => navigate('/funds')} />
         </div>
       </Card>
       {canRecord(user?.role) && (

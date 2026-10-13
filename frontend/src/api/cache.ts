@@ -12,8 +12,10 @@ const views = {
     'notifications',
     'closings',
     'voucher-platforms',
+    'funds',
   ],
   account: ['accounts', 'liabilities', 'stats', 'notifications'],
+  fund: ['funds', 'accounts', 'stats', 'txns', 'notifications'],
   category: [
     'categories',
     'txns',

@@ -150,7 +150,7 @@ func (s *LiabilityService) Settle(actor *model.User, id int64, in SettlementInpu
 		if e := tx.First(&from, in.FromAccountID).Error; e != nil {
 			return result, e
 		}
-		if from.Type != model.AccountAsset || from.Status != model.StatusActive {
+		if !from.IsCash() || from.Status != model.StatusActive {
 			return result, ErrTxnAccountInvalid
 		}
 		op.PlanID = &p.ID
@@ -177,7 +177,7 @@ func (s *LiabilityService) Settle(actor *model.User, id int64, in SettlementInpu
 			if e := tx.First(&a, feeAccount).Error; e != nil {
 				return result, e
 			}
-			if a.ID != p.AccountID && (a.Type != model.AccountAsset || a.Status != model.StatusActive) {
+			if a.ID != p.AccountID && (!a.IsCash() || a.Status != model.StatusActive) {
 				return result, ErrTxnAccountInvalid
 			}
 			if e := tx.First(&cat, feeCategory).Error; e != nil {

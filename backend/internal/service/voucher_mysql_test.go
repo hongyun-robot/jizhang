@@ -74,9 +74,11 @@ func TestVoucherMySQL(t *testing.T) {
 	mustOK(t, db.Exec(readMigration("000006_voucher_platforms.up.sql")).Error)
 	mustOK(t, db.Exec(readMigration("000007_transaction_platform.up.sql")).Error)
 	mustOK(t, db.Exec(readMigration("000008_liability_billing.up.sql")).Error)
+	mustOK(t, db.Exec(readMigration("000013_installment_principal_remainder.up.sql")).Error)
 	// This fixture intentionally replays older voucher migrations; align its
 	// account row shape with the current service without seeding new catalogs.
-	mustOK(t, db.Exec("ALTER TABLE accounts ADD COLUMN owner_id BIGINT NULL").Error)
+	mustOK(t, db.Exec("ALTER TABLE accounts ADD COLUMN owner_id BIGINT NULL, ADD COLUMN asset_class VARCHAR(16) NULL").Error)
+	mustOK(t, db.Exec("ALTER TABLE transactions ADD COLUMN fund_event_id BIGINT NULL").Error)
 
 	t.Run("double-instance-auto-refund", func(t *testing.T) {
 		mustOK(t, db.AutoMigrate(&model.Category{}))

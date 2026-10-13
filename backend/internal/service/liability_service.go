@@ -306,7 +306,7 @@ func (s *LiabilityService) Repay(actor *model.User, in LiabilityRepaymentInput) 
 		if e := tx.First(&from, in.FromAccountID).Error; e != nil {
 			return LiabilityResult{}, e
 		}
-		if from.Type != model.AccountAsset || from.Status != model.StatusActive || !to.BillingEnabled || from.ID == to.ID {
+		if !from.IsCash() || from.Status != model.StatusActive || !to.BillingEnabled || from.ID == to.ID {
 			return LiabilityResult{}, liability.ErrInvalid
 		}
 		period := inner.deps.Periods.KeyForDate(date)

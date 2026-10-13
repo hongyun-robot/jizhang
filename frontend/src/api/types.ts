@@ -10,7 +10,10 @@ export type TxnPurpose =
   | 'voucher_purchase'
   | 'voucher_redemption'
   | 'voucher_refund'
-  | 'voucher_writeoff';
+  | 'voucher_writeoff'
+  | 'fund_purchase'
+  | 'fund_redemption'
+  | 'fund_dividend';
 export type CategoryKind = 'expense' | 'income';
 export type PrincipalRemainder = 'first' | 'last';
 
@@ -18,6 +21,9 @@ export interface Account {
   id: number;
   name: string;
   type: AccountType;
+  asset_class?: 'cash' | 'fund';
+  valuation_status?: string;
+  nav_date?: string;
   owner_id?: number | null;
   opening_balance: string;
   repayment_day?: number | null;
@@ -53,6 +59,9 @@ export interface CategoryTreeNode extends Category {
 export type CategoryForest = CategoryTreeNode[];
 
 export interface Transaction {
+  fund_event_id?: number | null;
+  fund_position_id?: number | null;
+  fund_code?: string;
   historical_readonly?: boolean;
   account_name_override?: string;
   transfer_name_override?: string;
@@ -174,18 +183,20 @@ export interface AssetAcct {
   account_id: number;
   name: string;
   type: AccountType;
-  balance: string;
+  balance: string | null;
+  asset_class?: 'cash' | 'fund';
+  nav_date?: string;
 }
 export interface AssetPoint {
   date: string;
-  total: string;
+  total: string | null;
   accounts: AssetAcct[];
 }
 export interface AssetsResp {
   start: string;
   end: string;
   points: AssetPoint[];
-  ending_total: string;
+  ending_total: string | null;
 }
 
 /** 通用区间（与统计页共用的区间语义）。 */

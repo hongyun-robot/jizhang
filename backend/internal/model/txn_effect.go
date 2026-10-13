@@ -11,10 +11,17 @@ const (
 	PurposeVoucherRedemption TxnPurpose = "voucher_redemption"
 	PurposeVoucherRefund     TxnPurpose = "voucher_refund"
 	PurposeVoucherWriteoff   TxnPurpose = "voucher_writeoff"
+	PurposeFundPurchase      TxnPurpose = "fund_purchase"
+	PurposeFundRedemption    TxnPurpose = "fund_redemption"
+	PurposeFundDividend      TxnPurpose = "fund_dividend"
 )
 
 func (t Transaction) IsVoucher() bool {
-	return t.VoucherEventID != nil || (t.Purpose != "" && t.Purpose != PurposeRegular)
+	return t.VoucherEventID != nil || (t.Purpose != "" && t.Purpose != PurposeRegular && !t.IsFundManaged())
+}
+
+func (t Transaction) IsFundManaged() bool {
+	return t.FundEventID != nil || t.Purpose == PurposeFundPurchase || t.Purpose == PurposeFundRedemption || t.Purpose == PurposeFundDividend
 }
 
 // Effects 返回行所属账户的资金影响和消费支出影响。转账的转入侧由账户聚合另计。

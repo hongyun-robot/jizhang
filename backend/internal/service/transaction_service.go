@@ -141,6 +141,9 @@ func (s *TransactionService) validate(in *TxnInput) error {
 	if acc == nil || acc.Status != model.StatusActive {
 		return ErrTxnAccountInvalid
 	}
+	if acc.IsFund() {
+		return ErrFundManaged
+	}
 	if acc.Type == model.AccountLiability && !acc.BillingEnabled {
 		return liability.ErrSetup
 	}
@@ -155,6 +158,9 @@ func (s *TransactionService) validate(in *TxnInput) error {
 		}
 		if tAcc == nil || tAcc.Status != model.StatusActive {
 			return ErrTxnAccountInvalid
+		}
+		if tAcc.IsFund() {
+			return ErrFundManaged
 		}
 		if tAcc.Type == model.AccountLiability && !tAcc.BillingEnabled {
 			return liability.ErrSetup
@@ -330,6 +336,9 @@ func (s *TransactionService) update(actor *model.User, id int64, in TxnInput) (*
 	if t.IsVoucher() {
 		return nil, ErrTxnVoucherManaged
 	}
+	if t.FundEventID != nil {
+		return nil, ErrFundManaged
+	}
 	if t.InstallmentPlanID != nil || t.LiabilityTermID != nil || t.LiabilityOperationID != nil {
 		return nil, liability.ErrManaged
 	}
@@ -402,6 +411,9 @@ func (s *TransactionService) delete(actor *model.User, id int64) error {
 	}
 	if t.IsVoucher() {
 		return ErrTxnVoucherManaged
+	}
+	if t.FundEventID != nil {
+		return ErrFundManaged
 	}
 	if t.InstallmentPlanID != nil || t.LiabilityTermID != nil || t.LiabilityOperationID != nil {
 		return liability.ErrManaged

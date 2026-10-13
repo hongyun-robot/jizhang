@@ -27,6 +27,7 @@ type Config struct {
 	CookiePath string
 	// BackupStatusFile 备份状态文件路径（docker/backup.sh 写入，health 暴露最近备份时间）。
 	BackupStatusFile string
+	FuyaoAPIKey      string `json:"-"`
 }
 
 func getEnv(key, def string) string {
@@ -75,6 +76,7 @@ func Load() *Config {
 		CookiePath:      getEnv("COOKIE_PATH", "/api/v1/auth"),
 
 		BackupStatusFile: getEnv("BACKUP_STATUS_FILE", ""),
+		FuyaoAPIKey:      getEnv("FUYAO_API_KEY", ""),
 	}
 }
 

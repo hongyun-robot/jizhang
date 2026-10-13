@@ -26,6 +26,7 @@ type Deps struct {
 	NotifSvc     *service.NotificationService
 	VoucherSvc   *service.VoucherService
 	LiabilitySvc *service.LiabilityService
+	FundSvc      *service.FundService
 	// BackupStatusFile 备份状态文件路径（health 暴露最近备份时间，任务 11.3）。
 	BackupStatusFile string
 }
@@ -76,6 +77,24 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 			accounts.DELETE("/:id", accth.Delete)
 		}
 
+		if d.FundSvc != nil {
+			fh := handler.NewFund(d.FundSvc)
+			funds := v1.Group("/funds", middleware.Auth(d.AuthSvc))
+			funds.GET("/instruments/search", fh.Search)
+			funds.GET("/accounts", fh.Accounts)
+			funds.GET("/accounts/:id", fh.Account)
+			funds.POST("/accounts/:id/positions", fh.Opening)
+			funds.POST("/accounts/:id/events", fh.FirstBuy)
+			funds.POST("/accounts/:id/refresh", fh.Refresh)
+			funds.GET("/positions/:id", fh.Position)
+			funds.PUT("/positions/:id", fh.Amend)
+			funds.GET("/positions/:id/events", fh.Events)
+			funds.POST("/positions/:id/events", fh.Operate)
+			funds.POST("/positions/:id/events/:eventId/undo", fh.Undo)
+			funds.GET("/positions/:id/valuations", fh.Valuations)
+			funds.GET("/positions/:id/dividends", fh.Dividends)
+			funds.GET("/positions/:id/audits", fh.Audits)
+		}
 		// 分类：读全部角色，写仅管理员
 		if d.LiabilitySvc != nil {
 			lh := handler.NewLiability(d.LiabilitySvc)

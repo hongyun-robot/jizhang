@@ -196,6 +196,8 @@ func TestPersonalCatalogMySQLMigration(t *testing.T) {
 func TestPersonalCatalogMySQLConcurrentCreate(t *testing.T) {
 	db, migrate := catalogMySQL(t)
 	migrate("000012_personal_catalogs.up.sql")
+	migrate("000013_installment_principal_remainder.up.sql")
+	migrate("000014_personal_fund_accounts.up.sql")
 	mustOK(t, db.Exec("INSERT INTO users(id,username,password_hash,role,status) VALUES(1,'create-member','hash','member','active')").Error)
 	actor := &model.User{ID: 1, Role: model.RoleMember, Status: model.StatusActive}
 	svc := NewAccountService(repository.NewAccountRepo(db))

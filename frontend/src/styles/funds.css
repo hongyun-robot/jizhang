@@ -1,0 +1,21 @@
+.fund-account-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; }
+.fund-account-heading, .fund-position-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.fund-position-heading .ant-btn-link, .fund-account-heading .ant-btn-link { padding-inline: 0; height: auto; white-space: normal; text-align: left; font-size: 17px; }
+.fund-overview { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 24px; align-items: start; padding: 24px; margin-bottom: 16px; }
+.fund-primary-amount { font-size: clamp(24px, 3.2vw, 38px); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.fund-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; padding-block: 16px; }
+.fund-values > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.fund-position-list, .fund-event-list { display: grid; gap: 14px; }
+.fund-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-block: 16px; }
+.fund-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; margin-top: 16px; }
+.fund-search-results { margin-bottom: 16px; }
+.fund-event-row { padding: 16px; }
+.fund-event-row > .ant-space { margin-top: 12px; }
+@media (max-width: 767px) {
+  .fund-overview { grid-template-columns: 1fr 1fr; gap: 18px; padding: 18px; }
+  .fund-overview > div:first-child { grid-column: 1 / -1; }
+  .fund-values { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .fund-form-grid { grid-template-columns: 1fr; }
+  .fund-toolbar { align-items: flex-start; }
+  .fund-position-row .ant-card-body { padding: 16px; }
+}

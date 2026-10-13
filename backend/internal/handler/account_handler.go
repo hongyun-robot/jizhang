@@ -26,6 +26,7 @@ type accountReq struct {
 	Name                 string            `json:"name" binding:"required,max=64"`
 	RequestKey           string            `json:"request_key"`
 	Type                 model.AccountType `json:"type" binding:"required"`
+	AssetClass           *string           `json:"asset_class"`
 	OpeningBalance       *string           `json:"opening_balance"`
 	RepaymentDay         *int              `json:"repayment_day"`
 	LiabilityType        string            `json:"liability_type"`
@@ -44,6 +45,10 @@ func (r *accountReq) parse() (service.CreateAccountInput, bool) {
 		PrincipalRemainder: r.PrincipalRemainder,
 		RepaymentDay:       r.RepaymentDay,
 		LiabilityType:      r.LiabilityType, StatementDay: r.StatementDay, RepaymentMonthOffset: r.RepaymentMonthOffset,
+	}
+	if r.AssetClass != nil {
+		in.AssetClass = *r.AssetClass
+		in.AssetClassProvided = true
 	}
 	if r.OpeningBalance != nil && *r.OpeningBalance != "" {
 		amt, err := decimal.NewFromString(*r.OpeningBalance)

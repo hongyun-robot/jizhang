@@ -81,6 +81,8 @@ func (s *AccountService) TotalAssets() (decimal.Decimal, error) {
 type CreateAccountInput struct {
 	Name                 string
 	Type                 model.AccountType
+	AssetClass           string
+	AssetClassProvided   bool
 	OpeningBalance       decimal.Decimal
 	RepaymentDay         *int
 	Sort                 int
@@ -151,6 +153,12 @@ func (s *AccountService) accountWrite(fn func(*gorm.DB) error) error {
 }
 
 func validateAccountInput(in CreateAccountInput) error {
+	if (in.Type == model.AccountLiability && in.AssetClass != "") || (in.Type == model.AccountAsset && in.AssetClass != "" && in.AssetClass != "cash" && in.AssetClass != "fund") {
+		return ErrInvalidAccountType
+	}
+	if in.AssetClass == "fund" && !in.OpeningBalance.IsZero() {
+		return ErrInvalidAmount
+	}
 	if in.PrincipalRemainder != "" && (in.Type != model.AccountLiability || (in.PrincipalRemainder != "first" && in.PrincipalRemainder != "last")) {
 		return ErrPrincipalRemainderInvalid
 	}
@@ -193,12 +201,16 @@ func (s *AccountService) createAt(tx *gorm.DB, in CreateAccountInput) (*model.Ac
 	a := &model.Account{
 		Name:               in.Name,
 		Type:               in.Type,
+		AssetClass:         in.AssetClass,
 		OpeningBalance:     in.OpeningBalance,
 		RepaymentDay:       in.RepaymentDay,
 		Status:             model.StatusActive,
 		Sort:               in.Sort,
 		LiabilityType:      in.LiabilityType,
 		PrincipalRemainder: in.PrincipalRemainder,
+	}
+	if a.Type == model.AccountAsset && a.AssetClass == "" {
+		a.AssetClass = "cash"
 	}
 	if in.ActorID > 0 {
 		owner := in.ActorID
@@ -250,6 +262,12 @@ func (s *AccountService) updateAt(tx *gorm.DB, id int64, in CreateAccountInput, 
 	if a == nil {
 		return nil, ErrAccountNotFound
 	}
+	if !in.AssetClassProvided && in.AssetClass == "" && in.Type == model.AccountAsset && a.Type == model.AccountAsset {
+		in.AssetClass = a.AssetClass
+	}
+	if e := validateAccountInput(in); e != nil {
+		return nil, e
+	}
 	if !validAccountTypes[in.Type] {
 		return nil, ErrInvalidAccountType
 	}
@@ -267,7 +285,15 @@ func (s *AccountService) updateAt(tx *gorm.DB, id int64, in CreateAccountInput, 
 		}
 		has = has || n > 0
 	}
-	if has && (in.Type != a.Type || !in.OpeningBalance.Equal(a.OpeningBalance)) {
+	currentClass := a.AssetClass
+	if currentClass == "" && a.Type == model.AccountAsset {
+		currentClass = "cash"
+	}
+	wantedClass := in.AssetClass
+	if wantedClass == "" && in.Type == model.AccountAsset {
+		wantedClass = "cash"
+	}
+	if has && (in.Type != a.Type || wantedClass != currentClass || !in.OpeningBalance.Equal(a.OpeningBalance)) {
 		return nil, ErrAccountHasTransactions
 	}
 	if a.BillingEnabled && in.StatementDay == nil && in.RepaymentDay != nil && (a.RepaymentDay == nil || *in.RepaymentDay != *a.RepaymentDay) {
@@ -275,6 +301,7 @@ func (s *AccountService) updateAt(tx *gorm.DB, id int64, in CreateAccountInput, 
 	}
 	a.Name = in.Name
 	a.Type = in.Type
+	a.AssetClass = wantedClass
 	if a.OwnerID == nil && in.ActorID > 0 {
 		owner := in.ActorID
 		a.OwnerID = &owner

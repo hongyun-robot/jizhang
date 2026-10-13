@@ -70,6 +70,12 @@ func purposeLabel(p model.TxnPurpose) string {
 		return "券退款"
 	case model.PurposeVoucherWriteoff:
 		return "券作废"
+	case model.PurposeFundPurchase:
+		return "基金买入付款"
+	case model.PurposeFundRedemption:
+		return "基金赎回到账"
+	case model.PurposeFundDividend:
+		return "基金分红到账"
 	}
 	return "普通记账"
 }
@@ -157,7 +163,7 @@ func (s *TransactionService) ExportCSV(actor *model.User, f repository.TxnFilter
 	}
 
 	acctNames := make(map[int64]string)
-	accs, err := s.deps.Accounts.List()
+	accs, err := s.deps.Accounts.ForOwner(actor.ID).List()
 	if err != nil {
 		return nil, err
 	}

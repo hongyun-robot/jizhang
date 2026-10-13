@@ -53,5 +53,7 @@ export function useStatsAssets(range: DateRange) {
   return useQuery({
     queryKey: queryKeys.key('stats', scope, url),
     queryFn: ({ signal }) => unwrap<AssetsResp>(url, signal),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 }

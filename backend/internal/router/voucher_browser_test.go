@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"jizhang/internal/cache"
+	"jizhang/internal/fuyao"
 	"jizhang/internal/liability"
 	"jizhang/internal/model"
 	"jizhang/internal/repository"
@@ -40,6 +41,7 @@ func TestLiabilityBrowserServer(t *testing.T) {
 }
 
 func runBrowserServer(t *testing.T, liabilityFixture bool) {
+	fundFixture := os.Getenv("FUND_BROWSER_SERVER") == "1"
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatal(err)
@@ -55,6 +57,11 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	}
 	if err := db.AutoMigrate(model.LiabilityModels()...); err != nil {
 		t.Fatal(err)
+	}
+	if fundFixture {
+		if err := db.AutoMigrate(&model.FundInstrument{}, &model.FundPosition{}, &model.FundEvent{}, &model.FundMutation{}, &model.FundNAV{}, &model.FundNAVRevision{}, &model.FundValuation{}, &model.FundAudit{}, &model.FundDividend{}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := db.Create(&[]model.LiabilityAccountType{{Code: "credit_card", Name: "信用卡", DefaultAccount: true}, {Code: "huabei", Name: "花呗", Sort: 1, DefaultAccount: true}, {Code: "jd_baitiao", Name: "京东白条", Sort: 2, DefaultAccount: true}, {Code: "douyin_monthly", Name: "抖音月付", Sort: 3, DefaultAccount: true}, {Code: "meituan_monthly", Name: "美团月付", Sort: 4, DefaultAccount: true}, {Code: "other_consumer", Name: "其他消费信用", Sort: 5}, {Code: "test_monthly", Name: "测试月付", Sort: 6}}).Error; err != nil {
 		t.Fatal(err)
@@ -94,12 +101,23 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	auth := service.NewAuthService(users, client, "voucher-browser-fixture-only", 30*time.Minute, 24*time.Hour, false, "/api/v1/auth")
 	txn := service.NewTransactionService(service.TxnDeps{Txns: repository.NewTransactionRepo(db), Accounts: accounts, Cats: cats, Closings: closings, Periods: periods})
 	stats := service.NewStatsService(statsRepo, accounts, cats, periods, cache.NewStatsCache(client))
+	var funds *service.FundService
+	var fundMarket *fundBrowserMarket
 	budgets := service.NewBudgetService(service.BudgetDeps{Budgets: repository.NewBudgetRepo(db), Stats: statsRepo, Cats: cats, Notifs: notifs, Periods: periods})
 	txn.OnWrite = stats.InvalidateAll
 	liab := service.NewLiabilityService(db, txn)
 	var browserTime atomic.Int64
 	initialDate, _ := liability.Parse("2026-11-01")
 	browserTime.Store(initialDate.Unix())
+	if fundFixture {
+		date := time.Date(2026, 10, 13, 19, 0, 0, 0, fuyao.Shanghai)
+		browserTime.Store(date.Unix())
+		fundMarket = newFundBrowserMarket()
+		funds = service.NewFundService(db, txn, fundMarket)
+		funds.Now = func() time.Time { return time.Unix(browserTime.Load(), 0).In(fuyao.Shanghai) }
+		funds.BindAccounts(accounts)
+		funds.OnWrite = stats.InvalidateAll
+	}
 	if liabilityFixture {
 		liab.Now = func() time.Time { return time.Unix(browserTime.Load(), 0).In(liability.Location) }
 	}
@@ -110,15 +128,76 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 			}
 		}
 	}
-	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601", "http://127.0.0.1:5602"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: service.NewAccountService(accounts), CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn), LiabilitySvc: liab})
+	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601", "http://127.0.0.1:5602", "http://127.0.0.1:5603"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: service.NewAccountService(accounts), CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn), LiabilitySvc: liab, FundSvc: funds})
 	stop := make(chan struct{}, 1)
 	r.GET("/api/v1/__test__/info", func(c *gin.Context) {
 		name := "voucher-browser"
 		if liabilityFixture {
 			name = "liability-browser"
 		}
+		if fundFixture {
+			name = "fund-browser"
+		}
 		c.JSON(http.StatusOK, gin.H{"fixture": name})
 	})
+	if fundFixture {
+		r.POST("/api/v1/__test__/fund-quote", func(c *gin.Context) {
+			var input struct {
+				Date    string `json:"date"`
+				NAV     string `json:"nav"`
+				Failure bool   `json:"failure"`
+			}
+			if c.ShouldBindJSON(&input) != nil {
+				c.Status(400)
+				return
+			}
+			date, e := liability.Parse(input.Date)
+			if e != nil {
+				c.Status(400)
+				return
+			}
+			value, e := decimal.NewFromString(input.NAV)
+			if e != nil || !value.IsPositive() {
+				c.Status(400)
+				return
+			}
+			fundMarket.mu.Lock()
+			found := false
+			for i := range fundMarket.quotes {
+				if fundMarket.quotes[i].Date.Format("2006-01-02") == date.Format("2006-01-02") {
+					fundMarket.quotes[i] = fuyao.NAV{Date: date, Value: value}
+					found = true
+					break
+				}
+			}
+			if !found {
+				fundMarket.quotes = append(fundMarket.quotes, fuyao.NAV{Date: date, Value: value})
+			}
+			fundMarket.failure = nil
+			if input.Failure {
+				fundMarket.failure = fuyao.ErrRateLimited
+			}
+			fundMarket.mu.Unlock()
+			browserTime.Add(1800)
+			c.JSON(200, gin.H{"queued": true})
+		})
+		r.POST("/api/v1/__test__/fund-date", func(c *gin.Context) {
+			var input struct {
+				Date string `json:"date"`
+			}
+			if c.ShouldBindJSON(&input) != nil {
+				c.Status(400)
+				return
+			}
+			date, e := liability.Parse(input.Date)
+			if e != nil {
+				c.Status(400)
+				return
+			}
+			browserTime.Store(date.Unix())
+			c.JSON(200, gin.H{"date": input.Date})
+		})
+	}
 	if liabilityFixture {
 		r.POST("/api/v1/__test__/date", func(c *gin.Context) {
 			var in struct {
@@ -153,6 +232,9 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	if liabilityFixture {
 		address = "127.0.0.1:18085"
 	}
+	if fundFixture {
+		address = "127.0.0.1:18086"
+	}
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		t.Fatal(err)
@@ -164,6 +246,22 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 		}
 	}()
 	t.Log("BROWSER_READY http://" + address)
+	if fundFixture {
+		workerCtx, cancelWorker := context.WithCancel(context.Background())
+		defer cancelWorker()
+		go func() {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					funds.Ensure(workerCtx)
+				case <-workerCtx.Done():
+					return
+				}
+			}
+		}()
+	}
 	lifetime := 20 * time.Minute
 	if raw := os.Getenv("BROWSER_FIXTURE_TTL"); raw != "" {
 		configured, e := time.ParseDuration(raw)

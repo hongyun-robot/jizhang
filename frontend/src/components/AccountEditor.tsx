@@ -18,6 +18,7 @@ import dayjs from 'dayjs';
 interface FormValues {
   name: string;
   type: AccountType;
+  asset_class?: 'cash' | 'fund';
   opening_balance?: string;
   repayment_day?: number;
   liability_type?: string;
@@ -32,11 +33,13 @@ export interface AccountEditorProps {
   account?: Account;
   initialName?: string;
   assetOnly?: boolean;
+  allowFunds?: boolean;
+  fundOnly?: boolean;
   onClose: () => void;
   onCreated?: (account: Account) => void;
   onPending?: (pending: boolean) => void;
 }
-export default function AccountEditor({ account, initialName = '', assetOnly = false, onClose, onCreated, onPending }: AccountEditorProps) {
+export default function AccountEditor({ account, initialName = '', assetOnly = false, allowFunds = false, fundOnly = false, onClose, onCreated, onPending }: AccountEditorProps) {
   const scope = useScope();
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
@@ -145,6 +148,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
     form.setFieldsValue({
       name: initialName,
       type: 'asset',
+      asset_class: fundOnly ? 'fund' : 'cash',
       opening_balance: '0',
       sort: 0,
       liability_type: defaultType,
@@ -163,6 +167,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
     form.setFieldsValue({
       name: a.name,
       type: a.type,
+      asset_class: a.asset_class || 'cash',
       opening_balance: a.opening_balance,
       repayment_day: a.repayment_day ?? undefined,
       liability_type: a.liability_type || defaultType,
@@ -194,10 +199,12 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
           name: v.name.trim(),
           request_key: editing ? undefined : requestKey.current,
           type: v.type,
+          asset_class: v.type === 'asset' ? v.asset_class || 'cash' : undefined,
           opening_balance: v.opening_balance ?? '0',
           sort: v.sort ?? 0,
           status: v.status === false ? 'disabled' : 'active',
         };
+        if (input.asset_class === 'fund') input.opening_balance = '0';
         if (v.type === 'liability') {
           const rules = editingDetail.data?.rules;
           const last = rules?.at(-1);
@@ -271,7 +278,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
             </Form.Item>
             <Form.Item name="type" label="类型">
               <Segmented
-                disabled={assetOnly || !!editing?.has_financial_history}
+                disabled={assetOnly || fundOnly || !!editing?.has_financial_history}
                 onChange={(value) => {
                   if (value === 'liability')
                     form.setFieldsValue({
@@ -289,6 +296,8 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
                 ]}
               />
             </Form.Item>
+            {values?.type === 'asset' && (allowFunds || fundOnly || editing?.asset_class === 'fund') && <Form.Item name="asset_class" label="资产类别"><Segmented disabled={fundOnly || !!editing?.has_financial_history} options={[{ value: 'cash', label: '现金资产' }, { value: 'fund', label: '基金账户' }]} onChange={(value) => { if (value === 'fund') form.setFieldValue('opening_balance', '0'); }} /></Form.Item>}
+            {values?.asset_class === 'fund' && values?.type === 'asset' && <Alert type="info" title="在基金详情添加持仓" description="基金账户从零现金开始，市值按确认份额和最新有效净值计算。" />}
             <Form.Item
               name="opening_balance"
               label="期初余额（新负债账户从零开始）"
@@ -298,7 +307,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
                 inputMode="decimal"
                 disabled={
                   !!editing?.has_financial_history ||
-                  values?.type === 'liability'
+                  values?.type === 'liability' || values?.asset_class === 'fund'
                 }
               />
             </Form.Item>

@@ -78,6 +78,7 @@ func (s *TransactionService) Delete(actor *model.User, id int64) error {
 
 func (s *TransactionService) fillEffects(rows []model.Transaction) {
 	s.fillLiabilityLinks(rows)
+	s.fillFundLinks(rows)
 	var ids []int64
 	for i := range rows {
 		rows[i].FillEffects()
@@ -101,6 +102,52 @@ func (s *TransactionService) fillEffects(rows []model.Transaction) {
 		if rows[i].VoucherEventID != nil {
 			if id, ok := byID[*rows[i].VoucherEventID]; ok {
 				rows[i].VoucherID = &id
+			}
+		}
+	}
+}
+
+func (s *TransactionService) fillFundLinks(rows []model.Transaction) {
+	provider, ok := s.deps.Txns.(interface{ DB() *gorm.DB })
+	if !ok {
+		return
+	}
+	ids := []int64{}
+	for _, r := range rows {
+		if r.FundEventID != nil {
+			ids = append(ids, *r.FundEventID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	var events []model.FundEvent
+	if e := provider.DB().Where("id IN ?", ids).Find(&events).Error; e != nil {
+		return
+	}
+	byID := map[int64]model.FundEvent{}
+	positions := []int64{}
+	for _, e := range events {
+		byID[e.ID] = e
+		positions = append(positions, e.PositionID)
+	}
+	var data []struct {
+		ID      int64
+		THSCode string
+	}
+	if e := provider.DB().Table("fund_positions p").Select("p.id,i.ths_code").Joins("JOIN fund_instruments i ON i.id=p.instrument_id").Where("p.id IN ?", positions).Scan(&data).Error; e != nil {
+		return
+	}
+	codes := map[int64]string{}
+	for _, p := range data {
+		codes[p.ID] = p.THSCode
+	}
+	for i := range rows {
+		if rows[i].FundEventID != nil {
+			if e, ok := byID[*rows[i].FundEventID]; ok {
+				id := e.PositionID
+				rows[i].FundPositionID = &id
+				rows[i].FundCode = codes[id]
 			}
 		}
 	}

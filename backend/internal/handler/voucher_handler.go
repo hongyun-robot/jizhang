@@ -76,6 +76,8 @@ func voucherErr(c *gin.Context, err error) {
 		response.Invalid(c, err.Error())
 	case errors.Is(err, service.ErrTxnClosedPeriod), errors.Is(err, service.ErrVoucherSettled), errors.Is(err, service.ErrVoucherDependent), errors.Is(err, service.ErrVoucherKeyConflict), errors.Is(err, service.ErrVoucherUsed):
 		response.Conflict(c, err.Error())
+	case errors.Is(err, service.ErrFundManaged):
+		response.Invalid(c, err.Error())
 	default:
 		response.Internal(c, "券操作失败")
 	}
