@@ -5,7 +5,7 @@
 1. 规划归档至本目录，41/41 任务完成，六份正式规范已同步。归档前修复清仓后最终净值区间缺失，独立复核通过。
 2. 新功能及主分支整期还款整合到 master，功能合并提交为 `e4dd72b3652f917ab1c8e1ed98fd690e6545f065`，已推送 origin/master。基金原始实现提交 `d60fda1` 是该主分支祖先。分期还款统一校验现金子类；负债查询及流水脱敏避免无关基金估值。整合后完整 Go/MySQL、vet/build 通过；前端 70 项测试、类型与构建通过；基金浏览器 83 次断言、整期提前还款桌面/手机 32 项检查通过。
 3. 按仓库 deploy 技能，从主工作区同步并重建 web/api。394 个文件同步，598 项源码验证全部一致，无孤儿；四个项目容器 running/healthy，首页/health、favicon 均通过，`DEPLOY: ALL_GREEN`，生产冒烟 17/17 通过且本次临时流水已清理。
-4. 主分支祖先关系、基金调度源文件及归档存在已确认。清理 worktree 使用 Codex 的可恢复归档；被忽略的六张基金验收截图提前保存到主工作区同一路径，原主工作区的旧未跟踪规划保存到 `C:/Users/Administrator/.codex/backups/fund-plan-before-main-20261013-193626`。
+4. 主分支祖先关系、基金调度源文件及归档存在已确认。Codex 归档调用仅返回排队，已另存完整 Git 快照 C:/Users/Administrator/.codex/backups/fund-release-e4dd72b.bundle（验证通过），随后使用 Git 移除干净的检出目录，确认目录不存在且 git worktree list 仅剩主工作区；被忽略的六张基金验收截图提前保存到主工作区同一路径，原主工作区的旧未跟踪规划保存到 `C:/Users/Administrator/.codex/backups/fund-plan-before-main-20261013-193626`。
 
 ## 生产数据与配置
 
