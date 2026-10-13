@@ -37,7 +37,7 @@
 - 浏览器没有运行时异常。
 - `refactor_settlement.mjs`：通过；更新为实际还款日期和锁定报价，验证日期变化使报价失效并禁用提交、失败保留草稿、连点防重，以及原请求标识/版本的稳定重试。
 
-截图目录为 `frontend/e2e/shots/refactor-frontend`，主要结果：
+截图已保留到主工作区的 `frontend/e2e/shots/installment-early-repayment`，主要结果：
 
 - `installment-early-repayment-1440.png`
 - `installment-early-repayment-390.png`
@@ -48,3 +48,9 @@
 没有执行生产部署或真实资金处理，也没有更改主工作区其他任务文件。只读核验的旧资金处理流程用隔离测试验证，不根据测试样例自动修改目标账本。
 
 发布前备份并在目标环境运行 `go run ./cmd/liability-audit`；有余额时先按真实资金、全部来源权限及开放账期核对，不能删钱或虚构返还。前后端须同步使用新契约。已经执行新按期操作后，回退应用必须保留兼容保护或先按依赖合法撤销相关新操作；无需结构迁移不代表可以直接恢复旧写入规则。
+
+## 归档检查
+
+四份正式规范已同步：新增 3 条要求、修改 14 条要求、移除 1 条旧要求；保留既有标题、Purpose 和未涉及的内容，所有变更要求与 delta 完全对应。`openspec validate --specs` 的 18 份规范全部通过。全库 `--strict` 检查仍有 12 份既有规范因 Purpose 少于 50 字符而报告警告，本次保留原文，未扩展修改范围。
+
+全部 39 项实施任务完成，归档目录为 `openspec/changes/archive/2026-10-13-add-installment-early-repayment`。
