@@ -5,7 +5,7 @@ import "jizhang/internal/model"
 // Legacy transfers expose only the caller's side. The stored journal and money
 // stay intact; synthetic labels are presentation data and never written back.
 func (s *TransactionService) redactHistory(actor *model.User, rows []model.Transaction) error {
-	accounts, e := s.deps.Accounts.List()
+	accounts, e := s.deps.Accounts.Metadata()
 	if e != nil {
 		return e
 	}

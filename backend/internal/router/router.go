@@ -114,6 +114,8 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 			liabilities.POST("/installments/:id/refund-adjustments", lh.RefundPlan)
 			liabilities.POST("/installments/:id/settlement-preview", lh.Preview)
 			liabilities.POST("/installments/:id/settle", lh.Settle)
+			liabilities.POST("/installments/:id/repayment-preview", lh.RepaymentPreview)
+			liabilities.POST("/installments/:id/repay", lh.RepayInstallment)
 			liabilities.POST("/operations/:id/reverse", lh.Reverse)
 		}
 		cath := handler.NewCategory(d.CategorySvc)

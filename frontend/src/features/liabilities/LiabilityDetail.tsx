@@ -36,12 +36,13 @@ import {
 } from '../../api/liability';
 import { useAuth, canRecord } from '../../stores/auth';
 import Money from '../../components/Money';
+import LiabilityAmount from './LiabilityAmount';
 import LiabilityDialogs, {
   type LiabilityDialog,
 } from '../../components/LiabilityDialogs';
 import TxnFormModal, { type TxnRefill } from '../../components/TxnFormModal';
 import type { Transaction } from '../../api/types';
-import { cents } from '../../lib/money';
+
 import '../../styles/liabilities.css';
 
 import PersonalLiabilityAccountModal from '../../components/PersonalLiabilityAccountModal';
@@ -223,14 +224,10 @@ export default function LiabilityDetail() {
           <div className="liability-summary">
             <div>
               <span>
-                {cents(d.summary.surplus) > 0n ? '溢缴金额' : '总欠款'}
+                总欠款
               </span>
               <Money
-                value={
-                  cents(d.summary.surplus) > 0n
-                    ? d.summary.surplus
-                    : d.summary.total_debt
-                }
+                value={d.summary.total_debt}
               />
             </div>
             <div>
@@ -254,9 +251,6 @@ export default function LiabilityDetail() {
             </span>
             <span>
               其中后续分期本金 <Money value={d.summary.future_principal} />
-            </span>
-            <span>
-              待抵扣资金 <Money value={d.summary.pending_credit} />
             </span>
             <span>
               未来手续费预估 <Money value={d.summary.forecast_fees} />
@@ -315,17 +309,19 @@ export default function LiabilityDetail() {
                       },
                       {
                         title: '账单金额',
-                        render: (_, b) => <Money value={b.amount} />,
+                        render: (_, b) => <LiabilityAmount total={b.amount} fee={index.amounts.billFee(b.id)} />,
                       },
                       {
                         title: '已还',
-                        render: (_, b) => <Money value={b.paid_amount} />,
+                        render: (_, b) => <LiabilityAmount total={b.paid_amount} fee={index.amounts.billPaidFee(b.id)} feeLabel="已还手续费" />,
                       },
                       {
                         title: '剩余应还',
                         render: (_, b) => (
-                          <Money
-                            value={b.remaining}
+                          <LiabilityAmount
+                            total={b.remaining}
+                            fee={index.amounts.billRemainingFee(b.id)}
+                            feeLabel="未还手续费"
                             tone={
                               b.due_date < dayjs().format('YYYY-MM-DD') &&
                               b.issued_at
@@ -368,10 +364,11 @@ export default function LiabilityDetail() {
                             )}
                           </p>
                           <Table
-                            rowKey="id"
+                            className="liability-bill-items"
+                            rowKey="key"
                             size="small"
                             pagination={false}
-                            dataSource={index.itemsByBill.get(b.id) ?? []}
+                            dataSource={index.amounts.billItems(b.id)}
                             columns={[
                               {
                                 title: '项目',
@@ -379,14 +376,14 @@ export default function LiabilityDetail() {
                                   <>
                                     {i.kind === 'fee'
                                       ? '手续费'
-                                      : i.plan_id
-                                        ? '分期本金'
+                                      : i.planId
+                                        ? `分期${i.termId ? ` · 第 ${index.terms.get(i.termId)?.number ?? '—'} 期` : ''}`
                                         : '消费本金'}
-                                    {i.plan_id && (
+                                    {i.planId && (
                                       <Button
                                         type="link"
                                         size="small"
-                                        onClick={() => setPlanFocus(i.plan_id!)}
+                                        onClick={() => setPlanFocus(i.planId!)}
                                       >
                                         查看分期
                                       </Button>
@@ -396,15 +393,15 @@ export default function LiabilityDetail() {
                               },
                               {
                                 title: '金额',
-                                render: (_, i) => <Money value={i.amount} />,
+                                render: (_, i) => <LiabilityAmount total={i.amount} fee={i.fee} />,
                               },
                               {
                                 title: '未还',
-                                render: (_, i) => <Money value={i.remaining} />,
+                                render: (_, i) => <LiabilityAmount total={i.remaining} fee={i.remainingFee} feeLabel="未还手续费" />,
                               },
                               {
                                 title: '来源',
-                                render: (_, i) => sourceButton(i.source_id),
+                                render: (_, i) => i.sources.map((id) => <span key={id}>{sourceButton(id)}</span>),
                               },
                             ]}
                           />

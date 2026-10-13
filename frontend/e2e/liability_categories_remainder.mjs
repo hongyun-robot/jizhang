@@ -81,7 +81,7 @@ await withFixture(base, async (browser) => {
       assert.equal((await api('GET', `/accounts/${account.id}/liability`)).plans.length, 0, 'missing leaf cannot create a plan');
       await pick(modal, '手续费支出分类', otherRoot, otherLeaf);
       await noPopup(page);
-      const principalPreview = await modal.locator('.ant-table-tbody > tr.ant-table-row').evaluateAll((rows) => rows.map((row) => row.querySelectorAll('td')[2]?.textContent));
+      const principalPreview = await modal.locator('.liability-term-amount > .money').allTextContents();
       assert.deepEqual(principalPreview, ['¥332.79', '¥332.77', '¥332.77']);
       assert(await modal.getByText('本金尾差按账户设置放在首期，可在账户设置中修改。', { exact: true }).isVisible());
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'no page overflow');
@@ -103,7 +103,7 @@ await withFixture(base, async (browser) => {
       await page.getByRole('button', { name: /记分期/ }).click();
       modal = dialog(page, '记录固定分期');
       await modal.getByLabel('消费本金', { exact: true }).fill('998.33');
-      assert.deepEqual(await modal.locator('.ant-table-tbody > tr.ant-table-row').evaluateAll((rows) => rows.map((row) => row.querySelectorAll('td')[2]?.textContent)), ['¥332.77', '¥332.77', '¥332.79']);
+      assert.deepEqual(await modal.locator('.liability-term-amount > .money').allTextContents(), ['¥332.77', '¥332.77', '¥332.79']);
       await save(modal);
       detail = await until(() => api('GET', `/accounts/${account.id}/liability`), (d) => d.plans.length === 2, 'last-term plan saved');
       assert.deepEqual(detail.plans.find((plan) => plan.id !== firstPlanId).terms.map((term) => Number(term.principal)), [332.77, 332.77, 332.79]);

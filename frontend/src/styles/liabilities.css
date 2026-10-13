@@ -97,6 +97,35 @@
   border-bottom: 1px solid var(--line, #dce1dd);
   padding: 12px 0;
 }
+.liability-term-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.liability-term-amount > .money {
+  font-weight: 600;
+}
+.liability-term-preview {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-block: 12px;
+}
+.liability-history-term {
+  padding-block: 8px;
+}
+.liability-history-amounts {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+}
+.liability-installment-schedule .ant-picker {
+  width: 128px;
+  max-width: 100%;
+}
 .liability-problem {
   display: block;
   font-size: 12px;

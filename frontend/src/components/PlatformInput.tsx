@@ -63,6 +63,7 @@ export default function PlatformInput({
   }, [active, isDesktop]);
   useEffect(() => {
     onCreatingChange(active && create.isPending);
+    return () => onCreatingChange(false);
   }, [active, create.isPending, onCreatingChange]);
   // 浮层关闭时复位搜索词，下次打开是干净列表
   useEffect(() => {

@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"io"
 	"jizhang/internal/liability"
 	"jizhang/internal/middleware"
 	"jizhang/internal/model"
@@ -192,6 +194,48 @@ func (h *liabilityHandler) Settle(c *gin.Context) {
 	}
 	x, e := h.svc.Settle(middleware.CurrentUser(c), id, in)
 	liabilityReply(c, x, e)
+}
+
+func repaymentInput(c *gin.Context) (service.InstallmentRepaymentInput, bool) {
+	var in service.InstallmentRepaymentInput
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&in); err != nil {
+		response.Invalid(c, "整期还款输入无效，请重新核对期次，不支持手填本金或手续费")
+		return in, false
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		response.Invalid(c, "还款输入须为单个对象")
+		return in, false
+	}
+	return in, true
+}
+
+func (h *liabilityHandler) RepaymentPreview(c *gin.Context) {
+	id, ok := pathID(c)
+	if !ok {
+		return
+	}
+	in, ok := repaymentInput(c)
+	if !ok {
+		return
+	}
+	preview, err := h.svc.InstallmentRepaymentPreview(middleware.CurrentUser(c), id, in)
+	liabilityReply(c, preview, err)
+}
+
+func (h *liabilityHandler) RepayInstallment(c *gin.Context) {
+	id, ok := pathID(c)
+	if !ok {
+		return
+	}
+	in, ok := repaymentInput(c)
+	if !ok {
+		return
+	}
+	result, err := h.svc.RepayInstallment(middleware.CurrentUser(c), id, in)
+	liabilityReply(c, result, err)
 }
 func (h *liabilityHandler) Reverse(c *gin.Context) {
 	id, ok := pathID(c)

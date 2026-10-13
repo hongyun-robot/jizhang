@@ -28,6 +28,7 @@ export type LiabilityDialog =
   | State<'create_plan', { draft?: PlanDraft }>
   | State<'edit_plan', { planId: number; version: number }>
   | State<'settle', { planId: number; version: number }>
+  | State<'repay_plan', { planId: number; version: number }>
   | State<'reverse', { operationId: number }>;
 type Intent<T> = T extends { version: number }
   ? Omit<T, 'requestKey' | 'version'> & { version?: number }
@@ -40,7 +41,7 @@ export function beginDialog(
   plans: Pick<InstallmentPlan, 'id' | 'version'>[],
   requestKey: string = crypto.randomUUID()
 ): LiabilityDialog {
-  if (intent.mode === 'edit_plan' || intent.mode === 'settle') {
+  if (intent.mode === 'edit_plan' || intent.mode === 'settle' || intent.mode === 'repay_plan') {
     const version =
       intent.version ??
       plans.find((plan) => plan.id === intent.planId)?.version;

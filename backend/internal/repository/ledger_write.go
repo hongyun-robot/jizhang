@@ -3,6 +3,7 @@ package repository
 import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"jizhang/internal/liability"
 	"jizhang/internal/model"
 )
 
@@ -19,6 +20,13 @@ func LedgerWrite(db *gorm.DB, fn func(*gorm.DB) error) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&guard, "`key` = ?", ledgerGuardKey).Error; err != nil {
 			return err
 		}
-		return fn(tx)
+		before, err := liability.RepaymentSnapshot(tx)
+		if err != nil {
+			return err
+		}
+		if err := fn(tx); err != nil {
+			return err
+		}
+		return liability.ValidateRepaymentWrite(tx, before)
 	})
 }

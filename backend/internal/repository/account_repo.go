@@ -12,10 +12,11 @@ import (
 
 // AccountRepo accounts 表数据访问。
 type AccountRepo struct {
-	db         *gorm.DB
-	ownerID    int64
-	FundValues func(*gorm.DB, []int64, []time.Time) (map[string]map[int64]FundAccountValue, error)
-	Now        func() time.Time
+	db          *gorm.DB
+	ownerID     int64
+	accountType model.AccountType
+	FundValues  func(*gorm.DB, []int64, []time.Time) (map[string]map[int64]FundAccountValue, error)
+	Now         func() time.Time
 }
 
 type FundAccountValue struct {
@@ -29,7 +30,13 @@ func NewAccountRepo(db *gorm.DB) *AccountRepo { return &AccountRepo{db: db} }
 
 func (r *AccountRepo) DB() *gorm.DB { return r.db }
 func (r *AccountRepo) ForOwner(id int64) *AccountRepo {
-	return &AccountRepo{db: r.db, ownerID: id, FundValues: r.FundValues, Now: r.Now}
+	return &AccountRepo{db: r.db, ownerID: id, accountType: r.accountType, FundValues: r.FundValues, Now: r.Now}
+}
+
+// ForType lets liability operations load their balances without valuing
+// unrelated investment accounts inside a financial transaction.
+func (r *AccountRepo) ForType(kind model.AccountType) *AccountRepo {
+	return &AccountRepo{db: r.db, ownerID: r.ownerID, accountType: kind, FundValues: r.FundValues, Now: r.Now}
 }
 
 // netRow 中间聚合结果。
@@ -42,23 +49,35 @@ type netRow struct {
 func (r *AccountRepo) List() ([]model.Account, error) {
 	var rows []model.Account
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		bound := &AccountRepo{db: tx, ownerID: r.ownerID, FundValues: r.FundValues, Now: r.Now}
+		bound := &AccountRepo{db: tx, ownerID: r.ownerID, accountType: r.accountType, FundValues: r.FundValues, Now: r.Now}
 		var e error
 		rows, e = bound.list()
 		return e
 	})
 	return rows, err
 }
-func (r *AccountRepo) list() ([]model.Account, error) {
+
+// Metadata loads ownership and display fields without computing balances.
+func (r *AccountRepo) Metadata() ([]model.Account, error) {
 	var accounts []model.Account
 	q := r.db
 	if r.ownerID > 0 {
 		q = q.Where("owner_id = ?", r.ownerID)
 	}
+	if r.accountType != "" {
+		q = q.Where("type = ?", r.accountType)
+	}
 	if err := q.Order("sort, id").Find(&accounts).Error; err != nil {
 		return nil, err
 	}
+	return accounts, nil
+}
 
+func (r *AccountRepo) list() ([]model.Account, error) {
+	accounts, err := r.Metadata()
+	if err != nil {
+		return nil, err
+	}
 	// 流水净额：资产/负债共用同一口径（信用卡支出=余额变负，还款=转入回正，退款=资金回流）
 	netSQL := `
 		SELECT aid, SUM(v) AS net FROM (

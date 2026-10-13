@@ -12,10 +12,9 @@ const base = { request_key: 'stable-attempt', reason: '核对' };
 const settlement: SettlementInput = {
   ...base,
   version: 2,
-  principal: '10',
-  fee_amount: '0',
-  fee_account_id: 1,
-  fee_category_id: 1,
+  all_remaining: true,
+  quote_signature: 'fixed-quote',
+  total_amount: '10',
   from_account_id: 1,
   entry_date: '2026-10-12',
 };
@@ -59,7 +58,7 @@ describe('liability operation contract', () => {
       {
         mode: 'allocation',
         txnId: 3,
-        input: { ...base, mode: 'hold', targets: [] },
+        input: { ...base, mode: 'auto', targets: [] },
       },
       {
         mode: 'reconcile',
@@ -92,9 +91,11 @@ describe('liability operation contract', () => {
       },
       { mode: 'settle', planId: 5, input: settlement },
       { mode: 'reverse', operationId: 6, input: base },
+      { mode: 'repay_plan', planId: 5, input: { ...settlement, all_remaining: false, term_ids: [1, 2] } },
     ];
     for (const command of commands) await client.execute(command);
     await client.preview(5, settlement);
+    await client.preview(5, { ...settlement, all_remaining: false, term_ids: [1] }, 'repay_plan');
     expect(calls.map(({ method, url }) => [method, url])).toEqual([
       ['post', '/liabilities/repayments'],
       ['put', '/liabilities/repayments/3/allocations'],
@@ -104,10 +105,12 @@ describe('liability operation contract', () => {
       ['post', '/liabilities/installments/5/refund-adjustments'],
       ['post', '/liabilities/installments/5/settle'],
       ['post', '/liabilities/operations/6/reverse'],
+      ['post', '/liabilities/installments/5/repay'],
       ['post', '/liabilities/installments/5/settlement-preview'],
+      ['post', '/liabilities/installments/5/repayment-preview'],
     ]);
     expect(calls[6].data).toEqual(settlement);
-    expect(calls[8].data).toEqual(settlement);
+    expect(calls[9].data).toEqual(settlement);
   });
   it('captures a version once and disallows incomplete states at compile time', () => {
     expect(

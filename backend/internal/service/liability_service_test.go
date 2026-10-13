@@ -28,10 +28,10 @@ func TestLiabilitySettleAndReverse(t *testing.T) {
 	e.pay(t, "1020", "2026-11-09")
 	p, err := e.svcL.Plan(adminUser(), r.PlanID)
 	mustOK(t, err)
-	in := SettlementInput{RequestKey: uuid.NewString(), Version: p.Version, Principal: dec("2000"), FeeAmount: dec("15"), FeeAccountID: e.account, FromAccountID: e.account, EntryDate: "2026-11-09"}
+	in := settlementRequest(t, e, p.ID)
 	preview, err := e.svcL.SettlementPreview(adminUser(), p.ID, in)
 	mustOK(t, err)
-	if !preview.CancelledFees.Equal(dec("40")) || !preview.TransferAmount.Equal(dec("2000")) {
+	if !preview.ScheduledFees.Equal(dec("40")) || !preview.TransferAmount.Equal(dec("2040")) {
 		t.Fatal(preview)
 	}
 	wrong := in
@@ -53,7 +53,7 @@ func TestLiabilitySettleAndReverse(t *testing.T) {
 	}
 	feeVisible := false
 	for _, x := range d.Transactions {
-		if x.LiabilityOperationID != nil && *x.LiabilityOperationID == settled.OperationID && x.Kind == model.TxnExpense && x.Amount.Equal(dec("15")) {
+		if x.LiabilityOperationID != nil && *x.LiabilityOperationID == settled.OperationID && x.Kind == model.TxnExpense && x.Amount.Equal(dec("20")) {
 			feeVisible = true
 		}
 	}
@@ -78,7 +78,7 @@ func TestLiabilitySettlementHasNoFutureBilling(t *testing.T) {
 	e.pay(t, "1020", "2026-11-09")
 	p, err := e.svcL.Plan(adminUser(), r.PlanID)
 	mustOK(t, err)
-	_, err = e.svcL.Settle(adminUser(), p.ID, SettlementInput{RequestKey: uuid.NewString(), Version: p.Version, Principal: dec("2000"), FeeAmount: dec("15"), FeeAccountID: e.card, FromAccountID: e.account, EntryDate: "2026-11-09"})
+	_, err = e.svcL.Settle(adminUser(), p.ID, settlementRequest(t, e, p.ID))
 	mustOK(t, err)
 	e.now = vdate(t, "2027-01-01")
 	_, err = e.svcL.EnsureDue(e.now)
@@ -211,6 +211,11 @@ func TestLiabilityPrepaymentAndRetry(t *testing.T) {
 	_, err := e.svcL.EnsureDue(e.now)
 	mustOK(t, err)
 	req := LiabilityRepaymentInput{AccountID: e.card, FromAccountID: e.account, Amount: dec("600"), EntryDate: "2026-11-01", RequestKey: uuid.NewString()}
+	_, err = e.svcL.Repay(adminUser(), req)
+	if !errors.Is(err, liability.ErrConflict) {
+		t.Fatal("excess repayment accepted", err)
+	}
+	req.Amount = dec("500")
 	first, err := e.svcL.Repay(adminUser(), req)
 	mustOK(t, err)
 	second, err := e.svcL.Repay(adminUser(), req)
@@ -225,7 +230,7 @@ func TestLiabilityPrepaymentAndRetry(t *testing.T) {
 	}
 	e.spend(t, "80", "2026-11-02")
 	d := e.state(t)
-	if !d.Summary.Balance.Equal(dec("20")) || !d.Summary.PendingCredit.Equal(dec("20")) {
+	if !d.Summary.Balance.Equal(dec("-80")) || !d.Summary.PendingCredit.IsZero() {
 		t.Fatal(d.Summary)
 	}
 }

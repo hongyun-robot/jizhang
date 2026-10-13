@@ -8,6 +8,7 @@ export interface HistoryTerm {
   fee_amount: string;
   fee_date: string;
   fee_status?: string;
+  status?: string;
 }
 export interface HistoryPlan {
   id: number;
@@ -47,6 +48,7 @@ function historyPlan(value: unknown): HistoryPlan | undefined {
       fee_amount: fee,
       fee_date: date,
       fee_status: text(term.fee_status),
+      status: text(term.status),
     });
   }
   return { id, version, terms };
@@ -108,6 +110,19 @@ export function historySnapshot(raw: string) {
     statements,
     assignments,
     plan_snapshot: historyPlan(source.plan_snapshot),
+    plan_snapshots: records(source.plan_snapshots).flatMap((item) => {
+      const plan = historyPlan(item);
+      return plan ? [plan] : [];
+    }),
+    term_ids: Array.isArray(source.term_ids) ? source.term_ids.flatMap((value) => {
+      const id = numeric(value);
+      return id === undefined ? [] : [id];
+    }) : [],
+    transactions: records(source.transaction_snapshots).flatMap((item) => {
+      const id = numeric(item.id), value = text(item.amount), kind = text(item.kind), date = text(item.entry_date);
+      return id === undefined || value === undefined || parseCents(value) === null || (kind !== 'expense' && kind !== 'transfer') || date === undefined
+        ? [] : [{ id, amount: value, kind, entry_date: date }];
+    }),
     plans: records(source.plans).flatMap((item) => {
       const plan = historyPlan(item);
       return plan ? [plan] : [];

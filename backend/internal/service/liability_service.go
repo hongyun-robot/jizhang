@@ -23,18 +23,25 @@ type LiabilityService struct {
 }
 
 func NewLiabilityService(db *gorm.DB, txns *TransactionService) *LiabilityService {
-	return &LiabilityService{db: db, txns: txns, Now: time.Now}
+	s := &LiabilityService{db: db, txns: txns, Now: time.Now}
+	txns.liabilityNow = func() time.Time { return s.Now() }
+	return s
 }
 
 type LiabilityResult struct {
-	OperationID      int64                  `json:"operation_id"`
-	PlanID           int64                  `json:"plan_id,omitempty"`
-	Version          int                    `json:"version,omitempty"`
-	TransactionIDs   []int64                `json:"transaction_ids"`
-	CreditSignatures map[int64]string       `json:"credit_signatures,omitempty"`
-	ChangedPeriods   []string               `json:"-"`
-	Assignments      []LiabilityAssignment  `json:"assignments,omitempty"`
-	PlanSnapshot     *model.InstallmentPlan `json:"plan_snapshot,omitempty"`
+	OperationID      int64                   `json:"operation_id"`
+	PlanID           int64                   `json:"plan_id,omitempty"`
+	Version          int                     `json:"version,omitempty"`
+	TransactionIDs   []int64                 `json:"transaction_ids"`
+	CreditSignatures map[int64]string        `json:"credit_signatures,omitempty"`
+	ChangedPeriods   []string                `json:"-"`
+	Assignments      []LiabilityAssignment   `json:"assignments,omitempty"`
+	PlanSnapshot     *model.InstallmentPlan  `json:"plan_snapshot,omitempty"`
+	TermIDs          []int64                 `json:"term_ids,omitempty"`
+	PlanIDs          []int64                 `json:"plan_ids,omitempty"`
+	PlanSnapshots    []model.InstallmentPlan `json:"plan_snapshots,omitempty"`
+	ManagedSourceIDs []int64                 `json:"managed_source_ids,omitempty"`
+	PostingSnapshots []model.Transaction     `json:"transaction_snapshots,omitempty"`
 }
 type LiabilityAssignment struct {
 	ItemID   int64           `json:"item_id"`
@@ -48,7 +55,7 @@ func (s *LiabilityService) List(actor *model.User) ([]liability.Summary, error) 
 	if !CanView(actor) {
 		return nil, ErrTxnForbidden
 	}
-	accounts, e := NewAccountService(repository.NewAccountRepo(s.db)).ListFor(actor)
+	accounts, e := NewAccountService(repository.NewAccountRepo(s.db).ForType(model.AccountLiability)).ListFor(actor)
 	if e != nil {
 		return nil, e
 	}
@@ -69,7 +76,7 @@ func (s *LiabilityService) List(actor *model.User) ([]liability.Summary, error) 
 	return result, nil
 }
 func detailAt(db *gorm.DB, id int64, now time.Time) (*liability.Detail, error) {
-	accounts, e := repository.NewAccountRepo(db).List()
+	accounts, e := repository.NewAccountRepo(db).ForType(model.AccountLiability).List()
 	if e != nil {
 		return nil, e
 	}
@@ -164,7 +171,7 @@ func (s *LiabilityService) operation(actor *model.User, account int64, kind, key
 		if !before.Account.BillingEnabled {
 			return liability.ErrSetup
 		}
-		beforeJSON, e := json.Marshal(before)
+		beforeJSON, e := json.Marshal(operationSnapshot(before))
 		if e != nil {
 			return e
 		}
@@ -213,6 +220,7 @@ func (s *LiabilityService) operation(actor *model.User, account int64, kind, key
 			if e := tx.First(&t, id).Error; e != nil {
 				return e
 			}
+			result.PostingSnapshots = append(result.PostingSnapshots, t)
 			periods[t.PeriodKey] = true
 			dirty = true
 		}
@@ -236,6 +244,14 @@ func (s *LiabilityService) operation(actor *model.User, account int64, kind, key
 		s.txns.firePeriods(keys...)
 	}
 	return
+}
+
+// Prior operations are already durable audit rows. Do not recursively embed
+// their complete before/result JSON in every subsequent financial snapshot.
+func operationSnapshot(detail *liability.Detail) *liability.Detail {
+	snapshot := *detail
+	snapshot.Operations = []model.LiabilityOperation{}
+	return &snapshot
 }
 
 type LiabilitySettingsInput struct {
@@ -287,12 +303,8 @@ func (s *LiabilityService) Repay(actor *model.User, in LiabilityRepaymentInput) 
 		if mode == "" {
 			mode = "auto"
 		}
-		if mode != "auto" && mode != "manual" && mode != "hold" {
-			return LiabilityResult{}, liability.ErrInvalid
-		}
-		targetJSON, e := liability.TargetsJSON(tx, in.AccountID, in.Amount, in.Targets, false)
-		if e != nil {
-			return LiabilityResult{}, e
+		if mode != "auto" && mode != "manual" {
+			return LiabilityResult{}, requestConflict("不支持暂不分配，还款资金必须当次完整使用")
 		}
 		if mode != "manual" && len(in.Targets) > 0 {
 			return LiabilityResult{}, liability.ErrInvalid
@@ -303,6 +315,9 @@ func (s *LiabilityService) Repay(actor *model.User, in LiabilityRepaymentInput) 
 			return LiabilityResult{}, e
 		}
 		var from model.Account
+		if e := checkRepaymentAccount(tx, actor, in.FromAccountID); e != nil {
+			return LiabilityResult{}, e
+		}
 		if e := tx.First(&from, in.FromAccountID).Error; e != nil {
 			return LiabilityResult{}, e
 		}
@@ -313,9 +328,26 @@ func (s *LiabilityService) Repay(actor *model.User, in LiabilityRepaymentInput) 
 		if e := inner.guardOpen(period); e != nil {
 			return LiabilityResult{}, e
 		}
+		prepared, e := s.prepareOrdinaryRepayment(tx, actor, to.ID, from.ID, in.Amount, in.EntryDate, mode, in.Targets, op)
+		if e != nil {
+			return LiabilityResult{}, e
+		}
+		targetJSON := "[]"
+		if prepared == nil {
+			targetJSON, e = liability.TargetsJSON(tx, in.AccountID, in.Amount, in.Targets, false)
+			if e != nil {
+				return LiabilityResult{}, e
+			}
+		}
 		t := model.Transaction{Kind: model.TxnTransfer, Amount: in.Amount, AccountID: from.ID, TransferAccountID: &to.ID, EntryDate: date, PeriodKey: period, CreatedBy: actor.ID, Source: model.SourceManual, Note: in.Reason}
+		if prepared != nil {
+			t.LiabilityOperationID = &op.ID
+		}
 		if e := repository.NewTransactionRepo(tx).Create(&t); e != nil {
 			return LiabilityResult{}, e
+		}
+		if prepared != nil {
+			return prepared.finish(tx, actor, &t, true)
 		}
 		if e := tx.Model(&model.LiabilityCreditEvent{}).Where("account_id = ? AND source_id = ?", to.ID, t.ID).Updates(map[string]any{"mode": mode, "targets": targetJSON}).Error; e != nil {
 			return LiabilityResult{}, e
@@ -350,6 +382,9 @@ func (s *LiabilityService) Allocate(actor *model.User, txnID int64, in Liability
 		if e := s.txns.bound(tx).checkPostingOwnership(actor, &source); e != nil {
 			return LiabilityResult{}, e
 		}
+		if e := s.txns.bound(tx).guardOpen(source.PeriodKey); e != nil {
+			return LiabilityResult{}, e
+		}
 		if source.LiabilityOperationID != nil {
 			return LiabilityResult{}, liability.ErrManaged
 		}
@@ -357,19 +392,29 @@ func (s *LiabilityService) Allocate(actor *model.User, txnID int64, in Liability
 		if e := tx.Where("source_id = ? AND account_id = ? AND active = ?", txnID, *t.TransferAccountID, true).First(&c).Error; e != nil {
 			return LiabilityResult{}, e
 		}
+		if c.Mode == "settlement" {
+			return LiabilityResult{}, liability.ErrManaged
+		}
 		if e := tx.Model(&model.LiabilityAllocation{}).Where("credit_event_id = ? AND active = ?", c.ID, true).Updates(map[string]any{"active": false, "voided_at": s.Now()}).Error; e != nil {
 			return LiabilityResult{}, e
 		}
 		mode := in.Mode
-		if mode != "auto" && mode != "manual" && mode != "hold" {
+		if mode != "auto" && mode != "manual" {
+			return LiabilityResult{}, requestConflict("不支持暂不分配，还款资金必须当次完整使用")
+		}
+		if mode != "manual" && len(in.Targets) > 0 {
 			return LiabilityResult{}, liability.ErrInvalid
+		}
+		prepared, e := s.prepareOrdinaryRepayment(tx, actor, c.AccountID, source.AccountID, c.Amount, liability.Date(source.EntryDate), mode, in.Targets, op)
+		if e != nil {
+			return LiabilityResult{}, e
+		}
+		if prepared != nil {
+			return prepared.finish(tx, actor, &source, false)
 		}
 		targets, e := liability.TargetsJSON(tx, c.AccountID, c.Amount, in.Targets, false)
 		if e != nil {
 			return LiabilityResult{}, e
-		}
-		if mode != "manual" && len(in.Targets) > 0 {
-			return LiabilityResult{}, liability.ErrInvalid
 		}
 		return LiabilityResult{}, tx.Model(&c).Updates(map[string]any{"mode": mode, "targets": targets}).Error
 	})

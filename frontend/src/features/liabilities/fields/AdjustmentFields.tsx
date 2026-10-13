@@ -6,7 +6,8 @@ import { amountRules } from './amountRules';
 import { Alert, DatePicker, Form, Input, InputNumber, Space } from 'antd';
 import dayjs from 'dayjs';
 import Money from '../../../components/Money';
-import { previewSum as sumMoney } from '../../../lib/money';
+import LiabilityAmount from '../LiabilityAmount';
+import { money, previewCents, previewSum as sumMoney } from '../../../lib/money';
 import type { FieldContext } from './context';
 export default function AdjustmentFields({
   context,
@@ -60,6 +61,14 @@ export default function AdjustmentFields({
               )?.issued_at;
               const canChangePrincipal =
                 !issued || plan.status === 'needs_reconcile';
+              const draft = values?.terms?.[f.name];
+              const fee = draft?.fee_amount ?? old.fee_amount;
+              const total = sumMoney([
+                old.principal,
+                money(-previewCents(old.remaining)),
+                draft?.remaining_principal ?? old.remaining,
+                fee,
+              ]);
               return (
                 <div key={f.key} className="liability-term-edit">
                   <h4>
@@ -71,6 +80,10 @@ export default function AdjustmentFields({
                       </span>
                     )}
                   </h4>
+                  <div className="liability-term-preview">
+                    <span className="small muted">调整后计划合计</span>
+                    <LiabilityAmount total={total} fee={fee} />
+                  </div>
                   <Form.Item name={[f.name, 'id']} hidden>
                     <InputNumber />
                   </Form.Item>

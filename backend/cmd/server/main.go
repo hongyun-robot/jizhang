@@ -15,6 +15,7 @@ import (
 	"jizhang/internal/config"
 	"jizhang/internal/database"
 	"jizhang/internal/fuyao"
+	"jizhang/internal/liability"
 	"jizhang/internal/logger"
 	"jizhang/internal/repository"
 	"jizhang/internal/router"
@@ -38,6 +39,9 @@ func main() {
 
 	cfg := config.Load()
 	db := database.Init(cfg)
+	if err := liability.CheckRepaymentCutover(db); err != nil {
+		logger.L().Fatal("liability repayment cutover blocked", zap.Error(err))
+	}
 	if err := seed.Admin(db, cfg); err != nil {
 		logger.L().Fatal("seed admin failed", zap.Error(err))
 	}

@@ -95,7 +95,7 @@ func (e *notifEnv) repaymentPayload() RepaymentNotifyPayload {
 func TestRepaymentNoDebtNoReminder(t *testing.T) {
 	env := newNotifEnv(t)
 	env.creditCard("已还清", "0", 10, model.StatusActive)
-	env.creditCard("有溢额", "300", 10, model.StatusActive)
+	env.creditCard("另一已还清账户", "0", 10, model.StatusActive)
 	// 负债但未配置还款日 → 不提醒
 	noDay := &model.Account{Name: "白条", Type: model.AccountLiability,
 		OpeningBalance: dec("-200"), Status: model.StatusActive}

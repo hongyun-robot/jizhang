@@ -33,7 +33,9 @@ func (s *TransactionService) bound(tx *gorm.DB) *TransactionService {
 	if _, ok := periods.settings.(*repository.SettingRepo); ok {
 		periods = NewPeriodService(repository.NewSettingRepo(tx))
 	}
-	return NewTransactionService(TxnDeps{Txns: repository.NewTransactionRepo(tx), Accounts: repository.NewAccountRepo(tx), Cats: repository.NewCategoryRepo(tx), Closings: repository.NewClosingRepo(tx), Periods: periods})
+	inner := NewTransactionService(TxnDeps{Txns: repository.NewTransactionRepo(tx), Accounts: repository.NewAccountRepo(tx), Cats: repository.NewCategoryRepo(tx), Closings: repository.NewClosingRepo(tx), Periods: periods})
+	inner.liabilityNow = s.liabilityNow
+	return inner
 }
 
 func (s *TransactionService) ensurePlatform(name string) error {

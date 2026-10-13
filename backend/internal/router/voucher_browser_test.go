@@ -128,7 +128,7 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 			}
 		}
 	}
-	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601", "http://127.0.0.1:5602", "http://127.0.0.1:5603"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: service.NewAccountService(accounts), CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn), LiabilitySvc: liab, FundSvc: funds})
+	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601", "http://127.0.0.1:5602", "http://127.0.0.1:5603", "http://127.0.0.1:5612"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: service.NewAccountService(accounts), CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn), LiabilitySvc: liab, FundSvc: funds})
 	stop := make(chan struct{}, 1)
 	r.GET("/api/v1/__test__/info", func(c *gin.Context) {
 		name := "voucher-browser"
@@ -234,6 +234,13 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	}
 	if fundFixture {
 		address = "127.0.0.1:18086"
+	}
+	if configured := os.Getenv("BROWSER_FIXTURE_ADDR"); configured != "" {
+		host, _, err := net.SplitHostPort(configured)
+		if err != nil || (host != "127.0.0.1" && host != "localhost" && host != "::1") {
+			t.Fatal("BROWSER_FIXTURE_ADDR must use a loopback address")
+		}
+		address = configured
 	}
 	listener, err := net.Listen("tcp", address)
 	if err != nil {

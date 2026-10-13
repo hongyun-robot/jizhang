@@ -222,6 +222,10 @@ func (s *LiabilityService) CreatePlan(actor *model.User, in InstallmentInput) (L
 }
 
 func (s *LiabilityService) postFee(tx *gorm.DB, p *model.InstallmentPlan, term *model.InstallmentTerm, operationID int64) (int64, error) {
+	return s.postFeeAt(tx, p, term, operationID, term.FeeDate, p.FeeAccountID)
+}
+
+func (s *LiabilityService) postFeeAt(tx *gorm.DB, p *model.InstallmentPlan, term *model.InstallmentTerm, operationID int64, feeDate string, feeAccountID int64) (int64, error) {
 	if p.Status == "needs_reconcile" {
 		return 0, requestConflict("请先核对退款后的分期和未来手续费")
 	}
@@ -231,7 +235,7 @@ func (s *LiabilityService) postFee(tx *gorm.DB, p *model.InstallmentPlan, term *
 	if !term.FeeAmount.IsPositive() || term.FeeStatus == "cancelled" {
 		return 0, nil
 	}
-	date, e := liability.Parse(term.FeeDate)
+	date, e := liability.Parse(feeDate)
 	if e != nil {
 		return 0, e
 	}
@@ -242,7 +246,7 @@ func (s *LiabilityService) postFee(tx *gorm.DB, p *model.InstallmentPlan, term *
 	}
 	var a model.Account
 	var cat model.Category
-	if e := tx.First(&a, p.FeeAccountID).Error; e != nil {
+	if e := tx.First(&a, feeAccountID).Error; e != nil {
 		return 0, e
 	}
 	if a.Status != model.StatusActive && a.ID != p.AccountID {
@@ -268,14 +272,14 @@ func (s *LiabilityService) postFee(tx *gorm.DB, p *model.InstallmentPlan, term *
 	if count > 0 || cat.Kind != model.KindExpense {
 		return 0, ErrTxnCategoryInvalid
 	}
-	t := model.Transaction{Kind: model.TxnExpense, Amount: term.FeeAmount, AccountID: p.FeeAccountID, CategoryID: &p.FeeCategoryID, EntryDate: date, PeriodKey: period, Source: model.SourceLiabilityAuto, CreatedBy: p.CreatedBy, LiabilityTermID: &term.ID, Note: fmt.Sprintf("分期 %d 第 %d 期手续费", p.ID, term.Number)}
+	t := model.Transaction{Kind: model.TxnExpense, Amount: term.FeeAmount, AccountID: feeAccountID, CategoryID: &p.FeeCategoryID, EntryDate: date, PeriodKey: period, Source: model.SourceLiabilityAuto, CreatedBy: p.CreatedBy, LiabilityTermID: &term.ID, Note: fmt.Sprintf("分期 %d 第 %d 期手续费", p.ID, term.Number)}
 	if operationID > 0 {
 		t.LiabilityOperationID = &operationID
 	}
 	if e := repository.NewTransactionRepo(tx).Create(&t); e != nil {
 		return 0, e
 	}
-	if p.FeeAccountID == p.AccountID {
+	if feeAccountID == p.AccountID {
 		if e := tx.Model(&model.LiabilityDebtItem{}).Where("source_id = ? AND account_id = ?", t.ID, p.AccountID).Updates(map[string]any{"plan_id": p.ID, "term_id": term.ID, "kind": "fee", "statement_id": term.StatementID}).Error; e != nil {
 			return 0, e
 		}

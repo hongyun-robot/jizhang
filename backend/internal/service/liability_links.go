@@ -2,8 +2,24 @@ package service
 
 import (
 	"gorm.io/gorm"
+	"jizhang/internal/liability"
 	"jizhang/internal/model"
 )
+
+func (s *TransactionService) guardSettlementFunds(t *model.Transaction) error {
+	provider, ok := s.deps.Txns.(interface{ DB() *gorm.DB })
+	if !ok || !provider.DB().Migrator().HasTable(&model.LiabilityCreditEvent{}) {
+		return nil
+	}
+	var count int64
+	if err := provider.DB().Model(&model.LiabilityCreditEvent{}).Where("source_id = ? AND active = ? AND mode = ?", t.ID, true, "settlement").Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return liability.ErrManaged
+	}
+	return nil
+}
 
 func (s *TransactionService) fillLiabilityLinks(rows []model.Transaction) {
 	provider, ok := s.deps.Txns.(interface{ DB() *gorm.DB })
