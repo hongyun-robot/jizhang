@@ -24,6 +24,7 @@ type Account struct {
 	RepaymentDay        *int            `gorm:"type:tinyint" json:"repayment_day"` // 信用卡还款日 1-28
 	LiabilityType       string          `gorm:"size:32" json:"liability_type"`
 	BillingEnabled      bool            `json:"billing_enabled"`
+	PrincipalRemainder  string          `gorm:"size:8;not null;default:last" json:"principal_remainder"`
 	Status              UserStatus      `json:"status"`
 	Sort                int             `json:"sort"`
 	Balance             decimal.Decimal `gorm:"-" json:"balance"` // 聚合计算，见 repository

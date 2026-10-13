@@ -1,4 +1,4 @@
-import ResponsiveSelect from '../../../components/ResponsiveSelect';
+import CategoryPicker from '../../../components/CategoryPicker';
 import AccountSelect from '../../../components/AccountSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
@@ -71,11 +71,7 @@ export default function SettlementFields({
         label="手续费支出分类"
         rules={[{ required: true }]}
       >
-        <ResponsiveSelect
-          sheetTitle="手续费支出分类"
-          options={categories}
-          getPopupContainer={popupInParent}
-        />
+        <CategoryPicker roots={categories} aria-label="手续费支出分类" />
       </Form.Item>
       <Form.Item
         name="entry_date"

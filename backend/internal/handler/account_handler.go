@@ -31,17 +31,19 @@ type accountReq struct {
 	LiabilityType        string            `json:"liability_type"`
 	StatementDay         *int              `json:"statement_day"`
 	RepaymentMonthOffset *int              `json:"repayment_month_offset"`
+	PrincipalRemainder   string            `json:"principal_remainder"`
 	Sort                 *int              `json:"sort"`
 	Status               model.UserStatus  `json:"status"`
 }
 
 func (r *accountReq) parse() (service.CreateAccountInput, bool) {
 	in := service.CreateAccountInput{
-		Name:          r.Name,
-		RequestKey:    r.RequestKey,
-		Type:          r.Type,
-		RepaymentDay:  r.RepaymentDay,
-		LiabilityType: r.LiabilityType, StatementDay: r.StatementDay, RepaymentMonthOffset: r.RepaymentMonthOffset,
+		Name:               r.Name,
+		RequestKey:         r.RequestKey,
+		Type:               r.Type,
+		PrincipalRemainder: r.PrincipalRemainder,
+		RepaymentDay:       r.RepaymentDay,
+		LiabilityType:      r.LiabilityType, StatementDay: r.StatementDay, RepaymentMonthOffset: r.RepaymentMonthOffset,
 	}
 	if r.OpeningBalance != nil && *r.OpeningBalance != "" {
 		amt, err := decimal.NewFromString(*r.OpeningBalance)
@@ -73,6 +75,7 @@ func mapAccountErr(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrAccountHasTransactions):
 		response.Conflict(c, err.Error())
 	case errors.Is(err, service.ErrInvalidAccountType),
+		errors.Is(err, service.ErrPrincipalRemainderInvalid),
 		errors.Is(err, service.ErrInvalidRepaymentDay),
 		errors.Is(err, service.ErrInvalidAmount):
 		response.Invalid(c, err.Error())

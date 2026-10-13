@@ -24,6 +24,12 @@
   align-items: center;
   gap: 4px;
 }
+
+.category-filter {
+  flex: 1 0 100%;
+  min-width: 0;
+  padding-block: 8px;
+}
 .amount-range .sep {
   color: var(--muted);
 }

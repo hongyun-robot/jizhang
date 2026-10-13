@@ -239,35 +239,28 @@ await withFixture(base, async (browser, cleanup) => {
     await page.goto(base + '/records');
     await page.getByRole('button', { name: /筛选/ }).first().click();
     const filter = dialog('筛选');
-    sheet = await openSheet(
-      filter.getByRole('button', { name: '分类', exact: true }),
-      '分类'
-    );
-    await sheet.getByRole('button', { name: prefix, exact: true }).click();
+    const categoryPicker = filter.getByRole('group', { name: '分类', exact: true });
+    await categoryPicker.getByRole('checkbox', { name: prefix, exact: true }).click();
     assert(
       !new URL(page.url()).searchParams.has('category_id'),
       'browsing a group must not select its virtual ID'
     );
-    await sheet.getByRole('button', { name: '同名子项', exact: true }).click();
-    await sheet.waitFor({ state: 'hidden' });
+    await categoryPicker.getByRole('checkbox', { name: '同名子项', exact: true }).click();
+    assert.equal(await page.locator('.selection-sheet:visible').count(), 0, 'category choice stays inline');
     await until(
       () => page.url(),
       (url) =>
         new URL(url).searchParams.get('category_id') === String(child.id),
       'leaf category URL'
     );
-    sheet = await openSheet(
-      filter.getByRole('button', { name: '分类', exact: true }),
-      '分类'
+    await until(
+      () => categoryPicker.getByRole('checkbox', { name: '同名子项', exact: true }).getAttribute('aria-checked'),
+      (checked) => checked === 'true',
+      'inline category selection is reflected'
     );
-    await sheet.getByLabel('搜索选项').fill('同名');
-    await sheet
-      .getByRole('button', { name: `${prefix} / 同名子项`, exact: true })
-      .waitFor();
-    await sheet.getByRole('button', { name: '清空分类', exact: true }).click();
-    await sheet.waitFor({ state: 'hidden' });
+    await categoryPicker.getByRole('checkbox', { name: '全部分类', exact: true }).click();
     assert(await filter.isVisible());
-    assert(!new URL(page.url()).searchParams.has('category_id'));
+    await until(() => page.url(), (url) => !new URL(url).searchParams.has('category_id'), 'inline category filter cleared');
     await filter.locator('.ant-drawer-close').click();
     await page.goto(base + '/vouchers');
     sheet = await openSheet(
@@ -303,7 +296,7 @@ await withFixture(base, async (browser, cleanup) => {
     await closeSheet(sheet);
     await voucher.getByRole('button', { name: /取\s*消/ }).click();
     console.log(
-      'PASS nested filter/category leaf/search/clear, enum empty string, high voucher modal selection, light/dark mobile screenshots'
+      'PASS inline category parent/leaf/clear, nested account filter, enum empty string, high voucher modal selection, light/dark mobile screenshots'
     );
 
     await page.goto(base + '/liabilities');

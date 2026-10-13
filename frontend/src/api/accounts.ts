@@ -1,7 +1,7 @@
 import { useInvalidation } from './cache';
 import { writeEmptyApi } from './request';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import type { Account } from './types';
+import type { Account, PrincipalRemainder } from './types';
 import { readApi as unwrap, writeApi } from './request';
 import { queryKeys, useScope } from './keys';
 
@@ -26,6 +26,7 @@ export interface AccountInput {
   liability_type?: string;
   statement_day?: number;
   repayment_month_offset?: number;
+  principal_remainder?: PrincipalRemainder;
   sort?: number;
   status?: 'active' | 'disabled';
 }

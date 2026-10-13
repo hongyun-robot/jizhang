@@ -73,7 +73,11 @@ func (s *LiabilityService) CreatePlan(actor *model.User, in InstallmentInput) (L
 		if in.SourceTxnID > 0 && !principal.Equal(item.Amount) && strings.TrimSpace(in.Reason) == "" {
 			return result, requestConflict("已有还款或退款，请填写未还本金核对原因")
 		}
-		parts, e := liability.Spread(principal, in.TermCount, true)
+		var account model.Account
+		if e := tx.First(&account, in.AccountID).Error; e != nil {
+			return result, e
+		}
+		parts, e := liability.SpreadPrincipal(principal, in.TermCount, account.PrincipalRemainder)
 		if e != nil {
 			return result, e
 		}

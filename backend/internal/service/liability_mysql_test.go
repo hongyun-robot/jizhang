@@ -14,6 +14,7 @@ import (
 	"jizhang/internal/repository"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -385,4 +386,36 @@ func TestLiabilityMySQL(t *testing.T) {
 	if !db.Migrator().HasTable(&model.InstallmentPlan{}) {
 		t.Fatal("guard failed to preserve schema")
 	}
+	t.Run("principal-remainder-preference-and-rollback", func(t *testing.T) {
+		a, err := repository.NewAccountRepo(db).GetByID(card2.ID)
+		mustOK(t, err)
+		if a.PrincipalRemainder != "last" {
+			t.Fatal("migration did not preserve the legacy default", a)
+		}
+		svc := NewAccountService(repository.NewAccountRepo(db))
+		_, err = svc.UpdateFor(adminUser(), a.ID, CreateAccountInput{Name: a.Name, Type: a.Type, OpeningBalance: a.OpeningBalance, Sort: a.Sort, PrincipalRemainder: "first"}, a.Status)
+		mustOK(t, err)
+		a, err = repository.NewAccountRepo(db).GetByID(a.ID)
+		mustOK(t, err)
+		if a.PrincipalRemainder != "first" {
+			t.Fatal("MySQL preference did not persist", a)
+		}
+		var beforeTerms, afterTerms []model.InstallmentTerm
+		mustOK(t, db.Order("id").Find(&beforeTerms).Error)
+		balance := a.Balance
+		mustOK(t, db.Exec(migration("000013_installment_principal_remainder.down.sql")).Error)
+		if db.Migrator().HasColumn(&model.Account{}, "principal_remainder") {
+			t.Fatal("rollback retained the preference column")
+		}
+		mustOK(t, db.Order("id").Find(&afterTerms).Error)
+		if !reflect.DeepEqual(beforeTerms, afterTerms) {
+			t.Fatal("rollback changed stored installment amounts")
+		}
+		mustOK(t, db.Exec(migration("000013_installment_principal_remainder.up.sql")).Error)
+		a, err = repository.NewAccountRepo(db).GetByID(a.ID)
+		mustOK(t, err)
+		if a.PrincipalRemainder != "last" || !a.Balance.Equal(balance) {
+			t.Fatal("reapplying migration changed money or the legacy default", a)
+		}
+	})
 }

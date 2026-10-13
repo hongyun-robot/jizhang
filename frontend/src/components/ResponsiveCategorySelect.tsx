@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { Button, Cascader, Grid } from 'antd';
 import type { CategoryOption } from '../domain/categories';
-import SelectionSheet, { SelectionTrigger } from './SelectionSheet';
+import { categoryPath } from '../domain/categories';
+import type { CategoryTreeNode } from '../api/types';
+import CategoryPicker from './CategoryPicker';
 import { useSelectionActive } from './SelectionScope';
 
 export default function ResponsiveCategorySelect({
@@ -16,97 +16,25 @@ export default function ResponsiveCategorySelect({
   active?: boolean;
 }) {
   const active = useSelectionActive(requestedActive);
-  const desktop = !!Grid.useBreakpoint().md;
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [group, setGroup] = useState<number>();
-  const trigger = useRef<HTMLButtonElement>(null);
-  const close = () => {
-    setOpen(false);
-    setQuery('');
-    setGroup(undefined);
-  };
-  useEffect(() => {
-    if (!active || desktop) close();
-  }, [active, desktop]);
-  if (desktop)
-    return (
-      <Cascader
-        size="small"
-        allowClear
-        placeholder="分类"
-        style={{ minWidth: 130 }}
-        value={value}
-        options={options}
-        onChange={onChange}
-      />
-    );
-  const paths = options.flatMap((root) =>
-    root.children?.length
-      ? root.children.map((leaf) => ({
-          ...leaf,
-          label: `${root.label} / ${leaf.label}`,
-          path: [root.value, leaf.value],
-        }))
-      : [{ ...root, path: [root.value] }]
-  );
-  const label = paths.find((row) => row.value === value?.at(-1))?.label;
-  const parent = options.find((row) => row.value === group);
-  const search = query.trim().toLowerCase();
-  const rows = search
-    ? paths.filter((row) => row.label.toLowerCase().includes(search))
-    : (parent?.children ?? options);
+  const node = (option: CategoryOption): CategoryTreeNode => ({
+    id: option.value,
+    name: option.label,
+    kind: 'expense',
+    sort: 0,
+    children: option.children?.map(node),
+  });
   return (
-    <>
-      <SelectionTrigger
-        label={label}
-        placeholder="分类"
-        ariaLabel="分类"
-        open={open && active}
-        triggerRef={trigger}
-        style={{ minWidth: 130 }}
-        onClick={() => {
-          if (active) setOpen(true);
-        }}
-      />
-      <SelectionSheet
-        open={open && active}
-        title="选择分类"
+    <div className="category-filter">
+      <CategoryPicker
+        heading="分类"
+        aria-label="分类"
+        roots={options.map(node)}
         value={value?.at(-1)}
-        currentLabel={label}
-        options={rows}
-        query={query}
-        onSearch={setQuery}
-        onClose={close}
-        trigger={trigger}
-        allowClear
-        onClear={() => {
-          onChange([]);
-          close();
-        }}
-        navigation={
-          !search && parent ? (
-            <Button type="text" onClick={() => setGroup(undefined)}>
-              ← {parent.label}
-            </Button>
-          ) : undefined
-        }
-        onSelect={(id) => {
-          const root =
-            !search && !parent
-              ? options.find((row) => row.value === id)
-              : undefined;
-          if (root?.children?.length) {
-            setGroup(id);
-            return;
-          }
-          const path = paths.find((row) => row.value === id)?.path;
-          if (path) {
-            onChange(path);
-            close();
-          }
-        }}
+        disabled={!active}
+        allowEmpty
+        emptyLabel="全部分类"
+        onChange={(id) => onChange(categoryPath(options, id) ?? [])}
       />
-    </>
+    </div>
   );
 }

@@ -12,6 +12,8 @@ export default function CategoryPicker({
   allowEmpty = false,
   error = false,
   heading,
+  emptyLabel = '未分类',
+  'aria-label': ariaLabel = '消费分类',
 }: {
   roots: CategoryTreeNode[];
   value?: number;
@@ -21,6 +23,8 @@ export default function CategoryPicker({
   allowEmpty?: boolean;
   error?: boolean;
   heading?: string;
+  emptyLabel?: string;
+  'aria-label'?: string;
 }) {
   const [activeId, setActiveId] = useState<number>();
   const selectedRoot = roots.find(
@@ -64,7 +68,7 @@ export default function CategoryPicker({
       id={id}
       className={`cat-pick${error ? ' pick-error' : ''}`}
       role="group"
-      aria-label="消费分类"
+      aria-label={ariaLabel}
     >
       {heading && <div className="pick-label">{heading}</div>}
       <div className="cat-roots">
@@ -83,10 +87,12 @@ export default function CategoryPicker({
         {allowEmpty && (
           <Tag.CheckableTag
             checked={!value}
-            onChange={() => onChange?.(undefined)}
+            onChange={() => {
+              if (!disabled) onChange?.(undefined);
+            }}
             disabled={disabled}
           >
-            未分类
+            {emptyLabel}
           </Tag.CheckableTag>
         )}
       </div>

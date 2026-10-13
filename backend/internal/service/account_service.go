@@ -19,13 +19,14 @@ import (
 
 // 账户业务错误。
 var (
-	ErrAccountNotFound        = errors.New("账户不存在")
-	ErrAccountHasTransactions = errors.New("该账户仍有关联流水或财务配置，只能停用不能删除")
-	ErrInvalidAccountType     = errors.New("无效的账户类型")
-	ErrInvalidRepaymentDay    = errors.New("还款日须为 1-31")
-	ErrInvalidAmount          = errors.New("金额格式无效")
-	ErrAccountCreateConflict  = errors.New("账户创建请求已使用，或创建的账户已删除，请核对结果")
-	ErrAccountNameInvalid     = errors.New("账户名称须为 1–64 字")
+	ErrAccountNotFound           = errors.New("账户不存在")
+	ErrAccountHasTransactions    = errors.New("该账户仍有关联流水或财务配置，只能停用不能删除")
+	ErrInvalidAccountType        = errors.New("无效的账户类型")
+	ErrInvalidRepaymentDay       = errors.New("还款日须为 1-31")
+	ErrInvalidAmount             = errors.New("金额格式无效")
+	ErrAccountCreateConflict     = errors.New("账户创建请求已使用，或创建的账户已删除，请核对结果")
+	ErrAccountNameInvalid        = errors.New("账户名称须为 1–64 字")
+	ErrPrincipalRemainderInvalid = errors.New("分期本金尾差须选择首期或最后一期")
 )
 
 var validAccountTypes = map[model.AccountType]bool{
@@ -86,6 +87,7 @@ type CreateAccountInput struct {
 	LiabilityType        string
 	StatementDay         *int
 	RepaymentMonthOffset *int
+	PrincipalRemainder   string
 	ActorID              int64
 	RequestKey           string
 }
@@ -149,6 +151,9 @@ func (s *AccountService) accountWrite(fn func(*gorm.DB) error) error {
 }
 
 func validateAccountInput(in CreateAccountInput) error {
+	if in.PrincipalRemainder != "" && (in.Type != model.AccountLiability || (in.PrincipalRemainder != "first" && in.PrincipalRemainder != "last")) {
+		return ErrPrincipalRemainderInvalid
+	}
 	if n := utf8.RuneCountInString(strings.TrimSpace(in.Name)); n < 1 || n > 64 {
 		return ErrAccountNameInvalid
 	}
@@ -186,13 +191,14 @@ func (s *AccountService) createAt(tx *gorm.DB, in CreateAccountInput) (*model.Ac
 		return nil, ErrInvalidRepaymentDay
 	}
 	a := &model.Account{
-		Name:           in.Name,
-		Type:           in.Type,
-		OpeningBalance: in.OpeningBalance,
-		RepaymentDay:   in.RepaymentDay,
-		Status:         model.StatusActive,
-		Sort:           in.Sort,
-		LiabilityType:  in.LiabilityType,
+		Name:               in.Name,
+		Type:               in.Type,
+		OpeningBalance:     in.OpeningBalance,
+		RepaymentDay:       in.RepaymentDay,
+		Status:             model.StatusActive,
+		Sort:               in.Sort,
+		LiabilityType:      in.LiabilityType,
+		PrincipalRemainder: in.PrincipalRemainder,
 	}
 	if in.ActorID > 0 {
 		owner := in.ActorID
@@ -274,6 +280,7 @@ func (s *AccountService) updateAt(tx *gorm.DB, id int64, in CreateAccountInput, 
 		a.OwnerID = &owner
 	}
 	if in.Type == model.AccountAsset {
+		a.PrincipalRemainder = "last"
 		a.BillingEnabled = false
 		a.LiabilityType = ""
 		a.RepaymentDay = nil
@@ -287,6 +294,9 @@ func (s *AccountService) updateAt(tx *gorm.DB, id int64, in CreateAccountInput, 
 		}
 	}
 	a.OpeningBalance = in.OpeningBalance
+	if in.Type == model.AccountLiability && in.PrincipalRemainder != "" {
+		a.PrincipalRemainder = in.PrincipalRemainder
+	}
 	if !a.BillingEnabled {
 		a.RepaymentDay = in.RepaymentDay
 	}

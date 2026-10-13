@@ -34,4 +34,21 @@ describe('financial cents', () => {
     expect(sumMoney(spreadMoney('100', 120))).toBe('100.00');
     expect(spreadMoney('100', 121)).toEqual([]);
   });
+  it('puts the whole principal remainder in the chosen term without losing cents', () => {
+    expect(spreadMoney('998.33', 3, true, 'first')).toEqual([
+      '332.79', '332.77', '332.77',
+    ]);
+    expect(spreadMoney('998.33', 3, true, 'last')).toEqual([
+      '332.77', '332.77', '332.79',
+    ]);
+    for (const placement of ['first', 'last'] as const) {
+      expect(spreadMoney('998.33', 1, true, placement)).toEqual(['998.33']);
+      expect(spreadMoney('0.02', 3, true, placement)).toEqual([]);
+      for (let count = 1; count <= 120; count++) {
+        const parts = spreadMoney('9999999999.99', count, true, placement);
+        expect(parts.every((part) => cents(part) > 0n)).toBe(true);
+        expect(sumMoney(parts)).toBe('9999999999.99');
+      }
+    }
+  });
 });

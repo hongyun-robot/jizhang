@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { App, Alert, Button, Form, Input, InputNumber, Modal, Segmented, Switch } from 'antd';
 import SelectionScope from './SelectionScope';
 import ResponsiveSelect from './ResponsiveSelect';
+import PrincipalRemainderField from './PrincipalRemainderField';
 import { useAccountMutations, type AccountInput } from '../api/accounts';
 import { useLiabilityDetail, useLiabilityTypes } from '../api/liability';
-import type { Account, AccountType } from '../api/types';
+import type { Account, AccountType, PrincipalRemainder } from '../api/types';
 import { useScope } from '../api/keys';
 import { errMsg } from '../api/client';
 import { submissionGate } from '../lib/submission';
@@ -22,6 +23,7 @@ interface FormValues {
   liability_type?: string;
   statement_day?: number;
   repayment_month_offset?: number;
+  principal_remainder?: PrincipalRemainder;
   sort?: number;
   status?: boolean;
 }
@@ -40,7 +42,10 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
   scopeRef.current = scope;
   const alive = useRef(true);
   const requestKey = useRef(crypto.randomUUID());
-  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
   const submitGate = submissionRef(submissionGate());
 
   const { message } = App.useApp();
@@ -146,6 +151,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
       statement_day: 31,
       repayment_day: 10,
       repayment_month_offset: 1,
+      principal_remainder: 'last',
     });
     setOpen(true);
   };
@@ -162,6 +168,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
       liability_type: a.liability_type || defaultType,
       statement_day: a.billing_enabled ? undefined : 31,
       repayment_month_offset: 1,
+      principal_remainder: a.principal_remainder ?? 'last',
       sort: a.sort,
       status: a.status === 'active',
     });
@@ -199,6 +206,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
           input.repayment_day = v.repayment_day;
           input.statement_day = v.statement_day;
           input.repayment_month_offset = v.repayment_month_offset;
+          input.principal_remainder = v.principal_remainder;
           if (
             editing?.billing_enabled &&
             last &&
@@ -272,6 +280,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
                       statement_day: 31,
                       repayment_day: 10,
                       repayment_month_offset: 1,
+                      principal_remainder: 'last',
                     });
                 }}
                 options={[
@@ -374,6 +383,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
                         placeholder="如：10"
                       />
                     </Form.Item>
+                    <PrincipalRemainderField />
                     {ruleError(
                       values?.statement_day,
                       values?.repayment_day,

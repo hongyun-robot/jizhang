@@ -1,4 +1,5 @@
 import ResponsiveSelect from '../../../components/ResponsiveSelect';
+import CategoryPicker from '../../../components/CategoryPicker';
 import AccountSelect from '../../../components/AccountSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
@@ -79,27 +80,20 @@ export default function InstallmentFields({
           >
             <Input inputMode="decimal" />
           </Form.Item>
-          <Space className="liability-form-row">
-            <Form.Item
-              name="entry_date"
-              label="实际消费日期"
-              rules={[{ required: true }]}
-            >
-              <DatePicker getPopupContainer={popupInParent} />
-            </Form.Item>
-            <Form.Item
-              name="category_id"
-              label="消费分类"
-              rules={[{ required: true }]}
-            >
-              <ResponsiveSelect
-                sheetTitle="消费分类"
-                options={categories}
-                style={{ minWidth: 190 }}
-                getPopupContainer={popupInParent}
-              />
-            </Form.Item>
-          </Space>
+          <Form.Item
+            name="entry_date"
+            label="实际消费日期"
+            rules={[{ required: true }]}
+          >
+            <DatePicker getPopupContainer={popupInParent} />
+          </Form.Item>
+          <Form.Item
+            name="category_id"
+            label="消费分类"
+            rules={[{ required: true }]}
+          >
+            <CategoryPicker roots={categories} aria-label="消费分类" />
+          </Form.Item>
           <Form.Item name="note" label="消费备注">
             <Input maxLength={255} />
           </Form.Item>
@@ -164,11 +158,7 @@ export default function InstallmentFields({
         label="手续费支出分类"
         rules={[{ required: true }]}
       >
-        <ResponsiveSelect
-          sheetTitle="手续费支出分类"
-          options={categories}
-          getPopupContainer={popupInParent}
-        />
+        <CategoryPicker roots={categories} aria-label="手续费支出分类" />
       </Form.Item>
       {feeMode === 'upfront' && (
         <Form.Item
@@ -182,6 +172,11 @@ export default function InstallmentFields({
       <p>
         本金合计 <Money value={originalRemaining} /> · 手续费预估合计{' '}
         <Money value={sumMoney(feeParts)} />
+      </p>
+      <p className="small muted">
+        本金尾差按账户设置放在
+        {context.d.account.principal_remainder === 'first' ? '首期' : '最后一期'}
+        ，可在账户设置中修改。
       </p>
       <Table
         size="small"

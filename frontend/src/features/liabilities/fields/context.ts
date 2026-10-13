@@ -6,7 +6,11 @@ import type {
   InstallmentPlan,
   SettlementPreview,
 } from '../../../api/liability';
-import type { Transaction, TxnListResp } from '../../../api/types';
+import type {
+  CategoryTreeNode,
+  Transaction,
+  TxnListResp,
+} from '../../../api/types';
 import type { FeeMode } from '../../../api/liability-inputs';
 import type { LiabilityDialog } from '../dialog';
 import type { LiabilityValues } from '../input';
@@ -32,7 +36,7 @@ export interface FieldContext {
   form: FormInstance<LiabilityValues>;
   assets: Option[];
   feeAccounts: Option[];
-  categories: Option[];
+  categories: CategoryTreeNode[];
   bills: Option[];
   availableExpenses: Transaction[];
   sourceExpense?: Transaction;

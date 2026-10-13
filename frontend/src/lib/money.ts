@@ -1,3 +1,5 @@
+import type { PrincipalRemainder } from '../api/types';
+
 export const MAX_AMOUNT_CENTS = 999999999999n;
 
 export function parseCents(value: string | null | undefined): bigint | null {
@@ -62,7 +64,8 @@ export function amountError(
 export function spreadMoney(
   value: string,
   count: number,
-  positive = false
+  positive = false,
+  remainder: PrincipalRemainder = 'last'
 ): string[] {
   const total = parseCents(value);
   if (
@@ -76,7 +79,8 @@ export function spreadMoney(
     return [];
   const base = total / BigInt(count);
   if (positive && base < 1n) return [];
+  const remainderIndex = remainder === 'first' ? 0 : count - 1;
   return Array.from({ length: count }, (_, index) =>
-    money(index === count - 1 ? total - base * BigInt(count - 1) : base)
+    money(index === remainderIndex ? total - base * BigInt(count - 1) : base)
   );
 }

@@ -51,3 +51,36 @@ func TestCalendarAndFees(t *testing.T) {
 		t.Fatal("zero principal term accepted")
 	}
 }
+
+func TestSpreadPrincipalRemainder(t *testing.T) {
+	for _, remainder := range []string{"first", "last", ""} {
+		for n := 1; n <= 120; n++ {
+			total := decimal.RequireFromString("9999999999.99")
+			parts, err := SpreadPrincipal(total, n, remainder)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sum := decimal.Zero
+			base := total.Div(decimal.NewFromInt(int64(n))).Truncate(2)
+			index := n - 1
+			if remainder == "first" {
+				index = 0
+			}
+			for i, part := range parts {
+				if !ValidAmount(part, false) || (i != index && !part.Equal(base)) {
+					t.Fatalf("invalid term %d of %d with %q: %s", i, n, remainder, part)
+				}
+				sum = sum.Add(part)
+			}
+			if !sum.Equal(total) {
+				t.Fatalf("lost cents with %d terms and %q: %s", n, remainder, sum)
+			}
+		}
+		if _, err := SpreadPrincipal(decimal.RequireFromString("0.02"), 3, remainder); err == nil {
+			t.Fatal("zero principal term accepted")
+		}
+	}
+	if _, err := SpreadPrincipal(decimal.NewFromInt(100), 3, "middle"); err == nil {
+		t.Fatal("invalid remainder placement accepted")
+	}
+}

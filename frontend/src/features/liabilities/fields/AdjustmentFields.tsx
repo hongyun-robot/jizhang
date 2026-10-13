@@ -1,4 +1,5 @@
 import ResponsiveSelect from '../../../components/ResponsiveSelect';
+import CategoryPicker from '../../../components/CategoryPicker';
 import AccountSelect from '../../../components/AccountSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
@@ -21,7 +22,7 @@ export default function AdjustmentFields({
         <AccountSelect sheetTitle="后续费用支付账户" assetOnly options={context.feeAccounts} onCreatingChange={context.setCreatingAccount} getPopupContainer={popupInParent} />
       </Form.Item>
       <Form.Item name="fee_category_id" label="后续手续费分类" rules={[{ required: true }]}>
-        <ResponsiveSelect sheetTitle="后续手续费分类" options={context.categories} getPopupContainer={popupInParent} />
+        <CategoryPicker roots={context.categories} aria-label="后续手续费分类" />
       </Form.Item>
       {plan.status === 'needs_reconcile' && (
         <Form.Item

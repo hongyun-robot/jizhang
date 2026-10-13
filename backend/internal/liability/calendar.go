@@ -93,3 +93,19 @@ func Spread(total decimal.Decimal, n int, positive bool) ([]decimal.Decimal, err
 	}
 	return out, nil
 }
+
+// SpreadPrincipal keeps integer-cent totals exact and moves the entire
+// remainder to the account's chosen installment. Fee spreading stays unchanged.
+func SpreadPrincipal(total decimal.Decimal, n int, remainder string) ([]decimal.Decimal, error) {
+	if remainder != "" && remainder != "first" && remainder != "last" {
+		return nil, ErrInvalid
+	}
+	parts, err := Spread(total, n, true)
+	if err != nil {
+		return nil, err
+	}
+	if remainder == "first" {
+		parts[0], parts[n-1] = parts[n-1], parts[0]
+	}
+	return parts, nil
+}

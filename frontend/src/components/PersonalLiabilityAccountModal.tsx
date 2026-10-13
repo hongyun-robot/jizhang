@@ -1,4 +1,6 @@
 import ResponsiveSelect from './ResponsiveSelect';
+import PrincipalRemainderField from './PrincipalRemainderField';
+import type { PrincipalRemainder } from '../api/types';
 import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 import { popupInParent } from '../lib/popup';
 import { submissionGate } from '../lib/submission';
@@ -17,6 +19,7 @@ interface Values {
   statement_day: number;
   repayment_day: number;
   repayment_month_offset: number;
+  principal_remainder: PrincipalRemainder;
   status: boolean;
 }
 export default function PersonalLiabilityAccountModal({
@@ -56,6 +59,7 @@ export default function PersonalLiabilityAccountModal({
         statement_day: last?.statement_day ?? 31,
         repayment_day: last?.repayment_day ?? 10,
         repayment_month_offset: last?.repayment_month_offset ?? 1,
+        principal_remainder: detail?.account.principal_remainder ?? 'last',
         status: detail?.account.status !== 'disabled',
       });
     }
@@ -121,6 +125,7 @@ export default function PersonalLiabilityAccountModal({
           statement_day: v.statement_day,
           repayment_day: v.repayment_day,
           repayment_month_offset: v.repayment_month_offset,
+          principal_remainder: v.principal_remainder,
           status: v.status ? ('active' as const) : ('disabled' as const),
           sort: detail?.account.sort ?? 10,
         };
@@ -223,6 +228,7 @@ export default function PersonalLiabilityAccountModal({
         >
           <InputNumber min={1} max={31} style={{ width: '100%' }} />
         </Form.Item>
+        <PrincipalRemainderField />
         {detail && (
           <Form.Item name="status" label="启用" valuePropName="checked">
             <Switch />

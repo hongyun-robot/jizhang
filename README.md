@@ -26,6 +26,8 @@
 
 普通“记一笔”选负债账户后可带着草稿进入固定分期，也可将已有消费转分期。手续费手动填写，支持每期固定、总额分摊和一次收取，可由原负债或资产支付。未来费用只作预估，到所填实际日期才计支出；封账或配置失效时显示待处理原因，条件修复后补齐。本金退款先按实际到账记录，再核对剩余期次；提前结清有预览、实际手续费和专用撤销入口。
 
+分类选择统一使用记账表单的内嵌一级 / 子分类按钮，包含流水筛选和负债各类费用表单。负债账户可配置“分期本金尾差”放首期或最后一期，默认最后一期；设置仅影响新建分期，已有分期及手续费分摊保持原值。迁移 `000013_installment_principal_remainder` 增加账户偏好列，既有账户默认最后一期，不改财务金额；回滚只删除偏好，已保存的期次保留，新建分期恢复最后一期补差。
+
 新增迁移为 `000008_liability_billing`。不重建存量负债、不清零旧流水；有既有流水或非零期初的未配置负债会拒绝直接启用。有负债财务历史时，数据库 down 会拒绝删除该模型。
 
 负债 MySQL 验证设置 `LIABILITY_MYSQL_DSN` 后执行 `go test ./internal/service -run TestLiabilityMySQL -v`，测试只使用随机独立数据库。浏览器验收在三个 PowerShell 终端运行：
@@ -41,6 +43,7 @@ npm run dev -- --port 5602 --host 127.0.0.1
 
 # 在 frontend；默认使用已安装的 Chrome，可用 CHROME_EXE 指定
 node e2e/liabilities.mjs
+node e2e/liability_categories_remainder.mjs
 ```
 
 脚本校验独立测试服务标识，覆盖消费、费用、出账、还款、核对、退款、结清、撤销、四档角色、提醒和移动端。完整规格验收见 `openspec/changes/enhance-liability-accounts/acceptance.md`。

@@ -107,14 +107,8 @@ export default function LiabilityDialogs({
     { value: d.account.id, label: `${d.account.name} · 计入欠款` },
     ...assets,
   ];
-  const categories = rootsOfKind(cats.data, 'expense').flatMap((root) =>
-    root.children?.length
-      ? root.children.map((leaf) => ({
-          value: leaf.id,
-          label: `${root.name} / ${leaf.name}`,
-        }))
-      : [{ value: root.id, label: root.name }]
-  );
+  const categories = rootsOfKind(cats.data, 'expense');
+  const firstCategory = categories[0]?.children?.[0]?.id ?? categories[0]?.id;
   const bills = d.statements.map((b) => ({
     value: b.id,
     label: `${b.kind === 'settlement' ? '结清单' : '账单'} ${b.cycle_end} · ${b.due_date} 到期${b.issued_at ? '' : ' · 未出账'}`,
@@ -143,7 +137,12 @@ export default function LiabilityDialogs({
       )
     : (values?.amount ?? '0');
   const count = values?.term_count ?? 3;
-  const principalParts = spreadMoney(originalRemaining, count);
+  const principalParts = spreadMoney(
+    originalRemaining,
+    count,
+    true,
+    d.account.principal_remainder ?? 'last'
+  );
   const cycleRows = plannedBills(
     d.rules,
     values?.first_statement_date?.format('YYYY-MM-DD') ||
@@ -194,8 +193,8 @@ export default function LiabilityDialogs({
       first_statement_date: dayjs(),
       fee_date: dayjs(),
       reason: '',
-      fee_category_id: categories[0]?.value,
-      category_id: categories[0]?.value,
+      fee_category_id: firstCategory,
+      category_id: firstCategory,
     };
     if (dialog.mode === 'create_plan' && dialog.draft) {
       Object.assign(initial, dialog.draft, {
@@ -249,11 +248,11 @@ export default function LiabilityDialogs({
   }, [dialog, form]);
   useEffect(() => {
     if (!dialog) return;
-    if (categories.length) {
+    if (firstCategory) {
       if (!form.getFieldValue('category_id'))
-        form.setFieldValue('category_id', categories[0].value);
+        form.setFieldValue('category_id', firstCategory);
       if (!form.getFieldValue('fee_category_id'))
-        form.setFieldValue('fee_category_id', categories[0].value);
+        form.setFieldValue('fee_category_id', firstCategory);
     }
     if (assets.length && !form.getFieldValue('from_account_id'))
       form.setFieldValue('from_account_id', assets[0].value);

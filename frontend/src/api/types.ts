@@ -12,6 +12,7 @@ export type TxnPurpose =
   | 'voucher_refund'
   | 'voucher_writeoff';
 export type CategoryKind = 'expense' | 'income';
+export type PrincipalRemainder = 'first' | 'last';
 
 export interface Account {
   id: number;
@@ -22,6 +23,7 @@ export interface Account {
   repayment_day?: number | null;
   liability_type?: string;
   billing_enabled?: boolean;
+  principal_remainder?: PrincipalRemainder;
   has_financial_history?: boolean;
   sort: number;
   status: Status;
