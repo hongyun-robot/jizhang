@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Button, Space, Table, Tag } from 'antd';
 import dayjs from 'dayjs';
 import Money from '../../components/Money';
+import LiabilityAmount from './LiabilityAmount';
 import LiabilityHistory from '../../components/LiabilityHistory';
 import type {
   LiabilityDetail,
@@ -56,7 +57,8 @@ export function PlanDetails({
         pagination={false}
         rowKey="id"
         dataSource={p.terms}
-        scroll={{ x: 620 }}
+        className="liability-plan-table"
+        scroll={{ x: 600 }}
         columns={[
           {
             title: '期次',
@@ -68,21 +70,24 @@ export function PlanDetails({
             render: (_, t) => bills.get(t.statement_id)?.cycle_end ?? '—',
           },
           {
-            title: '本金 / 未还',
+            title: '计划合计',
             render: (_, t) => (
-              <>
-                <Money value={t.principal} />
-                <div className="muted">
-                  <Money value={t.remaining} />
-                </div>
-              </>
+              <LiabilityAmount total={sumMoney([t.principal, t.fee_amount])} fee={t.fee_amount} />
             ),
           },
           {
-            title: '手续费',
+            title: '当前未还',
+            render: (_, t) => {
+              const fee = index.amounts.termRemainingFee(t.id, t.fee_txn_id);
+              return <LiabilityAmount total={sumMoney([t.remaining, fee])} fee={fee} feeLabel="未还手续费" />;
+            },
+          },
+          {
+            title: '状态 / 收取日期',
             render: (_, t) => (
               <>
-                <Money value={t.fee_amount} />
+                {t.status === 'settled' && <Tag>已结清</Tag>}
+                {t.status === 'cancelled' && <Tag>期次已取消</Tag>}
                 <div className="small muted">
                   {t.fee_txn_id
                     ? '已发生'
@@ -104,6 +109,9 @@ export function PlanDetails({
           },
         ]}
       />
+      <p className="small muted">
+        计划合计含预估费用；已取消期次保留原计划记录。当前未还仅包含本金和已计入此负债账户的费用。
+      </p>
       {editable(p.created_by) && p.status !== 'settled' && (
         <Space wrap className="liability-toolbar">
           <Button onClick={() => open({ mode: 'edit_plan', planId: p.id })}>
@@ -135,7 +143,7 @@ export function PaymentHistory({ context }: { context: RecordContext }) {
       scroll={{ x: 550 }}
       columns={[
         { title: '还款日期', dataIndex: 'entry_date' },
-        { title: '还款金额', render: (_, c) => <Money value={c.amount} /> },
+        { title: '还款金额', render: (_, c) => <LiabilityAmount total={c.amount} fee={index.amounts.paymentFee(c.id)} feeLabel="已抵扣手续费" /> },
         { title: '待抵扣', render: (_, c) => <Money value={c.remaining} /> },
         {
           title: '分配',
@@ -168,7 +176,7 @@ export function PaymentHistory({ context }: { context: RecordContext }) {
             return (
               <Space>
                 {sourceButton(c.source_id)}
-                {t && !t.liability_operation_id && editable(t.created_by) && (
+                {t && c.mode !== 'settlement' && !t.liability_operation_id && editable(t.created_by) && (
                   <Button
                     size="small"
                     onClick={() => open({ mode: 'allocation', txnId: t.id })}

@@ -275,6 +275,46 @@ func (s *LiabilityService) Settle(actor *model.User, id int64, in SettlementInpu
 				return result, liability.ErrInvariant
 			}
 		}
+		// A new settlement bill can sort before the old monthly bill. Keep
+		// fully-used automatic payments on their existing items, rather than
+		// letting FIFO move them ahead of the settlement's fixed targets.
+		planItems := map[int64]bool{}
+		for _, item := range check.Items {
+			if item.PlanID != nil && *item.PlanID == p.ID {
+				planItems[item.ID] = true
+			}
+		}
+		for _, credit := range check.Credits {
+			if credit.Mode != "auto" || !credit.Remaining.IsZero() {
+				continue
+			}
+			targets := []liability.Target{}
+			affectsPlan := false
+			for _, allocation := range check.Allocations {
+				if allocation.CreditEventID == credit.ID {
+					targets = append(targets, liability.Target{DebtItemID: allocation.DebtItemID, Amount: allocation.Amount})
+					affectsPlan = affectsPlan || planItems[allocation.DebtItemID]
+				}
+			}
+			if !affectsPlan {
+				continue
+			}
+			var source model.Transaction
+			if e := tx.First(&source, credit.SourceID).Error; e != nil {
+				return result, e
+			}
+			if !CanModifyTransaction(actor, source.CreatedBy) {
+				return result, ErrTxnForbidden
+			}
+			if e := inner.checkPostingOwnership(actor, &source); e != nil {
+				return result, e
+			}
+			encoded := jsonText(targets)
+			if e := tx.Model(&credit).Updates(map[string]any{"mode": "settlement", "targets": encoded}).Error; e != nil {
+				return result, e
+			}
+			result.CreditSignatures[credit.ID] = "settlement:" + encoded
+		}
 		rule, e := liability.RuleForDate(tx, p.AccountID, in.EntryDate)
 		if e != nil {
 			return result, e

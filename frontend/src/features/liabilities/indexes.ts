@@ -1,4 +1,5 @@
 import type { LiabilityDetail } from '../../api/liability';
+import { liabilityAmounts } from './amounts';
 
 function grouped<T>(items: T[], key: (item: T) => number): Map<number, T[]> {
   const result = new Map<number, T[]>();
@@ -12,6 +13,8 @@ function grouped<T>(items: T[], key: (item: T) => number): Map<number, T[]> {
 }
 export function liabilityIndexes(detail: LiabilityDetail) {
   return {
+    amounts: liabilityAmounts(detail),
+    terms: new Map(detail.plans.flatMap((plan) => plan.terms.map((term) => [term.id, term]))),
     bills: new Map(detail.statements.map((bill) => [bill.id, bill])),
     txns: new Map(
       detail.transactions.map((transaction) => [transaction.id, transaction])

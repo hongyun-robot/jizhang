@@ -5,6 +5,8 @@ import { amountRules } from './amountRules';
 import { Button, DatePicker, Form, Input, Space } from 'antd';
 
 import Money from '../../../components/Money';
+import LiabilityAmount from '../LiabilityAmount';
+import { sumMoney } from '../../../lib/money';
 
 import type { FieldContext } from './context';
 export default function SettlementFields({
@@ -86,6 +88,13 @@ export default function SettlementFields({
       </Button>
       {preview && (
         <div className="liability-preview">
+          <div className="liability-term-preview">
+            <span className="small muted">结清合计（抵扣前）</span>
+            <LiabilityAmount
+              total={sumMoney([preview.principal, preview.outstanding_fees, preview.fee_amount])}
+              fee={sumMoney([preview.outstanding_fees, preview.fee_amount])}
+            />
+          </div>
           <p>
             已还本金 <Money value={preview.paid_principal} /> · 未还本金{' '}
             <Money value={preview.principal} /> · 已发生未付费用{' '}
@@ -99,6 +108,7 @@ export default function SettlementFields({
             另记结清手续费 <Money value={preview.fee_amount} /> ·
             取消未来未发生费用 <Money value={preview.cancelled_fees} />
           </p>
+          <p className="small muted">结清手续费已包含在抵扣前合计中，记为单独支出；未来取消费用不计入合计。</p>
         </div>
       )}
     </>

@@ -240,6 +240,12 @@ func Reallocate(db *gorm.DB, account int64) error {
 	if e := db.Where("account_id = ?", account).Order("entry_date, id").Find(&credits).Error; e != nil {
 		return e
 	}
+	// Reserve a settlement's explicit item targets before automatic FIFO.
+	// This also repairs older allocations clipped after a bill move, using
+	// the same recorded funds and targets without changing any transaction.
+	sort.SliceStable(credits, func(i, j int) bool {
+		return credits[i].Mode == "settlement" && credits[j].Mode != "settlement"
+	})
 	if e := db.Where("account_id = ?", account).Find(&bills).Error; e != nil {
 		return e
 	}

@@ -78,6 +78,7 @@ export default function LiabilityDialogs({
   useVisualViewportKeyboard(true);
   const submitGate = submissionRef(submissionGate());
   const [creatingAccount, setCreatingAccount] = useState(false);
+  const [creatingPlatform, setCreatingPlatform] = useState(false);
   // This component is keyed by requestKey. Refreshes replace query data but must
   // not change this editor's diff baseline, operation mode or registered fields.
   const editingBaseline = useRef(d).current;
@@ -284,7 +285,7 @@ export default function LiabilityDialogs({
   };
   const submit = () =>
     submitGate.current(async () => {
-      if (creatingAccount) return;
+      if (creatingAccount || creatingPlatform) return;
       if (!dialog || write.isPending) return;
       try {
         const v = await form.validateFields();
@@ -456,7 +457,9 @@ export default function LiabilityDialogs({
     </>
   );
   const context: FieldContext = {
+    saving: write.isPending,
     setCreatingAccount,
+    setCreatingPlatform,
     d,
     dialog,
     plan,
@@ -490,7 +493,7 @@ export default function LiabilityDialogs({
       onCancel={onClose}
       onOk={submit}
       confirmLoading={write.isPending}
-      okButtonProps={{ disabled: creatingAccount }}
+      okButtonProps={{ disabled: creatingAccount || creatingPlatform }}
       width={
         dialog.mode === 'create_plan' || dialog.mode === 'edit_plan' ? 820 : 620
       }
@@ -498,6 +501,7 @@ export default function LiabilityDialogs({
       okText={dialog.mode === 'settle' ? '确认结清' : '保存'}
     >
       <Form
+        name="liability-operation"
         form={form}
         layout="vertical"
         onValuesChange={() => {

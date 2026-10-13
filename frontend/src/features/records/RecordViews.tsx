@@ -4,6 +4,7 @@ import type { CategoryInfo } from '../../domain/categories';
 import { Tag } from 'antd';
 import dayjs from 'dayjs';
 import Money from '../../components/Money';
+import LiabilityFeeTag from '../../components/LiabilityFeeTag';
 import { VOUCHER_PURPOSE_LABEL } from '../../labels';
 import { cents, formatMoney } from '../../lib/money';
 import { amountOf, tone, kindTag } from './display';
@@ -40,9 +41,7 @@ export function recordColumns({
           {t.source === 'voucher_auto' && (
             <Tag className="src-tag">到期自动</Tag>
           )}
-          {t.source === 'liability_auto' && (
-            <Tag className="src-tag">分期费用</Tag>
-          )}
+          <LiabilityFeeTag transaction={t} />
           {k === 'expense' && cents(t.refunded_amount ?? '0') > 0n && (
             <Tag
               className="refunded-tag"
@@ -142,9 +141,7 @@ export function RecordRows({
                 {t.source === 'voucher_auto' && (
                   <Tag className="src-tag">到期自动</Tag>
                 )}
-                {t.source === 'liability_auto' && (
-                  <Tag className="src-tag">分期费用</Tag>
-                )}
+                <LiabilityFeeTag transaction={t} />
                 {t.kind === 'expense' &&
                   cents(t.refunded_amount ?? '0') > 0n && (
                     <Tag

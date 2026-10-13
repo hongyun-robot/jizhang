@@ -1,6 +1,7 @@
 import ResponsiveSelect from '../../../components/ResponsiveSelect';
 import CategoryPicker from '../../../components/CategoryPicker';
 import AccountSelect from '../../../components/AccountSelect';
+import PlatformInput from '../../../components/PlatformInput';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
 import {
@@ -14,6 +15,7 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import Money from '../../../components/Money';
+import LiabilityAmount from '../LiabilityAmount';
 import {
   previewCents as cents,
   previewSum as sumMoney,
@@ -37,6 +39,8 @@ export default function InstallmentFields({
     setFeeDates,
     reason,
   } = context;
+  const feeOnLiability =
+    (context.values?.fee_account_id ?? context.d.account.id) === context.d.account.id;
   return (
     <>
       <Form.Item name="source_txn_id" label="消费来源">
@@ -97,8 +101,23 @@ export default function InstallmentFields({
           <Form.Item name="note" label="消费备注">
             <Input maxLength={255} />
           </Form.Item>
-          <Form.Item name="platform" label="平台 / 商家">
-            <Input maxLength={128} />
+          <Form.Item
+            name="platform"
+            label="平台 / 商家"
+            rules={[
+              {
+                validator: (_, value?: string) =>
+                  Array.from((value ?? '').trim()).length <= 128
+                    ? Promise.resolve()
+                    : Promise.reject(new Error('平台 / 商家名称最多 128 字')),
+              },
+            ]}
+          >
+            <PlatformInput
+              active
+              disabled={context.saving}
+              onCreatingChange={context.setCreatingPlatform}
+            />
           </Form.Item>
         </>
       )}
@@ -134,6 +153,7 @@ export default function InstallmentFields({
         <Form.Item
           name="fee_input"
           label={feeMode === 'per_term' ? '每期手续费' : '总手续费'}
+          extra="按元填写，例如 0.08 表示 8 分，不是费率。"
           rules={[{ required: true }, ...amountRules]}
         >
           <Input inputMode="decimal" />
@@ -141,6 +161,11 @@ export default function InstallmentFields({
         <Form.Item
           name="fee_account_id"
           label="费用支付账户"
+          extra={
+            feeOnLiability
+              ? '计入本负债账户的对应账单，与本金一起还款。'
+              : '由此资产账户单独支付，不计入本负债账户的应还金额。'
+          }
           rules={[{ required: true }]}
         >
           <AccountSelect
@@ -179,9 +204,10 @@ export default function InstallmentFields({
         ，可在账户设置中修改。
       </p>
       <Table
+        className="liability-installment-schedule"
         size="small"
         pagination={false}
-        scroll={{ x: 580 }}
+        scroll={{ x: 480 }}
         dataSource={schedule}
         columns={[
           { title: '期次', dataIndex: 'number' },
@@ -194,8 +220,12 @@ export default function InstallmentFields({
               </>
             ),
           },
-          { title: '本金', render: (_, r) => <Money value={r.amount} /> },
-          { title: '手续费', render: (_, r) => <Money value={r.fee} /> },
+          {
+            title: '本期合计',
+            render: (_, r) => (
+              <LiabilityAmount total={sumMoney([r.amount, r.fee])} fee={r.fee} />
+            ),
+          },
           {
             title: '收取日期',
             render: (_, r) =>

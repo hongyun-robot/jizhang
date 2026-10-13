@@ -1,6 +1,8 @@
 import { historySnapshot } from '../features/liabilities/history';
 import type { LiabilityBill, LiabilityOperation } from '../api/liability';
 import Money from './Money';
+import LiabilityAmount from '../features/liabilities/LiabilityAmount';
+import { sumMoney } from '../lib/money';
 
 export default function LiabilityHistory({
   operation: o,
@@ -75,22 +77,13 @@ export default function LiabilityHistory({
           {plan.terms.map((term) => {
             const prior = old?.terms.find((t) => t.id === term.id);
             return (
-              <p key={term.id}>
-                第 {term.number} 期 · 本金{' '}
-                {prior && (
-                  <>
-                    <Money value={prior.principal} /> →{' '}
-                  </>
-                )}
-                <Money value={term.principal} /> · 费用{' '}
-                {prior && (
-                  <>
-                    <Money value={prior.fee_amount} /> →{' '}
-                  </>
-                )}
-                <Money value={term.fee_amount} /> · {term.fee_date}
-                {term.fee_status === 'cancelled' && ' · 已取消'}
-              </p>
+              <div key={term.id} className="liability-history-term">
+                <div className="small muted">第 {term.number} 期 · 计划合计 · {term.fee_date}{term.fee_status === 'cancelled' && ' · 已取消'}</div>
+                <div className="liability-history-amounts">
+                  {prior && <><LiabilityAmount total={sumMoney([prior.principal, prior.fee_amount])} fee={prior.fee_amount} /><span>→</span></>}
+                  <LiabilityAmount total={sumMoney([term.principal, term.fee_amount])} fee={term.fee_amount} />
+                </div>
+              </div>
             );
           })}
         </div>

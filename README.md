@@ -28,6 +28,10 @@
 
 分类选择统一使用记账表单的内嵌一级 / 子分类按钮，包含流水筛选和负债各类费用表单。负债账户可配置“分期本金尾差”放首期或最后一期，默认最后一期；设置仅影响新建分期，已有分期及手续费分摊保持原值。迁移 `000013_installment_principal_remainder` 增加账户偏好列，既有账户默认最后一期，不改财务金额；回滚只删除偏好，已保存的期次保留，新建分期恢复最后一期补差。
 
+分期新消费的平台 / 商家复用记账的共享选择器。期次预览以一列显示“本金 + 手续费”合计，下方小字显示手续费；金额按元录入，默认在实际收取日计入当前负债账单，随本金一起还款。选择资产直接支付时，该费用不会加入负债应还金额。
+
+历史详情、账单、还款记录、调整 / 结清预览及操作历史采用相同双行金额展示。历史“计划合计”保留预估与取消记录，真实“当前未还”仅含本金和已入负债的费用；账单明细按期合并本金 / 已发生费用，保留来源链接和真实退款抵扣。手续费在收取日记一次支出、还款记转账，首页和流水保留费用标识；界面调整不重算、不补生成历史金额。
+
 新增迁移为 `000008_liability_billing`。不重建存量负债、不清零旧流水；有既有流水或非零期初的未配置负债会拒绝直接启用。有负债财务历史时，数据库 down 会拒绝删除该模型。
 
 负债 MySQL 验证设置 `LIABILITY_MYSQL_DSN` 后执行 `go test ./internal/service -run TestLiabilityMySQL -v`，测试只使用随机独立数据库。浏览器验收在三个 PowerShell 终端运行：
@@ -44,6 +48,8 @@ npm run dev -- --port 5602 --host 127.0.0.1
 # 在 frontend；默认使用已安装的 Chrome，可用 CHROME_EXE 指定
 node e2e/liabilities.mjs
 node e2e/liability_categories_remainder.mjs
+node e2e/liability_platform_totals.mjs
+node e2e/liability_history_amounts.mjs
 ```
 
 脚本校验独立测试服务标识，覆盖消费、费用、出账、还款、核对、退款、结清、撤销、四档角色、提醒和移动端。完整规格验收见 `openspec/changes/enhance-liability-accounts/acceptance.md`。

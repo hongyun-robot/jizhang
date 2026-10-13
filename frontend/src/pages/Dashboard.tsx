@@ -14,6 +14,7 @@ import { ROLE_LABEL, VOUCHER_PURPOSE_LABEL } from '../labels';
 import { useAuth } from '../stores/auth';
 import { canRecord } from '../domain/permissions';
 import Money, { fmtMoney } from '../components/Money';
+import LiabilityFeeTag from '../components/LiabilityFeeTag';
 import BudgetProgress from '../components/BudgetProgress';
 import QueryState, { QueryBoundary } from '../components/QueryState';
 import TxnFormModal from '../components/TxnFormModal';
@@ -278,6 +279,7 @@ export default function Dashboard() {
                     }}
                   >
                     <span className="recent-note">
+                        <LiabilityFeeTag transaction={t} />
                       {t.kind === 'transfer'
                         ? `转账 ${acctName.get(t.account_id) ?? ''}→${acctName.get(t.transfer_account_id ?? 0) ?? ''}`
                         : `${t.purpose && VOUCHER_PURPOSE_LABEL[t.purpose] ? `${VOUCHER_PURPOSE_LABEL[t.purpose]} · ` : ''}${t.note || acctName.get(t.account_id) || '—'}`}

@@ -357,6 +357,9 @@ func (s *LiabilityService) Allocate(actor *model.User, txnID int64, in Liability
 		if e := tx.Where("source_id = ? AND account_id = ? AND active = ?", txnID, *t.TransferAccountID, true).First(&c).Error; e != nil {
 			return LiabilityResult{}, e
 		}
+		if c.Mode == "settlement" {
+			return LiabilityResult{}, liability.ErrManaged
+		}
 		if e := tx.Model(&model.LiabilityAllocation{}).Where("credit_event_id = ? AND active = ?", c.ID, true).Updates(map[string]any{"active": false, "voided_at": s.Now()}).Error; e != nil {
 			return LiabilityResult{}, e
 		}

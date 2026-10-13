@@ -333,6 +333,9 @@ func (s *TransactionService) update(actor *model.User, id int64, in TxnInput) (*
 	if t.InstallmentPlanID != nil || t.LiabilityTermID != nil || t.LiabilityOperationID != nil {
 		return nil, liability.ErrManaged
 	}
+	if e := s.guardSettlementFunds(t); e != nil {
+		return nil, e
+	}
 	if err := s.validate(&in); err != nil {
 		return nil, err
 	}
@@ -405,6 +408,9 @@ func (s *TransactionService) delete(actor *model.User, id int64) error {
 	}
 	if t.InstallmentPlanID != nil || t.LiabilityTermID != nil || t.LiabilityOperationID != nil {
 		return liability.ErrManaged
+	}
+	if e := s.guardSettlementFunds(t); e != nil {
+		return e
 	}
 	if err := s.guardOpen(t.PeriodKey); err != nil {
 		return err
