@@ -40,9 +40,10 @@ export interface LiabilityValues {
   fee_date?: Dayjs;
   terms?: TermValue[];
   refund_txn_id?: number;
-  principal?: string;
-  fee_amount?: string;
   version?: number;
+  repayment_end?: number;
+  quote_signature?: string;
+  total_amount?: string;
 }
 function required<T>(value: T | undefined, label: string): T {
   if (value === undefined) throw new Error(`请填写${label}`);
@@ -50,23 +51,29 @@ function required<T>(value: T | undefined, label: string): T {
 }
 export function allocationMode(value: string | undefined): AllocationMode {
   if (!value || value === 'auto') return 'auto';
-  if (value === 'manual' || value === 'hold') return value;
+  if (value === 'manual') return value;
   throw new Error('还款分配模式无效，请重新选择');
 }
 export function settlementInput(
-  dialog: Extract<LiabilityDialog, { mode: 'settle' }>,
-  value: LiabilityValues
+  dialog: Extract<LiabilityDialog, { mode: 'settle' | 'repay_plan' }>,
+  value: LiabilityValues,
+  detail?: LiabilityDetail
 ): SettlementInput {
   return {
     request_key: dialog.requestKey,
     reason: value.reason ?? '',
     version: value.version ?? dialog.version,
-    principal: required(value.principal, '实际剩余本金'),
-    fee_amount: value.fee_amount || '0',
-    fee_account_id: required(value.fee_account_id, '费用支付账户'),
-    fee_category_id: required(value.fee_category_id, '费用分类'),
+    ...(dialog.mode === 'settle' || value.repayment_end === 0
+      ? { all_remaining: true }
+      : {
+          term_ids: required(detail?.plans.find((p) => p.id === dialog.planId), '分期计划').terms
+            .filter((t) => cents(t.remaining) > 0n && t.number <= required(value.repayment_end, '还款期数'))
+            .map((t) => t.id),
+        }),
     from_account_id: required(value.from_account_id, '还款账户'),
     entry_date: required(value.entry_date, '实际日期').format('YYYY-MM-DD'),
+    quote_signature: value.quote_signature,
+    total_amount: value.total_amount,
   };
 }
 /** For edit_plan, detail is the stable snapshot of this editor, not refreshed query data. */
@@ -199,10 +206,11 @@ export function liabilityCommand(
       };
     }
     case 'settle':
+    case 'repay_plan':
       return {
-        mode: 'settle',
+        mode: dialog.mode,
         planId: dialog.planId,
-        input: settlementInput(dialog, value),
+        input: settlementInput(dialog, value, detail),
       };
     case 'reverse':
       return { mode: 'reverse', operationId: dialog.operationId, input: base };

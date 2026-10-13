@@ -22,8 +22,6 @@ export interface LiabilitySummary {
   overdue: string;
   unbilled: string;
   future_principal: string;
-  pending_credit: string;
-  surplus: string;
   forecast_fees: string;
 }
 export interface BillRule {
@@ -130,9 +128,17 @@ export interface SettlementPreview {
   principal: string;
   paid_principal: string;
   outstanding_fees: string;
-  cancelled_fees: string;
-  pending_credit: string;
-  fee_amount: string;
+  scheduled_fees: string;
+  total_amount: string;
+  quote_signature: string;
+  terms: {
+    id: number;
+    number: number;
+    principal: string;
+    outstanding_fees: string;
+    scheduled_fees: string;
+    total_amount: string;
+  }[];
   transfer_amount: string;
 }
 

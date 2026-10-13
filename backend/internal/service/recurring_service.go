@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
+	"jizhang/internal/liability"
 	"jizhang/internal/logger"
 	"jizhang/internal/model"
 	"jizhang/internal/repository"
@@ -424,8 +425,20 @@ func (s *RecurringService) runOccurrence(r *model.RecurringRule) (bool, error) {
 			r.NextRunDate = next
 			return false, nil
 		}
+		if errors.Is(err, liability.ErrConflict) {
+			r.BlockedReason = err.Error()
+			if updateErr := s.deps.Rules.Update(r); updateErr != nil {
+				return false, errors.Join(err, updateErr)
+			}
+		}
 		// 账户停用等硬错误：停在本期不推进，下轮 cron 重试（不静默吞掉）
 		return false, err
+	}
+	if r.BlockedReason != "" {
+		r.BlockedReason = ""
+		if err := s.deps.Rules.Update(r); err != nil {
+			return false, err
+		}
 	}
 	r.NextRunDate = next
 	return true, nil

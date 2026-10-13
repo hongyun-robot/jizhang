@@ -42,4 +42,18 @@ describe('historical JSON compatibility', () => {
     expect(snapshot.plan_snapshot?.terms).toHaveLength(1);
     expect(historySnapshot('null').statements).toEqual([]);
   });
+  it('preserves new payment source snapshots and multi-plan history', () => {
+    const snapshot = historySnapshot(JSON.stringify({
+      term_ids: [3, 'invalid'],
+      plan_snapshots: [{ id: 1, version: 2, terms: [] }, { id: 2, version: 3, terms: [] }],
+      transaction_snapshots: [
+        { id: 7, amount: '20', kind: 'expense', entry_date: '2026-11-01' },
+        { id: 8, amount: '1020', kind: 'transfer', entry_date: '2026-11-01' },
+        { id: 9, amount: 'invalid', kind: 'transfer', entry_date: '2026-11-01' },
+      ],
+    }));
+    expect(snapshot.term_ids).toEqual([3]);
+    expect(snapshot.plan_snapshots).toHaveLength(2);
+    expect(snapshot.transactions.map((record) => record.amount)).toEqual(['20', '1020']);
+  });
 });

@@ -53,14 +53,14 @@ await withFixture(base, async (browser) => {
       assert(await modal.getByText('已发生', { exact: false }).first().isVisible());
       await modal.getByRole('button', { name: '关闭', exact: true }).click();
       assert.equal(JSON.stringify((await api('GET', `/accounts/${account.id}/liability`)).plans[0]), originalPlan, 'reading history never rewrites amounts');
-      await api('POST', '/liabilities/repayments', { request_key: crypto.randomUUID(), reason: '', account_id: account.id, from_account_id: bank.id, amount: '200', entry_date: '2026-11-14', mode: 'auto', targets: [] });
+      await api('POST', '/liabilities/repayments', { request_key: crypto.randomUUID(), reason: '', account_id: account.id, from_account_id: bank.id, amount: '332.87', entry_date: '2026-11-14', mode: 'auto', targets: [] });
       detail = await api('GET', `/accounts/${account.id}/liability`);
       const activeFee = detail.items.find((item) => item.source_id === fee.id && item.kind === 'fee');
-      assert.equal(detail.statements.find((entry) => entry.id === bill.id).remaining, '132.87');
+      assert.equal(detail.statements.find((entry) => entry.id === bill.id).remaining, '0');
       await page.reload();
       await page.getByRole('tab', { name: '分期计划', exact: true }).click();
       const history = page.locator('.liability-plan-table').first();
-      assert.deepEqual(await primary(history), ['¥332.87', '¥132.87', '¥332.85', '¥332.77', '¥332.85', '¥332.77']);
+      assert.deepEqual(await primary(history), ['¥332.87', '¥0.00', '¥332.85', '¥332.77', '¥332.85', '¥332.77']);
       assert((await history.locator('.small').allTextContents()).includes(`未还手续费 ${currency(activeFee.remaining)}`));
       await history.scrollIntoViewIfNeeded();
       await shot(page, `liability-history-${viewport.width}`);
@@ -76,7 +76,7 @@ await withFixture(base, async (browser) => {
       await page.getByRole('tab', { name: '账单', exact: true }).click();
       await billRow().locator('.ant-table-row-expand-icon').click();
       entries = page.locator('.liability-bill-items:visible');
-      assert.deepEqual(await primary(entries), ['¥332.87', '¥132.87']);
+      assert.deepEqual(await primary(entries), ['¥332.87', '¥0.00']);
       await shot(page, `liability-bill-${viewport.width}`);
       await page.goto(base + '/');
       const recentFee = page.locator('.recent-row').filter({ hasText: fee.note });
@@ -95,21 +95,23 @@ await withFixture(base, async (browser) => {
       await until(() => primary(assetHistory), (values) => values.join('|') === '¥101.00|¥100.00|¥101.00|¥100.00|¥101.00|¥100.00', 'asset-paid historic fees are excluded from debt');
       assert.equal((await api('GET', `/accounts/${assetAccount.id}/liability`)).summary.total_debt, '300');
       const current = await api('GET', `/accounts/${account.id}/liability`);
-      await api('POST', `/liabilities/installments/${created.plan_id}/settle`, { request_key: crypto.randomUUID(), reason: '验证历史显示保护', version: current.plans[0].version, principal: current.plans[0].terms.reduce((sum, term) => sum + Number(term.remaining), 0).toFixed(2), fee_amount: '0', fee_account_id: bank.id, fee_category_id: category.id, from_account_id: bank.id, entry_date: '2026-11-14' });
+      const payoff = { request_key: crypto.randomUUID(), reason: '验证历史显示保护', version: current.plans[0].version, all_remaining: true, from_account_id: bank.id, entry_date: '2026-11-14' };
+      const payoffQuote = await api('POST', `/liabilities/installments/${created.plan_id}/settlement-preview`, payoff);
+      await api('POST', `/liabilities/installments/${created.plan_id}/settle`, { ...payoff, quote_signature: payoffQuote.quote_signature, total_amount: payoffQuote.total_amount });
       detail = await api('GET', `/accounts/${account.id}/liability`);
       assert.equal(detail.summary.total_debt, '0');
       assert.equal(detail.summary.forecast_fees, '0');
       assert.deepEqual(detail.plans[0].terms.map((term) => Number(term.fee_amount)), [0.08, 0.08, 0.08], 'cancelled fee plans keep historical values');
-      assert.equal(detail.transactions.filter((txn) => txn.kind === 'expense' && txn.liability_term_id).length, 1, 'future cancelled fees create no expense');
+      assert.equal(detail.transactions.filter((txn) => txn.kind === 'expense' && txn.liability_term_id).length, 3, 'each future fee is posted exactly once during payoff');
       await page.goto(base + `/liabilities/${account.id}?plan=${created.plan_id}`);
       const settled = page.locator('.liability-plan-table').first();
       const planned = detail.plans[0].terms.map((term) => currency(Number(term.principal) + Number(term.fee_amount)));
       await until(() => primary(settled), (values) => values.join('|') === planned.flatMap((total) => [total, '¥0.00']).join('|'), 'settled history keeps plans and clears real unpaid amounts');
       assert.equal(await settled.getByText('已结清', { exact: true }).count(), 3);
-      assert.equal(detail.plans[0].terms.filter((term) => term.fee_status === 'cancelled').length, 2);
+      assert.equal(detail.plans[0].terms.filter((term) => term.fee_status === 'posted').length, 3);
       settledAccounts.push(account.id);
       assert.deepEqual(errors, []);
-      console.log(`PASS ${viewport.width}px: merged bill/source links, historical totals and real unpaid fees, partial repayment, draft cancellation, fee expense visibility, settled/cancelled history without rewriting money`);
+      console.log(`PASS ${viewport.width}px: bill/source links, whole-term repayment, draft cancellation, fee expense visibility and settled history without rewriting money`);
     } catch (error) {
       await shot(page, `liability-history-failure-${viewport.width}`).catch(() => {});
       throw error;
@@ -122,7 +124,7 @@ await withFixture(base, async (browser) => {
     const detail = await api('GET', `/accounts/${id}/liability`);
     assert.equal(detail.summary.total_debt, '0');
     assert.equal(detail.summary.overdue, '0');
-    assert.equal(detail.summary.pending_credit, '0');
-    assert.equal(detail.transactions.filter((txn) => txn.kind === 'expense' && txn.liability_term_id).length, 1, 'cancelled future fees remain unposted after advancing the clock');
+    assert(!('pending_credit' in detail.summary));
+    assert.equal(detail.transactions.filter((txn) => txn.kind === 'expense' && txn.liability_term_id).length, 3, 'early-paid fees are not posted again at their original dates');
   }
 }, 'chromium');

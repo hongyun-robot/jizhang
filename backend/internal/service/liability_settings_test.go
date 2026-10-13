@@ -95,7 +95,7 @@ func TestLiabilityRepaymentChangesPreserveIssuedBillsAndMoney(t *testing.T) {
 	e.now = vdate(t, "2026-11-01")
 	_, err = e.svcL.EnsureDue(e.now)
 	mustOK(t, err)
-	e.pay(t, "100", "2026-11-02")
+	historicalPayment(t, e, "100", "2026-11-02")
 	before := e.state(t)
 	_, err = e.svcL.Settings(adminUser(), e.card, LiabilitySettingsInput{LiabilityType: "huabei", StatementDay: 31, RepaymentDay: 8, RepaymentMonthOffset: 1})
 	mustOK(t, err)

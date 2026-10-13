@@ -1,4 +1,4 @@
-export type AllocationMode = 'auto' | 'manual' | 'hold';
+export type AllocationMode = 'auto' | 'manual';
 export type FeeMode = 'per_term' | 'total_spread' | 'upfront';
 export interface OperationInput {
   request_key: string;
@@ -66,20 +66,22 @@ export interface InstallmentUpdate extends OperationInput {
   refund_txn_id?: number;
   terms: TermChange[];
 }
-export interface SettlementInput extends OperationInput {
+export interface InstallmentRepaymentInput extends OperationInput {
   version: number;
-  principal: string;
-  fee_amount: string;
-  fee_account_id: number;
-  fee_category_id: number;
+  term_ids?: number[];
+  all_remaining?: boolean;
   from_account_id: number;
   entry_date: string;
+  quote_signature?: string;
+  total_amount?: string;
 }
+export type SettlementInput = InstallmentRepaymentInput;
 export interface LiabilityResult {
   operation_id: number;
   plan_id?: number;
   version?: number;
   transaction_ids: number[];
+  term_ids?: number[];
 }
 export type LiabilityCommand =
   | { mode: 'repay'; input: RepaymentInput }
@@ -92,4 +94,5 @@ export type LiabilityCommand =
       input: InstallmentUpdate;
     }
   | { mode: 'settle'; planId: number; input: SettlementInput }
+  | { mode: 'repay_plan'; planId: number; input: InstallmentRepaymentInput }
   | { mode: 'reverse'; operationId: number; input: OperationInput };

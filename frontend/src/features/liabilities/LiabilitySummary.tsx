@@ -6,7 +6,7 @@ import { useLiabilities, useLiabilityTypes } from '../../api/liability';
 import { QueryBoundary } from '../../components/QueryState';
 import PersonalLiabilityAccountModal from '../../components/PersonalLiabilityAccountModal';
 import Money from '../../components/Money';
-import { cents, sumMoney } from '../../lib/money';
+import { sumMoney } from '../../lib/money';
 import '../../styles/liabilities.css';
 export default function LiabilitySummary() {
   const navigate = useNavigate();
@@ -85,10 +85,10 @@ export default function LiabilitySummary() {
                   </span>
                   <span>
                     <small>
-                      {cents(a.surplus) > 0n ? '溢缴金额' : '总欠款'}
+                      总欠款
                     </small>
                     <Money
-                      value={cents(a.surplus) > 0n ? a.surplus : a.total_debt}
+                      value={a.total_debt}
                     />
                     <small>
                       本期应还 <Money value={a.current_due} />

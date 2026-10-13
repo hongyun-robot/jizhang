@@ -3,13 +3,16 @@ import type { LiabilityBill, LiabilityOperation } from '../api/liability';
 import Money from './Money';
 import LiabilityAmount from '../features/liabilities/LiabilityAmount';
 import { sumMoney } from '../lib/money';
+import type { ReactNode } from 'react';
 
 export default function LiabilityHistory({
   operation: o,
   bills,
+  sourceButton,
 }: {
   operation: LiabilityOperation;
   bills: Map<number, LiabilityBill>;
+  sourceButton?: (id: number) => ReactNode;
 }) {
   try {
     const before = historySnapshot(o.before_json);
@@ -66,23 +69,51 @@ export default function LiabilityHistory({
           <span className="small muted">消费日期和收支账期保持原记录。</span>
         </div>
       );
-    if (after.plan_snapshot) {
-      const plan = after.plan_snapshot;
-      const old = before.plans?.find((p) => p.id === plan.id);
+    const plans = after.plan_snapshots.length
+      ? after.plan_snapshots
+      : after.plan_snapshot
+        ? [after.plan_snapshot]
+        : [];
+    if (plans.length) {
       return (
         <div>
-          <p>
-            分期 {plan.id} · 版本 {old?.version ?? '新建'} → {plan.version}
-          </p>
-          {plan.terms.map((term) => {
-            const prior = old?.terms.find((t) => t.id === term.id);
+          {after.transactions.map((transaction) => (
+            <p key={transaction.id}>
+              {transaction.kind === 'transfer' ? '本次还款' : '手续费支出'}{' '}
+              <Money value={transaction.amount} /> · {transaction.entry_date.slice(0, 10)}{' '}
+              {o.reversed_at ? <span className="small muted">已撤销，原记录保留</span> : sourceButton?.(transaction.id)}
+            </p>
+          ))}
+          {plans.map((plan) => {
+            const old = before.plans?.find((p) => p.id === plan.id);
             return (
-              <div key={term.id} className="liability-history-term">
-                <div className="small muted">第 {term.number} 期 · 计划合计 · {term.fee_date}{term.fee_status === 'cancelled' && ' · 已取消'}</div>
-                <div className="liability-history-amounts">
-                  {prior && <><LiabilityAmount total={sumMoney([prior.principal, prior.fee_amount])} fee={prior.fee_amount} /><span>→</span></>}
-                  <LiabilityAmount total={sumMoney([term.principal, term.fee_amount])} fee={term.fee_amount} />
-                </div>
+              <div key={plan.id}>
+                <p>
+                  分期 {plan.id} · 版本 {old?.version ?? '新建'} → {plan.version}
+                </p>
+                {plan.terms
+                  .filter((term) => !after.term_ids.length || after.term_ids.includes(term.id))
+                  .map((term) => {
+                    const prior = old?.terms.find((t) => t.id === term.id);
+                    return (
+                      <div key={term.id} className="liability-history-term">
+                        <div className="small muted">
+                          第 {term.number} 期 · 计划合计 · {term.fee_date}
+                          {term.fee_status === 'cancelled' && ' · 已取消'}
+                          {term.status === 'settled' && ' · 已结清'}
+                        </div>
+                        <div className="liability-history-amounts">
+                          {prior && (
+                            <>
+                              <LiabilityAmount total={sumMoney([prior.principal, prior.fee_amount])} fee={prior.fee_amount} />
+                              <span>→</span>
+                            </>
+                          )}
+                          <LiabilityAmount total={sumMoney([term.principal, term.fee_amount])} fee={term.fee_amount} />
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             );
           })}

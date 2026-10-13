@@ -19,8 +19,8 @@ type Summary struct {
 	Overdue         decimal.Decimal `json:"overdue"`
 	Unbilled        decimal.Decimal `json:"unbilled"`
 	FuturePrincipal decimal.Decimal `json:"future_principal"`
-	PendingCredit   decimal.Decimal `json:"pending_credit"`
-	Surplus         decimal.Decimal `json:"surplus"`
+	PendingCredit   decimal.Decimal `json:"-"`
+	Surplus         decimal.Decimal `json:"-"`
 	ForecastFees    decimal.Decimal `json:"forecast_fees"`
 }
 type Detail struct {
@@ -38,6 +38,10 @@ type Detail struct {
 
 // Load uses a fixed set of batch reads rather than queries per account or bill.
 func Load(db *gorm.DB, accounts []model.Account, now time.Time) (map[int64]*Detail, error) {
+	return loadDetails(db, accounts, now, true)
+}
+
+func loadDetails(db *gorm.DB, accounts []model.Account, now time.Time, withHistory bool) (map[int64]*Detail, error) {
 	out := map[int64]*Detail{}
 	ids := []int64{}
 	for _, a := range accounts {
@@ -58,6 +62,9 @@ func Load(db *gorm.DB, accounts []model.Account, now time.Time) (map[int64]*Deta
 		order string
 	}{{&rules, "effective_from, version"}, {&bills, "cycle_end DESC"}, {&items, "id"}, {&credits, "entry_date, id"}, {&plans, "id DESC"}, {&ops, "id DESC"}}
 	for _, q := range queries {
+		if q.value == any(&ops) && !withHistory {
+			continue
+		}
 		query := db.Where("account_id IN ?", ids).Order(q.order)
 		if q.value == any(&ops) {
 			query = query.Limit(100)

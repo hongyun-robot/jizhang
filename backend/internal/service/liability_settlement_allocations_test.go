@@ -16,11 +16,11 @@ func TestLiabilitySettlementPreservesEarlierRepayment(t *testing.T) {
 	e.now = vdate(t, "2026-11-01")
 	_, err = e.svcL.EnsureDue(e.now)
 	mustOK(t, err)
-	e.pay(t, "20", "2026-11-01")
+	historicalPayment(t, e, "20", "2026-11-01")
 	before := e.state(t)
 	plan, err := e.svcL.Plan(adminUser(), created.PlanID)
 	mustOK(t, err)
-	settled, err := e.svcL.Settle(adminUser(), plan.ID, SettlementInput{RequestKey: uuid.NewString(), Version: plan.Version, Principal: dec("180"), FeeAmount: dec("0"), FeeAccountID: e.account, FeeCategoryID: e.category, FromAccountID: e.account, EntryDate: "2026-11-01"})
+	settled, err := e.svcL.Settle(adminUser(), plan.ID, settlementRequest(t, e, plan.ID))
 	mustOK(t, err)
 	assertPaid := func() {
 		t.Helper()
@@ -66,11 +66,11 @@ func TestLiabilityLegacySettlementTargetsTakePriorityWithoutNewMoney(t *testing.
 	e.now = vdate(t, "2026-11-01")
 	_, err = e.svcL.EnsureDue(e.now)
 	mustOK(t, err)
-	e.pay(t, "20", "2026-11-01")
+	historicalPayment(t, e, "20", "2026-11-01")
 	prior := e.state(t)
 	plan, err := e.svcL.Plan(adminUser(), created.PlanID)
 	mustOK(t, err)
-	_, err = e.svcL.Settle(adminUser(), plan.ID, SettlementInput{RequestKey: uuid.NewString(), Version: plan.Version, Principal: dec("180"), FeeAmount: dec("0"), FeeAccountID: e.account, FromAccountID: e.account, EntryDate: "2026-11-01"})
+	_, err = e.svcL.Settle(adminUser(), plan.ID, settlementRequest(t, e, plan.ID))
 	mustOK(t, err)
 	// Pre-fix settlements left the original paid credit in automatic mode.
 	mustOK(t, e.db.Model(&model.LiabilityCreditEvent{}).Where("id = ?", prior.Credits[0].ID).Updates(map[string]any{"mode": "auto", "targets": "[]"}).Error)
@@ -87,7 +87,7 @@ func TestLiabilityLegacySettlementTargetsTakePriorityWithoutNewMoney(t *testing.
 	}
 }
 
-func TestLiabilitySettlementKeepsExcessAutomaticCreditUsable(t *testing.T) {
+func TestLiabilitySettlementRejectsExcessAndHold(t *testing.T) {
 	e := newLiabilityEnv(t)
 	created, err := e.svcL.CreatePlan(adminUser(), InstallmentInput{AccountID: e.card, Amount: dec("200"), EntryDate: "2026-10-15", CategoryID: e.category, TermCount: 2, FeeInput: dec("0"), RequestKey: uuid.NewString()})
 	mustOK(t, err)
@@ -95,20 +95,26 @@ func TestLiabilitySettlementKeepsExcessAutomaticCreditUsable(t *testing.T) {
 	_, err = e.svcL.EnsureDue(e.now)
 	mustOK(t, err)
 	_, err = e.svcL.Repay(adminUser(), LiabilityRepaymentInput{AccountID: e.card, FromAccountID: e.account, Amount: dec("100"), EntryDate: "2026-11-01", Mode: "hold", RequestKey: uuid.NewString()})
-	mustOK(t, err)
-	e.pay(t, "150", "2026-11-01")
+	if !errors.Is(err, liability.ErrConflict) {
+		t.Fatal("hold request accepted", err)
+	}
+	_, err = e.svcL.Repay(adminUser(), LiabilityRepaymentInput{AccountID: e.card, FromAccountID: e.account, Amount: dec("150"), EntryDate: "2026-11-01", RequestKey: uuid.NewString()})
+	if !errors.Is(err, liability.ErrConflict) {
+		t.Fatal("excess request accepted", err)
+	}
+	e.pay(t, "100", "2026-11-01")
 	plan, err := e.svcL.Plan(adminUser(), created.PlanID)
 	mustOK(t, err)
-	_, err = e.svcL.Settle(adminUser(), plan.ID, SettlementInput{RequestKey: uuid.NewString(), Version: plan.Version, Principal: dec("100"), FeeAmount: dec("0"), FeeAccountID: e.account, FromAccountID: e.account, EntryDate: "2026-11-01"})
+	_, err = e.svcL.Settle(adminUser(), plan.ID, settlementRequest(t, e, plan.ID))
 	mustOK(t, err)
 	d := e.state(t)
-	if !d.Summary.PendingCredit.Equal(dec("50")) || d.Credits[1].Mode != "auto" {
-		t.Fatal("excess automatic funding was frozen", d.Summary, d.Credits)
+	if !d.Summary.PendingCredit.IsZero() || !d.Summary.TotalDebt.IsZero() {
+		t.Fatal("settlement left unused funds", d.Summary, d.Credits)
 	}
 	e.spend(t, "20", "2026-11-02")
 	d = e.state(t)
-	if !d.Summary.PendingCredit.Equal(dec("30")) || !d.Summary.TotalDebt.IsZero() || !d.Summary.Unbilled.IsZero() {
-		t.Fatal("excess funding cannot cover a new ordinary expense", d.Summary)
+	if !d.Summary.PendingCredit.IsZero() || !d.Summary.TotalDebt.Equal(dec("20")) || !d.Summary.Unbilled.Equal(dec("20")) {
+		t.Fatal("new expense was incorrectly prepaid", d.Summary)
 	}
 }
 
@@ -119,13 +125,13 @@ func TestLiabilitySettlementPinningChecksPaymentActorAndRollsBack(t *testing.T) 
 	e.now = vdate(t, "2026-11-01")
 	_, err = e.svcL.EnsureDue(e.now)
 	mustOK(t, err)
-	e.pay(t, "20", "2026-11-01")
+	historicalPayment(t, e, "20", "2026-11-01")
 	// Legacy shared-account history may have a payment created by another user.
 	mustOK(t, e.db.Model(&model.Transaction{}).Where("kind = ? AND transfer_account_id = ?", model.TxnTransfer, e.card).Update("created_by", 3).Error)
 	plan, err := e.svcL.Plan(adminUser(), created.PlanID)
 	mustOK(t, err)
 	actor := &model.User{ID: 1, Role: model.RoleMember}
-	_, err = e.svcL.Settle(actor, plan.ID, SettlementInput{RequestKey: uuid.NewString(), Version: plan.Version, Principal: dec("180"), FeeAmount: dec("0"), FeeAccountID: e.account, FromAccountID: e.account, EntryDate: "2026-11-01"})
+	_, err = e.svcL.Settle(actor, plan.ID, settlementRequest(t, e, plan.ID))
 	if !errors.Is(err, ErrTxnForbidden) {
 		t.Fatal("member changed another creator's payment allocation", err)
 	}

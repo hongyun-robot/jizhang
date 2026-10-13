@@ -52,6 +52,7 @@ import {
 } from '../lib/money';
 import { plannedBills } from '../lib/liability';
 import Money from './Money';
+import { isAxiosError } from 'axios';
 
 const titles: Record<LiabilityDialog['mode'], string> = {
   repay: '记录还款',
@@ -60,6 +61,7 @@ const titles: Record<LiabilityDialog['mode'], string> = {
   create_plan: '记录固定分期',
   edit_plan: '调整分期与费用',
   settle: '提前结清',
+  repay_plan: '按期提前还款',
   reverse: '撤销并恢复记录',
 };
 import { amountRules } from '../features/liabilities/fields/amountRules';
@@ -77,6 +79,7 @@ export default function LiabilityDialogs({
 }) {
   useVisualViewportKeyboard(true);
   const submitGate = submissionRef(submissionGate());
+  const attempt = useRef<{ fingerprint?: string; key?: string }>({});
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [creatingPlatform, setCreatingPlatform] = useState(false);
   // This component is keyed by requestKey. Refreshes replace query data but must
@@ -102,7 +105,7 @@ export default function LiabilityDialogs({
   );
   const editable = (id: number) => canModifyOwnedRecord(user, id);
   const assets = (accounts.data ?? [])
-    .filter((a) => a.type === 'asset' && a.status === 'active')
+    .filter((a) => a.type === 'asset' && a.status === 'active' && !('asset_kind' in a && a.asset_kind === 'fund'))
     .map((a) => ({ value: a.id, label: a.name }));
   const feeAccounts = [
     { value: d.account.id, label: `${d.account.name} · 计入欠款` },
@@ -188,7 +191,6 @@ export default function LiabilityDialogs({
       term_count: 3,
       fee_mode: 'per_term',
       fee_input: '0',
-      fee_amount: '0',
       fee_account_id: d.account.id,
       from_account_id: firstAsset,
       first_statement_date: dayjs(),
@@ -230,9 +232,8 @@ export default function LiabilityDialogs({
     if (plan) {
       initial.version = dialog.version ?? plan.version;
       initial.fee_category_id = plan.fee_category_id;
-      if (dialog.mode === 'settle') {
-        initial.principal = sumMoney(plan.terms.map((t) => t.remaining));
-        initial.fee_account_id = firstAsset;
+      if (dialog.mode === 'settle' || dialog.mode === 'repay_plan') {
+        initial.repayment_end = dialog.mode === 'settle' ? 0 : plan.terms.find((t) => cents(t.remaining) > 0n)?.number;
       }
       if (dialog.mode === 'edit_plan')
         initial.terms = plan.terms.map((t) => ({
@@ -260,8 +261,8 @@ export default function LiabilityDialogs({
   }, [dialog, cats.data, accounts.data, form]);
 
   const settlementInput = (value: Values) => {
-    if (dialog?.mode !== 'settle') throw new Error('请选择结清操作');
-    return makeSettlementInput(dialog, value);
+    if (dialog?.mode !== 'settle' && dialog?.mode !== 'repay_plan') throw new Error('请选择分期还款操作');
+    return makeSettlementInput(dialog, value, operationDetail);
   };
   const previewGeneration = useRef(0);
   const loadPreview = async () => {
@@ -272,11 +273,12 @@ export default function LiabilityDialogs({
       const values = await form.validateFields();
       const result = await liabilityClient.preview(
         plan.id,
-        settlementInput(values)
+        settlementInput(values),
+        dialog?.mode === 'repay_plan' ? 'repay_plan' : 'settle'
       );
       if (generation !== previewGeneration.current) return;
       setPreview(result);
-      form.setFieldValue('version', result.version);
+      form.setFieldsValue({ version: result.version, quote_signature: result.quote_signature, total_amount: result.total_amount });
     } catch (error) {
       message.error(errMsg(error));
     } finally {
@@ -289,22 +291,35 @@ export default function LiabilityDialogs({
       if (!dialog || write.isPending) return;
       try {
         const v = await form.validateFields();
-        if (dialog.mode === 'settle' && !preview) {
-          message.info('请先核对结清预览');
+        if ((dialog.mode === 'settle' || dialog.mode === 'repay_plan') && !preview) {
+          message.info('请先核对本次还款金额');
           return;
         }
         const feeDatesInput =
           Object.keys(feeDates).length && v.fee_mode !== 'upfront'
             ? schedule.map((row) => row.feeDate)
             : undefined;
-        await write.mutateAsync(
-          liabilityCommand(operationDetail, dialog, v, feeDatesInput)
-        );
+        const command = liabilityCommand(operationDetail, dialog, v, feeDatesInput);
+        if (command.mode === 'settle' || command.mode === 'repay_plan') {
+          const fingerprint = JSON.stringify(command.input);
+          if (attempt.current.fingerprint !== fingerprint) {
+            attempt.current = {
+              fingerprint,
+              key: attempt.current.fingerprint ? crypto.randomUUID() : dialog.requestKey,
+            };
+          }
+          command.input.request_key = attempt.current.key ?? dialog.requestKey;
+        }
+        await write.mutateAsync(command);
         message.success('已保存，账单与资金记录已更新');
         onClose();
       } catch (e) {
         if (e && typeof e === 'object' && 'errorFields' in e) return;
         message.error(errMsg(e));
+        if ((dialog.mode === 'settle' || dialog.mode === 'repay_plan') && isAxiosError(e) && e.response?.status === 409) {
+          previewGeneration.current++;
+          setPreview(null);
+        }
       }
     });
   if (!dialog) return null;
@@ -336,9 +351,7 @@ export default function LiabilityDialogs({
   const targets =
     values?.mode === 'manual'
       ? (values.targets ?? [])
-      : values?.mode === 'hold'
-        ? []
-        : eligible.map((b) => ({
+      : eligible.map((b) => ({
             statement_id: b.id,
             amount: money(available.get(b.id) ?? 0n),
           }));
@@ -385,7 +398,6 @@ export default function LiabilityDialogs({
           options={[
             { value: 'auto', label: '先还最早到期账单' },
             { value: 'manual', label: '手动指定账单' },
-            { value: 'hold', label: '保留为待抵扣资金' },
           ]}
         />
       </Form.Item>
@@ -430,7 +442,7 @@ export default function LiabilityDialogs({
         </Form.List>
       )}
       <p className="small muted">
-        未分配金额保留待抵扣。还款本金不会计入收支和预算。
+        还款金额须全部用于实际欠款。分期必须连同手续费整期还清，本金还款不计入收支和预算。
       </p>
       {allocationError ? (
         <Alert type="warning" title={allocationError} />
@@ -449,8 +461,7 @@ export default function LiabilityDialogs({
             ]}
           />
           <p>
-            本次保留待抵扣 <Money value={money(previewLeft)} />
-            。提交时按最新账单重新核验。
+            {previewLeft > 0n ? '金额超过当前账单可偿付范围；提前偿还未来期次请从分期计划操作。' : '提交时核对最新账单及完整分期期次金额。'}
           </p>
         </>
       )}
@@ -493,19 +504,20 @@ export default function LiabilityDialogs({
       onCancel={onClose}
       onOk={submit}
       confirmLoading={write.isPending}
-      okButtonProps={{ disabled: creatingAccount || creatingPlatform }}
+      okButtonProps={{ disabled: creatingAccount || creatingPlatform || ((dialog.mode === 'settle' || dialog.mode === 'repay_plan') && (!preview || previewing)) }}
       width={
         dialog.mode === 'create_plan' || dialog.mode === 'edit_plan' ? 820 : 620
       }
       styles={{ body: { maxHeight: '65dvh', overflowY: 'auto' } }}
-      okText={dialog.mode === 'settle' ? '确认结清' : '保存'}
+      okText={dialog.mode === 'settle' ? '确认结清' : dialog.mode === 'repay_plan' ? '确认还款' : '保存'}
     >
       <Form
         name="liability-operation"
         form={form}
         layout="vertical"
+        disabled={write.isPending}
         onValuesChange={() => {
-          if (dialog.mode === 'settle') {
+          if (dialog.mode === 'settle' || dialog.mode === 'repay_plan') {
             previewGeneration.current++;
             setPreview(null);
           }
@@ -514,6 +526,8 @@ export default function LiabilityDialogs({
         <Form.Item name="version" hidden>
           <InputNumber />
         </Form.Item>
+        <Form.Item name="quote_signature" hidden><Input /></Form.Item>
+        <Form.Item name="total_amount" hidden><Input /></Form.Item>
         {dialog.mode === 'repay' && <RepaymentFields context={context} />}
         {dialog.mode === 'allocation' && <AllocationFields context={context} />}
         {dialog.mode === 'reconcile' && <ReconcileFields context={context} />}
@@ -523,7 +537,7 @@ export default function LiabilityDialogs({
         {dialog.mode === 'edit_plan' && plan && (
           <AdjustmentFields context={context} />
         )}
-        {dialog.mode === 'settle' && plan && (
+        {(dialog.mode === 'settle' || dialog.mode === 'repay_plan') && plan && (
           <SettlementFields context={context} />
         )}
         {dialog.mode === 'reverse' && <ReverseFields context={context} />}

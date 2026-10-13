@@ -78,11 +78,13 @@ func TestLiabilityOrdinaryMutationAndAllFundDirections(t *testing.T) {
 	cat := model.Category{OwnerID: testOwner(1), Name: "credit-income", Kind: model.KindIncome}
 	mustOK(t, e.db.Create(&cat).Error)
 	_, err = e.txn.Create(adminUser(), TxnInput{Kind: model.TxnIncome, Amount: dec("50"), AccountID: e.card, CategoryID: cat.ID, EntryDate: vdate(t, "2026-11-02")})
-	mustOK(t, err)
+	if !errors.Is(err, liability.ErrConflict) {
+		t.Fatal("income without actual debt accepted", err)
+	}
 	_, err = e.txn.Create(adminUser(), TxnInput{Kind: model.TxnTransfer, Amount: dec("30"), AccountID: e.card, TransferAccountID: e.account, EntryDate: vdate(t, "2026-11-02")})
 	mustOK(t, err)
 	d = e.state(t)
-	if !d.Summary.Balance.Equal(dec("20")) {
+	if !d.Summary.Balance.Equal(dec("-30")) {
 		t.Fatal(d.Summary)
 	}
 	cat2 := model.Category{OwnerID: testOwner(1), Name: "actual asset expense", Kind: model.KindExpense}
@@ -118,10 +120,10 @@ func TestLiabilityManualAllocationAndReallocation(t *testing.T) {
 			november = b.ID
 		}
 	}
-	r, err := e.svcL.Repay(adminUser(), LiabilityRepaymentInput{AccountID: e.card, FromAccountID: e.account, Amount: dec("400"), EntryDate: "2026-12-01", RequestKey: uuid.NewString(), Mode: "manual", Targets: []liability.Target{{StatementID: november, Amount: dec("100")}}})
+	r, err := e.svcL.Repay(adminUser(), LiabilityRepaymentInput{AccountID: e.card, FromAccountID: e.account, Amount: dec("400"), EntryDate: "2026-12-01", RequestKey: uuid.NewString(), Mode: "manual", Targets: []liability.Target{{StatementID: november, Amount: dec("400")}}})
 	mustOK(t, err)
 	d = e.state(t)
-	if !d.Summary.Overdue.Equal(dec("300")) || !d.Summary.PendingCredit.Equal(dec("300")) || !d.Summary.CurrentDue.Equal(dec("400")) {
+	if !d.Summary.Overdue.Equal(dec("300")) || !d.Summary.PendingCredit.IsZero() || !d.Summary.CurrentDue.Equal(dec("100")) {
 		t.Fatal("manual intent changed", d.Summary)
 	}
 	_, err = e.svcL.Allocate(adminUser(), r.TransactionIDs[0], LiabilityAllocationInput{RequestKey: uuid.NewString(), Reason: "改为按到期日偿还", Mode: "auto"})
@@ -270,10 +272,14 @@ func TestLiabilityRoleBoundsAndRefundToDifferentAccount(t *testing.T) {
 		t.Fatal("asset refund incorrectly repaid debt")
 	}
 	_, err = e.txn.Create(adminUser(), TxnInput{Kind: model.TxnRefund, Amount: dec("600"), AccountID: e.card, RelatedTxnID: source.ID, EntryDate: vdate(t, "2026-11-03")})
+	if !errors.Is(err, liability.ErrConflict) {
+		t.Fatal("excess liability refund accepted", err)
+	}
+	_, err = e.txn.Create(adminUser(), TxnInput{Kind: model.TxnRefund, Amount: dec("600"), AccountID: e.account, RelatedTxnID: source.ID, EntryDate: vdate(t, "2026-11-03")})
 	mustOK(t, err)
 	d := e.state(t)
-	if !d.Summary.Surplus.Equal(dec("100")) {
-		t.Fatal("excess refund lost", d.Summary)
+	if !d.Summary.TotalDebt.Equal(dec("500")) || !d.Summary.PendingCredit.IsZero() {
+		t.Fatal("asset refund changed original debt", d.Summary)
 	}
 }
 

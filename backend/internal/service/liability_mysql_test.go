@@ -302,6 +302,7 @@ func TestLiabilityMySQL(t *testing.T) {
 	}
 	// Distinct money operations compete for the same remaining principal.
 	plan := d.Plans[0]
+	settlement := settlementRequest(t, e, plan.ID)
 	start := make(chan struct{})
 	results := make(chan error, 3)
 	go func() {
@@ -316,7 +317,7 @@ func TestLiabilityMySQL(t *testing.T) {
 	}()
 	go func() {
 		<-start
-		_, err := e.svcL.Settle(adminUser(), plan.ID, SettlementInput{Version: plan.Version, Principal: dec("3000"), FeeAmount: dec("15"), FeeAccountID: e.account, FromAccountID: e.account, EntryDate: "2026-12-01", RequestKey: uuid.NewString()})
+		_, err := e.svcL.Settle(adminUser(), plan.ID, settlement)
 		results <- err
 	}()
 	close(start)
@@ -333,10 +334,10 @@ func TestLiabilityMySQL(t *testing.T) {
 		}
 	}
 	if d.Plans[0].Status == "settled" {
-		if !d.Summary.Balance.Equal(dec("1520")) {
+		if !d.Summary.Balance.IsZero() || !d.Summary.PendingCredit.IsZero() {
 			t.Fatal(d.Summary)
 		}
-	} else if !d.Summary.TotalDebt.Equal(dec("1500")) {
+	} else if !d.Summary.TotalDebt.Equal(dec("1500")) && !d.Summary.TotalDebt.Equal(dec("2520")) {
 		t.Fatal(d.Summary)
 	}
 	// Fee generation and a real payment share the closing lock, so a frozen
@@ -361,7 +362,7 @@ func TestLiabilityMySQL(t *testing.T) {
 	close(start)
 	for i := 0; i < 3; i++ {
 		err := <-results
-		if err != nil && !errors.Is(err, ErrTxnClosedPeriod) {
+		if err != nil && !errors.Is(err, ErrTxnClosedPeriod) && !errors.Is(err, liability.ErrConflict) {
 			t.Fatal(err)
 		}
 	}

@@ -37,6 +37,11 @@ func TestLiabilityTypesComeFromDatabase(t *testing.T) {
 	if rows[0].Name != "已更新的数据库名称" {
 		t.Fatal("stale code labels", rows)
 	}
-	_, err = e.svcL.Repay(adminUser(), LiabilityRepaymentInput{AccountID: a.ID, FromAccountID: e.account, Amount: dec("10"), EntryDate: "2026-10-15", RequestKey: uuid.NewString()})
+	_, err = e.txn.Create(adminUser(), TxnInput{Kind: model.TxnExpense, AccountID: a.ID, CategoryID: e.category, Amount: dec("10"), EntryDate: e.now})
+	mustOK(t, err)
+	e.now = vdate(t, "2026-11-01")
+	_, err = e.svcL.EnsureDue(e.now)
+	mustOK(t, err)
+	_, err = e.svcL.Repay(adminUser(), LiabilityRepaymentInput{AccountID: a.ID, FromAccountID: e.account, Amount: dec("10"), EntryDate: "2026-11-01", RequestKey: uuid.NewString()})
 	mustOK(t, err)
 }

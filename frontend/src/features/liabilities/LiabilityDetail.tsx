@@ -42,7 +42,7 @@ import LiabilityDialogs, {
 } from '../../components/LiabilityDialogs';
 import TxnFormModal, { type TxnRefill } from '../../components/TxnFormModal';
 import type { Transaction } from '../../api/types';
-import { cents } from '../../lib/money';
+
 import '../../styles/liabilities.css';
 
 import PersonalLiabilityAccountModal from '../../components/PersonalLiabilityAccountModal';
@@ -224,14 +224,10 @@ export default function LiabilityDetail() {
           <div className="liability-summary">
             <div>
               <span>
-                {cents(d.summary.surplus) > 0n ? '溢缴金额' : '总欠款'}
+                总欠款
               </span>
               <Money
-                value={
-                  cents(d.summary.surplus) > 0n
-                    ? d.summary.surplus
-                    : d.summary.total_debt
-                }
+                value={d.summary.total_debt}
               />
             </div>
             <div>
@@ -255,9 +251,6 @@ export default function LiabilityDetail() {
             </span>
             <span>
               其中后续分期本金 <Money value={d.summary.future_principal} />
-            </span>
-            <span>
-              待抵扣资金 <Money value={d.summary.pending_credit} />
             </span>
             <span>
               未来手续费预估 <Money value={d.summary.forecast_fees} />

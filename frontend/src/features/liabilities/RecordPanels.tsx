@@ -13,6 +13,7 @@ import type { SessionUser } from '../../domain/identity';
 import type { LiabilityIntent } from './dialog';
 import { liabilityIndexes } from './indexes';
 import { cents, sumMoney } from '../../lib/money';
+import { historySnapshot } from './history';
 
 export interface RecordContext {
   d: LiabilityDetail;
@@ -33,6 +34,7 @@ const opNames: Record<string, string> = {
   refund_adjustment: '退款核对',
   fee: '分期费用',
   settle: '提前结清',
+  installment_repayment: '按期还款',
   reverse: '撤销操作',
   reconcile: '账单核对',
 };
@@ -98,8 +100,11 @@ export function PlanDetails({
                         : cents(t.fee_amount) === 0n
                           ? '无费用'
                           : '预估'}{' '}
-                  · {t.fee_date}
+                  · {t.fee_txn_id ? (index.txns.get(t.fee_txn_id)?.entry_date.slice(0, 10) ?? t.fee_date) : t.fee_date}
                 </div>
+                {t.fee_txn_id && index.txns.get(t.fee_txn_id)?.entry_date.slice(0, 10) !== t.fee_date && (
+                  <div className="small muted">计划收取日 {t.fee_date}</div>
+                )}
                 {t.blocked_reason && (
                   <span className="liability-problem">{t.blocked_reason}</span>
                 )}
@@ -119,7 +124,10 @@ export function PlanDetails({
               ? '核对退款后的期次'
               : '调整未来期次 / 费用'}
           </Button>
-          <Button onClick={() => open({ mode: 'settle', planId: p.id })}>
+          <Button disabled={p.status === 'needs_reconcile'} onClick={() => open({ mode: 'repay_plan', planId: p.id })}>
+            按期提前还款
+          </Button>
+          <Button disabled={p.status === 'needs_reconcile'} onClick={() => open({ mode: 'settle', planId: p.id })}>
             提前结清
           </Button>
         </Space>
@@ -144,7 +152,6 @@ export function PaymentHistory({ context }: { context: RecordContext }) {
       columns={[
         { title: '还款日期', dataIndex: 'entry_date' },
         { title: '还款金额', render: (_, c) => <LiabilityAmount total={c.amount} fee={index.amounts.paymentFee(c.id)} feeLabel="已抵扣手续费" /> },
-        { title: '待抵扣', render: (_, c) => <Money value={c.remaining} /> },
         {
           title: '分配',
           render: (_, c) => (
@@ -152,10 +159,8 @@ export function PaymentHistory({ context }: { context: RecordContext }) {
               {c.mode === 'auto'
                 ? '按到期日'
                 : c.mode === 'settlement'
-                  ? '结清分配'
-                  : c.mode === 'hold'
-                    ? '待抵扣'
-                    : '手动指定'}
+                  ? '整期分配'
+                  : '手动指定'}
               {(index.allocationsByCredit.get(c.id) ?? []).map((a) => (
                 <div className="small muted" key={a.id}>
                   {
@@ -230,7 +235,7 @@ export function OperationHistory({ context }: { context: RecordContext }) {
         {
           title: '修正',
           render: (_, o: LiabilityOperation) =>
-            ['settle', 'repayment'].includes(o.kind) &&
+            (['settle', 'repayment', 'installment_repayment'].includes(o.kind) || (o.kind === 'allocation' && historySnapshot(o.result_json).term_ids.length > 0)) &&
             !o.reversed_at &&
             editable(o.actor_id) ? (
               <Button
@@ -244,7 +249,7 @@ export function OperationHistory({ context }: { context: RecordContext }) {
       ]}
       expandable={{
         expandedRowRender: (o) => (
-          <LiabilityHistory operation={o} bills={bills} />
+          <LiabilityHistory operation={o} bills={bills} sourceButton={context.sourceButton} />
         ),
       }}
     />

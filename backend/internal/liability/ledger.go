@@ -265,35 +265,11 @@ func Reallocate(db *gorm.DB, account int64) error {
 		remaining[d.ID] = d.Amount
 	}
 	desired := map[int64][]model.LiabilityAllocation{}
-	sourceIds := []int64{}
-	for _, d := range items {
-		sourceIds = append(sourceIds, d.SourceID)
-	}
-	var sourceRows []model.Transaction
-	if len(sourceIds) > 0 {
-		if e := db.Where("id IN ?", sourceIds).Find(&sourceRows).Error; e != nil {
-			return e
-		}
-	}
-	sourceDates := map[int64]string{}
-	for _, t := range sourceRows {
-		sourceDates[t.ID] = Date(t.EntryDate)
-	}
 	for _, c := range credits {
 		if !c.Active {
 			continue
 		}
 		left := c.Amount
-		newPurchase := func(d model.LiabilityDebtItem) bool {
-			return d.PlanID == nil && d.CreatedAt.After(c.CreatedAt) && sourceDates[d.SourceID] >= c.EntryDate
-		}
-		newBill := func(b model.LiabilityStatement) bool {
-			if b.IssuedAt == nil {
-				return false
-			}
-			date := Date(*b.IssuedAt)
-			return date > c.EntryDate || (date == c.EntryDate && Date(c.CreatedAt) == c.EntryDate && b.IssuedAt.After(c.CreatedAt))
-		}
 		allocate := func(d model.LiabilityDebtItem, limit decimal.Decimal) {
 			n := decimal.Min(left, decimal.Min(remaining[d.ID], limit))
 			if !n.IsPositive() {
@@ -325,14 +301,6 @@ func Reallocate(db *gorm.DB, account int64) error {
 					}
 				}
 			}
-			if c.Mode == "manual" {
-				for _, d := range items {
-					b := bm[d.StatementID]
-					if newBill(b) || newPurchase(d) {
-						allocate(d, left)
-					}
-				}
-			}
 			continue
 		}
 		if c.Mode == "hold" {
@@ -347,8 +315,9 @@ func Reallocate(db *gorm.DB, account int64) error {
 		}
 		for _, d := range items {
 			b := bm[d.StatementID]
-			// Prepayment can cover a later ordinary purchase, not unissued installment terms.
-			if b.IssuedAt != nil || newPurchase(d) {
+			// Future installment payments use explicit term targets. There is no
+			// unused funding that may silently pay a later purchase or bill.
+			if b.IssuedAt != nil {
 				allocate(d, left)
 			}
 		}

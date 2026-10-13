@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+	"gorm.io/gorm"
 
 	"jizhang/internal/liability"
 	"jizhang/internal/model"
@@ -55,7 +56,8 @@ type TxnDeps struct {
 
 // TransactionService 流水记账。
 type TransactionService struct {
-	deps TxnDeps
+	deps         TxnDeps
+	liabilityNow func() time.Time
 	// OnWrite 写成功后的钩子（用于统计缓存主动失效）。
 	OnWrite func()
 	// OnWritePeriod 写成功后携带受影响账期（预算超支评估用，任务 8.2）。
@@ -241,8 +243,37 @@ func (s *TransactionService) create(actor *model.User, in TxnInput) (*model.Tran
 		rid := in.RelatedTxnID
 		t.RelatedTxnID = &rid
 	}
+	var prepared *preparedRepayment
+	if in.Kind == model.TxnTransfer {
+		if provider, ok := s.deps.Txns.(interface{ DB() *gorm.DB }); ok {
+			var account model.Account
+			if err := provider.DB().First(&account, in.TransferAccountID).Error; err != nil {
+				return nil, err
+			}
+			if account.BillingEnabled {
+				if err := checkRepaymentAccount(provider.DB(), actor, in.AccountID); err != nil {
+					return nil, err
+				}
+				liabilities := &LiabilityService{db: provider.DB(), txns: s, Now: s.liabilityClock}
+				var err error
+				prepared, err = liabilities.prepareOrdinaryRepayment(provider.DB(), actor, account.ID, in.AccountID, in.Amount, liability.Date(in.EntryDate), "auto", nil, nil)
+				if err != nil {
+					return nil, err
+				}
+				if prepared != nil {
+					t.LiabilityOperationID = &prepared.Op.ID
+				}
+			}
+		}
+	}
 	if err := s.deps.Txns.Create(t); err != nil {
 		return nil, err
+	}
+	if prepared != nil {
+		provider := s.deps.Txns.(interface{ DB() *gorm.DB })
+		if _, err := prepared.finish(provider.DB(), actor, t, true); err != nil {
+			return nil, err
+		}
 	}
 	if err := s.ensurePlatform(t.Platform); err != nil {
 		return nil, err

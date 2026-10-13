@@ -4,6 +4,7 @@ import type {
   LiabilityCommand,
   LiabilityResult,
   SettlementInput,
+  InstallmentRepaymentInput,
 } from './liability-inputs';
 
 export function createLiabilityClient(send = writeApi) {
@@ -50,15 +51,22 @@ export function createLiabilityClient(send = writeApi) {
             `/liabilities/operations/${command.operationId}/reverse`,
             command.input
           );
+        case 'repay_plan':
+          return send(
+            'post',
+            `/liabilities/installments/${command.planId}/repay`,
+            command.input
+          );
       }
     },
     preview(
       planId: number,
-      input: SettlementInput
+      input: SettlementInput | InstallmentRepaymentInput,
+      mode: 'settle' | 'repay_plan' = 'settle'
     ): Promise<SettlementPreview> {
       return send(
         'post',
-        `/liabilities/installments/${planId}/settlement-preview`,
+        `/liabilities/installments/${planId}/${mode === 'repay_plan' ? 'repayment-preview' : 'settlement-preview'}`,
         input
       );
     },
