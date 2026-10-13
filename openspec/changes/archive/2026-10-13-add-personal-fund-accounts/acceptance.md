@@ -64,12 +64,12 @@ remaining_isolated_test_databases=0
 
 截图由本次脚本生成，保留在工作区的被忽略目录，未纳入源码提交：
 
-- [桌面基金账户](../../../frontend/e2e/shots/refactor-frontend/funds-desktop-account.png)
-- [桌面持仓详情](../../../frontend/e2e/shots/refactor-frontend/funds-desktop-position.png)
-- [360px 多持仓账户](../../../frontend/e2e/shots/refactor-frontend/funds-mobile-account.png)
-- [360px 只读持仓](../../../frontend/e2e/shots/refactor-frontend/funds-mobile-readonly.png)
-- [360px 现金分红](../../../frontend/e2e/shots/refactor-frontend/funds-mobile-position.png)
-- [360px 再投资](../../../frontend/e2e/shots/refactor-frontend/funds-mobile-reinvestment.png)
+- [桌面基金账户](../../../../frontend/e2e/shots/refactor-frontend/funds-desktop-account.png)
+- [桌面持仓详情](../../../../frontend/e2e/shots/refactor-frontend/funds-desktop-position.png)
+- [360px 多持仓账户](../../../../frontend/e2e/shots/refactor-frontend/funds-mobile-account.png)
+- [360px 只读持仓](../../../../frontend/e2e/shots/refactor-frontend/funds-mobile-readonly.png)
+- [360px 现金分红](../../../../frontend/e2e/shots/refactor-frontend/funds-mobile-position.png)
+- [360px 再投资](../../../../frontend/e2e/shots/refactor-frontend/funds-mobile-reinvestment.png)
 
 ## 晚间与凌晨调度修订验收
 
