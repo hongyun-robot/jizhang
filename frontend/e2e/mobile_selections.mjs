@@ -242,8 +242,8 @@ await withFixture(base, async (browser, cleanup) => {
     const categoryPicker = filter.getByRole('group', { name: '分类', exact: true });
     await categoryPicker.getByRole('checkbox', { name: prefix, exact: true }).click();
     assert(
-      !new URL(page.url()).searchParams.has('category_id'),
-      'browsing a group must not select its virtual ID'
+      new URL(page.url()).searchParams.get('category_id') === String(parent.id),
+      'selecting a parent filters all of its real subcategories'
     );
     await categoryPicker.getByRole('checkbox', { name: '同名子项', exact: true }).click();
     assert.equal(await page.locator('.selection-sheet:visible').count(), 0, 'category choice stays inline');
@@ -258,7 +258,7 @@ await withFixture(base, async (browser, cleanup) => {
       (checked) => checked === 'true',
       'inline category selection is reflected'
     );
-    await categoryPicker.getByRole('checkbox', { name: '全部分类', exact: true }).click();
+    await categoryPicker.locator('.cat-roots').getByRole('checkbox', { name: '全部', exact: true }).click();
     assert(await filter.isVisible());
     await until(() => page.url(), (url) => !new URL(url).searchParams.has('category_id'), 'inline category filter cleared');
     await filter.locator('.ant-drawer-close').click();

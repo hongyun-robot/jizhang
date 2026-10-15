@@ -29,7 +29,8 @@ describe('catalog presentation', () => {
       kind: 'expense',
       parent: 1,
     });
-    expect(categoryPath(index.options, 2)).toEqual([-1, 2]);
+    expect(categoryPath(index.options, 1)).toEqual([1]);
+    expect(categoryPath(index.options, 2)).toEqual([1, 2]);
     expect(categoryPath(index.options, 3)).toEqual([3]);
     expect(index.rootsFor('income')).toEqual([]);
   });

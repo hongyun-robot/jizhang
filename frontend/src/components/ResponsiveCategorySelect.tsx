@@ -31,8 +31,7 @@ export default function ResponsiveCategorySelect({
         roots={options.map(node)}
         value={value?.at(-1)}
         disabled={!active}
-        allowEmpty
-        emptyLabel="全部分类"
+        mode="filter"
         onChange={(id) => onChange(categoryPath(options, id) ?? [])}
       />
     </div>

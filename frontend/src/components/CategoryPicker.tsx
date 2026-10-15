@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Tag } from 'antd';
 import type { CategoryTreeNode } from '../api/types';
 
-/** 与记账表单一致的一级分类/子分类按钮，提交值始终是叶子分类。 */
+/** 业务表单选择末级分类；筛选模式允许选择整个大类或全部分类。 */
 export default function CategoryPicker({
   roots,
   value,
@@ -13,6 +13,7 @@ export default function CategoryPicker({
   error = false,
   heading,
   emptyLabel = '未分类',
+  mode = 'leaf',
   'aria-label': ariaLabel = '消费分类',
 }: {
   roots: CategoryTreeNode[];
@@ -24,28 +25,34 @@ export default function CategoryPicker({
   error?: boolean;
   heading?: string;
   emptyLabel?: string;
+  mode?: 'leaf' | 'filter';
   'aria-label'?: string;
 }) {
   const [activeId, setActiveId] = useState<number>();
+  const filtering = mode === 'filter';
   const selectedRoot = roots.find(
     (root) =>
       root.id === value || root.children?.some((leaf) => leaf.id === value)
   );
   const activeRoot =
-    selectedRoot ?? roots.find((root) => root.id === activeId) ?? roots[0];
+    selectedRoot ??
+    (filtering
+      ? undefined
+      : roots.find((root) => root.id === activeId) ?? roots[0]);
   const leaves = activeRoot?.children?.length
     ? activeRoot.children
-    : activeRoot
+    : activeRoot && !filtering
       ? [activeRoot]
       : [];
 
   const button = (
-    category: CategoryTreeNode,
+    key: number | string,
+    label: string,
     checked: boolean,
     choose: () => void
   ) => (
     <Tag.CheckableTag
-      key={category.id}
+      key={key}
       checked={checked}
       disabled={disabled}
       onChange={() => {
@@ -59,7 +66,7 @@ export default function CategoryPicker({
       }}
       style={disabled ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
     >
-      {category.name}
+      {label}
     </Tag.CheckableTag>
   );
 
@@ -72,19 +79,32 @@ export default function CategoryPicker({
     >
       {heading && <div className="pick-label">{heading}</div>}
       <div className="cat-roots">
+        {filtering &&
+          button('all-roots', '全部', value === undefined, () =>
+            onChange?.(undefined)
+          )}
         {roots.map((root) =>
-          button(root, activeRoot?.id === root.id, () => {
+          button(root.id, root.name, activeRoot?.id === root.id, () => {
             setActiveId(root.id);
-            onChange?.(root.children?.length ? undefined : root.id);
+            onChange?.(!filtering && root.children?.length ? undefined : root.id);
           })
         )}
       </div>
-      {leaves.length > 0 && <div className="pick-label">子分类</div>}
+      {(filtering || leaves.length > 0) && (
+        <div className="pick-label">子分类</div>
+      )}
       <div className="cat-leaves">
+        {filtering &&
+          button(
+            'all-leaves',
+            '全部',
+            value === undefined || value === activeRoot?.id,
+            () => onChange?.(activeRoot?.id)
+          )}
         {leaves.map((leaf) =>
-          button(leaf, value === leaf.id, () => onChange?.(leaf.id))
+          button(leaf.id, leaf.name, value === leaf.id, () => onChange?.(leaf.id))
         )}
-        {allowEmpty && (
+        {allowEmpty && !filtering && (
           <Tag.CheckableTag
             checked={!value}
             onChange={() => {

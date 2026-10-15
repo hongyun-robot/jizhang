@@ -128,7 +128,7 @@ await withFixture(base, async (browser) => {
       await pick(filter, '分类', root, leaf);
       await page.waitForURL((url) => url.searchParams.get('category_id') === String(leaf.id));
       await noPopup(page);
-      await filter.getByRole('group', { name: '分类', exact: true }).getByRole('checkbox', { name: '全部分类', exact: true }).click();
+      await filter.getByRole('group', { name: '分类', exact: true }).locator('.cat-roots').getByRole('checkbox', { name: '全部', exact: true }).click();
       await page.waitForURL((url) => !url.searchParams.has('category_id'));
       assert(await filter.isVisible(), 'filter stays open while choosing categories');
       await page.goto(base + '/accounts');

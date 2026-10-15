@@ -19,7 +19,6 @@ export function categoryIndex(forest?: CategoryForest | null) {
   const info = new Map<number, CategoryInfo>();
   const options: CategoryOption[] = [];
   const roots = (forest ?? []).flatMap((wrapper) => wrapper.children ?? []);
-  let group = -1;
   for (const root of roots) {
     if (!root.id) continue;
     info.set(root.id, { name: root.name, full: root.name, kind: root.kind });
@@ -29,7 +28,7 @@ export function categoryIndex(forest?: CategoryForest | null) {
       continue;
     }
     options.push({
-      value: group--,
+      value: root.id,
       label: root.kind === 'income' ? `收 · ${root.name}` : root.name,
       children: leaves.map((leaf) => {
         info.set(leaf.id, {
