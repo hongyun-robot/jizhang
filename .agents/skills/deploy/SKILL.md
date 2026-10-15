@@ -5,7 +5,7 @@ description: "Deploy local changes to the production jizhang server: hash-diff l
 
 # Deploy
 
-把当前工作树发布到 `https://jizhang.zhanghongyun.cn/`。整个流程由一个编排器驱动，因此**重复执行始终安全**：哈希比对让"树没变"的那次成为 **no-op**，`up -d --build` 本身幂等，`ssh` 全程只读写 `/srv/jizhang` 自己的四个容器。构建失败时**旧容器原样继续服务**——部署不会因为失败而让站点下线。
+把当前工作树发布到 `https://jizhang.zhanghongyun.cn/`。编排器按哈希差异同步并重建受影响的服务；构建期间旧容器继续服务。有待执行的数据库迁移时，构建完成后暂停 API 写入和后台任务，备份并在独立恢复库验证升级、回滚和再次升级，再切换服务。
 
 ## Steps
 
@@ -17,7 +17,7 @@ description: "Deploy local changes to the production jizhang server: hash-diff l
 
    **完成判据**：输出 `DEPLOY: ALL_GREEN`。
 
-   若输出 `无差异，无需同步`，这是一次**完成的空跑**——内容本就已在线上。如实报告后停止；`-Force` 用来处理"没改动但想重建"，不用来把空跑变成成功。
+   若无差异且验证成功，这是一次完成的空跑。若上次已同步但构建或切换失败，文件一致不能证明新镜像已运行，修复原因后用 `-Force` 完成重建。
 
 2. 若第 1 步打印出 `D 路径` 行，那是**孤儿**：服务器上有、本地已删或已移出作用域的文件。与用户确认后加 `-Purge` 重跑一次即删除（默认只报警不删）。
 
@@ -31,7 +31,7 @@ description: "Deploy local changes to the production jizhang server: hash-diff l
    | `[4/4]` | 已部署但验证不过 | 看具体哪条 `FAIL` 及其 `实际`/`期望` |
    | `[5/5]` | 冒烟没过（仅 `-Smoke`） | 失败时输出**全量**打印，据此定位是哪一项真的坏了 |
 
-   修完回到第 1 步重跑——diff 驱动，重跑只补未完成的部分。
+   修复后重跑。迁移验证失败时，`release.sh` 仅在生产库仍为原版本且 clean 时重启旧 API；若生产库已变更或 dirty，保留备份，先查明迁移状态并修复，再恢复服务。数据库迁移的业务回滚限制见 `docs/personal-platform-migration.md`。
 
 4. 报告：同步了哪些文件、重建了哪些容器、`verify.sh` 四项结果、冒烟是否通过。
 
@@ -43,19 +43,20 @@ description: "Deploy local changes to the production jizhang server: hash-diff l
 
 1. 生成本地哈希清单并上传。`targets` 覆盖 `frontend/src|public|index.html|package.json|package-lock.json|tsconfig.json|vite.config.ts|Dockerfile|nginx.conf|.dockerignore|e2e`、`backend`、`docker`、`openspec`、`README.md` 等 —— **`package-lock.json` 与 `nginx.conf` 少一个都不行**：前者漏了，服务器就是"新 package.json + 旧 lock"，`npm ci` 直接报 out of sync；后者是 Dockerfile 里 `COPY nginx.conf` 的源。同时上传 `roots` + `exclude`，让远端用**同一份**作用域规则找孤儿。
 2. 远端 `diff.sh` 比对 → 产出 `M`（内容不同）/`A`（缺失）清单，逐个 `scp` 补齐；另产出 `D`（孤儿）清单，只报警不删除。
-3. `docker compose --profile app up -d --build --wait --wait-timeout 180`，服务集按改动范围推导。`--wait` 阻塞到 healthcheck 通过——不等的话紧接着的验证会看到 `running/starting` 而误判 FAIL。
+3. 上传并执行 `scripts/release.sh`：先构建受影响服务；有待执行迁移时暂停 API、创建压缩备份、恢复到随机命名的独立库，验证 up/down/up 和原财务表数据哈希一致，再清理恢复库。生产迁移也在 API 暂停期间执行并比较原财务表哈希，验证后切换服务。备份保留在 `/srv/jizhang/backups/jizhang-pre-release-*.sql.gz`。切换使用 `up -d --no-build --wait --wait-timeout 180`，等健康检查通过。
 4. 远端 `verify.sh`：源码复比对必须 `0 不同 / 0 缺失`、四容器 `running/healthy`、`/` 与 `/api/v1/health` 返回 200、线上 `index.html` 引用的每个 favicon 都取得到 → `VERIFY: ALL_GREEN`。验证不过是**结果**不是异常，逐行打印出来。
 
-`-Smoke` 再追加一步：读 `/srv/jizhang/.env` 的 `ADMIN_PASSWORD`，跑 `frontend/e2e/prod_smoke.mjs`（17 项浏览器冒烟）。
+`-Smoke` 再追加一步：读 `/srv/jizhang/.env` 的 `ADMIN_PASSWORD`，创建唯一命名的临时账本账号，跑 `frontend/e2e/prod_smoke.mjs`。包括管理页 CRUD、跨账号目录隔离、记账与会话验证。仅清理本次测试流水及商家，最后停用临时账号并撤销会话；系统不提供用户物理删除接口，因此保留停用的测试账号。清理失败也判冒烟失败。
 
 ### 开关
 
 | 开关 | 作用 |
 |---|---|
-| `-Smoke` | 验证通过后跑 17 项生产冒烟 |
+| `-Smoke` | 验证通过后用临时账本跑生产冒烟 |
 | `-Force` | 无视差异，强制重建 `web` + `api` |
 | `-Purge` | 删除孤儿文件（默认只报警）；带 `..` 或绝对路径的条目会被拒删 |
-| `-Key` / `-Server` / `-Remote` / `-Site` | 覆盖默认连接参数 |
+| `-Key` | 指定 SSH 私钥；省略时自动选择候选路径中第一个存在的文件 |
+| `-Server` / `-Remote` / `-Site` | 覆盖默认连接参数 |
 
 ### 构建发生在服务器上
 
@@ -75,7 +76,7 @@ description: "Deploy local changes to the production jizhang server: hash-diff l
 
 - 远端命令一律**写成脚本文件、scp 过去执行**。内联进 PowerShell 的 `$(...)` 会被本机提前展开，`\"` 穿过 ssh 参数也会破形。
 - 传给远端的文本必须是 **LF**。CRLF 会让 bash `read` 把 `\r` 留在路径末尾，症状是"全部文件服务器缺失"。
-- SSH 一律 `-o BatchMode=yes -o ConnectTimeout=15 -i <key>`；私钥 `C:\Users\hongy\AppData\Local\Temp\opencode\id_jizhang`。原键 `C:\Users\hongy\Documents\1` 权限过宽，ssh 会拒用。
+- SSH 一律 `-o BatchMode=yes -o ConnectTimeout=15 -i <key>`。未传 `-Key` 时，编排器依次检查 `C:\Users\hongy\AppData\Local\Temp\opencode\id_jizhang`、`C:\Users\Administrator\Documents\1`，使用第一个存在的文件；全部缺失时提示用 `-Key` 指定。显式传入 `-Key` 优先，指定文件缺失时直接报错。候选列表由 `scripts/deploy.ps1` 的 `$KeyCandidates` 维护。旧路径 `C:\Users\hongy\Documents\1` 曾因权限过宽被 ssh 拒用，不在自动候选中。
 - PowerShell 的 `2>&1` 会把远端 stderr 变成 ErrorRecord，在 `$ErrorActionPreference='Stop'` 下放大成终止错误——脚本里已把 stderr 落到临时文件。
 - 非 root 下 `/var/lib/docker/**` 的通配符不展开，需要 `sudo bash -c '...'`；`docker ps --format '{{.ImageID}}'` 字段不存在，改用 `docker inspect -f '{{.Image}}'`。
 

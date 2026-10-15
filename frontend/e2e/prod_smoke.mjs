@@ -16,14 +16,22 @@ fs.mkdirSync(SHOTS, { recursive: true });
 
 const EXE =
   process.env.CHROME_EXE ??
-  path.join(process.env.LOCALAPPDATA, 'ms-playwright', 'chromium-1208', 'chrome-win64', 'chrome.exe');
+  [
+    path.join(process.env.LOCALAPPDATA, 'ms-playwright', 'chromium-1208', 'chrome-win64', 'chrome.exe'),
+    'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+  ].find((candidate) => fs.existsSync(candidate));
 const BASE = process.env.BASE ?? 'https://jizhang.zhanghongyun.cn';
-const USER = process.env.JZ_USER ?? 'admin';
-const PASS = process.env.JZ_PASS;
+const ADMIN_USER = process.env.JZ_USER ?? 'admin';
+const ADMIN_PASS = process.env.JZ_PASS;
+const USER = `deploy-smoke-${randomUUID()}`;
+const PASS = randomUUID();
+let smokeUserId;
+let adminToken;
 const SMOKE_NOTE = `生产冒烟-${randomUUID()}`;
 const INITIAL_COMPARE_DELAY = Number(process.env.PROD_SMOKE_COMPARE_DELAY_MS ?? 0);
 
-if (!PASS) {
+if (!ADMIN_PASS) {
   console.error('FATAL 需要环境变量 JZ_PASS（生产管理员口令）');
   process.exit(2);
 }
@@ -43,6 +51,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, `${name}.p
 const consoleErrors = [];
 const failedRequests = [];
 
+if (!EXE) throw new Error('找不到 Chromium 浏览器，请通过 CHROME_EXE 指定');
 const browser = await chromium.launch({ executablePath: EXE, headless: true });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();
@@ -72,6 +81,19 @@ page.on('response', (r) => {
 });
 
 try {
+  // Each user owns an independent ledger. Keep smoke writes out of real users' data.
+  const adminLogin = await fetch(BASE + '/api/v1/auth/login', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: ADMIN_USER, password: ADMIN_PASS }),
+  }).then((response) => response.json());
+  adminToken = adminLogin?.data?.access_token;
+  if (adminLogin?.code !== 0 || !adminToken) throw new Error('冒烟准备：管理员认证失败');
+  const createdUser = await fetch(BASE + '/api/v1/users', {
+    method: 'POST', headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ username: USER, password: PASS, role: 'admin' }),
+  }).then((response) => response.json());
+  if (createdUser?.code !== 0 || !createdUser?.data?.id) throw new Error('冒烟准备：临时账本账号创建失败');
+  smokeUserId = createdUser.data.id;
   // 1. 首屏（未登录应被 RequireAuth 异步跳到 /login，故等 URL 变化）
   const resp = await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
   ok(resp?.status() === 200, '首页 HTTP 200', String(resp?.status()));
@@ -107,6 +129,37 @@ try {
     ok(r?.status() === 200 && hasMarker > 0, `深链 ${path} 可刷新直达`, `http=${r?.status()} marker=${hasMarker}`);
   }
   await shot(page, 'prod-02-stats');
+
+  // Mine navigation and CRUD use only this run's private platform directory.
+  await page.getByRole('button', { name: '平台 / 商家管理', exact: true }).click();
+  await page.waitForURL(BASE + '/platforms');
+  await page.getByRole('heading', { name: '平台 / 商家管理', exact: true }).waitFor();
+  ok(true, '我的 → 平台 / 商家管理可达');
+  await page.getByRole('button', { name: '新建平台 / 商家', exact: true }).click();
+  let platformEditor = page.getByRole('dialog', { name: '新建平台 / 商家', exact: true });
+  await platformEditor.getByLabel('名称', { exact: true }).fill(SMOKE_NOTE);
+  await platformEditor.getByRole('button', { name: /确\s*定/ }).click();
+  await platformEditor.waitFor({ state: 'hidden' });
+  let platformRow = page.locator('.platform-row').filter({ hasText: SMOKE_NOTE });
+  await platformRow.waitFor();
+  ok(true, '本人平台 / 商家创建成功');
+  const adminDirectory = await fetch(BASE + '/api/v1/voucher-platforms', {
+    headers: { authorization: `Bearer ${adminToken}` },
+  }).then((response) => response.json());
+  ok(adminDirectory.code === 0 && !adminDirectory.data.some((row) => row.name === SMOKE_NOTE), '平台 / 商家跨账号不共享');
+  await platformRow.getByRole('button', { name: `重命名 ${SMOKE_NOTE}`, exact: true }).click();
+  platformEditor = page.getByRole('dialog', { name: '重命名平台 / 商家', exact: true });
+  await platformEditor.getByLabel('名称', { exact: true }).fill(SMOKE_NOTE + '-改名');
+  await platformEditor.getByRole('button', { name: /确\s*定/ }).click();
+  await platformEditor.waitFor({ state: 'hidden' });
+  platformRow = page.locator('.platform-row').filter({ hasText: SMOKE_NOTE + '-改名' });
+  await platformRow.waitFor();
+  ok(true, '本人平台 / 商家重命名成功');
+  await platformRow.getByRole('button', { name: `删除 ${SMOKE_NOTE}-改名`, exact: true }).click();
+  await page.locator('.ant-popconfirm:visible').getByRole('button', { name: /确\s*定/ }).click();
+  await platformRow.waitFor({ state: 'hidden' });
+  ok(true, '本人平台 / 商家删除成功');
+  await shot(page, 'prod-02-platforms');
 
   // 5. 记一笔（真实写入，随后删除还原）
   await page.goto(BASE + '/records', { waitUntil: 'domcontentloaded' });
@@ -180,7 +233,7 @@ try {
   ok(tabs === 4, '移动端四项导航可见', `tabs=${tabs}`);
   await shot(page, 'prod-05-mobile');
 } catch (e) {
-  ok(false, '执行异常', String(e).replaceAll(PASS, '<REDACTED>').slice(0, 300));
+  ok(false, '执行异常', String(e).replaceAll(PASS, '<REDACTED>').replaceAll(ADMIN_PASS, '<REDACTED>').slice(0, 300));
   await shot(page, 'prod-99-error').catch(() => {});
 }
 
@@ -230,10 +283,36 @@ try {
       throw new Error('清理后仍有本次冒烟流水或查询失败');
     }
     console.log(`-- 清理冒烟流水 ${hits.length} 条`);
+    const catalog = await fetch(BASE + '/api/v1/voucher-platforms', {
+      headers: { authorization: `Bearer ${tok}` },
+    }).then((response) => response.json());
+    if (catalog?.code !== 0 || !Array.isArray(catalog.data)) throw new Error('清理商家查询失败');
+    for (const row of catalog.data.filter((row) => [SMOKE_NOTE, SMOKE_NOTE + '-改名'].includes(row.name))) {
+      const response = await fetch(BASE + `/api/v1/voucher-platforms/${row.id}`, {
+        method: 'DELETE', headers: { authorization: `Bearer ${tok}` },
+      });
+      const body = await response.json();
+      if (!response.ok || body.code !== 0) throw new Error('清理商家失败');
+    }
   }
 } catch (e) {
   cleanupFailed = true;
-  console.log(`-- 清理失败: ${String(e).replaceAll(PASS, '<REDACTED>').slice(0, 120)}`);
+  console.log(`-- 清理失败: ${String(e).replaceAll(PASS, '<REDACTED>').replaceAll(ADMIN_PASS, '<REDACTED>').slice(0, 120)}`);
+}
+
+if (smokeUserId && adminToken) {
+  try {
+    const response = await fetch(BASE + `/api/v1/users/${smokeUserId}/status`, {
+      method: 'PATCH', headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'disabled' }),
+    });
+    const body = await response.json();
+    if (!response.ok || body?.code !== 0) throw new Error('临时冒烟账号停用失败');
+    console.log('-- 临时账本账号已停用，会话已撤销');
+  } catch (error) {
+    cleanupFailed = true;
+    console.log(`-- 临时账号清理失败: ${String(error).slice(0, 120)}`);
+  }
 }
 
 await browser.close();

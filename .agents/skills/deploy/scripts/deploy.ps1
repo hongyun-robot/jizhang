@@ -17,16 +17,19 @@
   无视差异，强制重建 web + api（用于镜像层缓存可疑、或只想重跑构建）。
 
 .PARAMETER Smoke
-  验证通过后用生产管理员账号跑 frontend/e2e/prod_smoke.mjs（17 项冒烟）。
+  验证通过后由生产管理员创建临时账本账号，跑 frontend/e2e/prod_smoke.mjs。
 
 .PARAMETER Purge
   同步完成后删除"服务器上有、本地已删/不入清单"的孤儿文件。
   不加此开关时只报警不删除——被删的源文件会经 `COPY . .` 继续进 Docker 构建上下文。
+
+.PARAMETER Key
+  指定 SSH 私钥；省略时按候选路径顺序选择第一个存在的文件。
 #>
 [CmdletBinding()]
 param(
   [string]$Server = 'ubuntu@124.221.104.237',
-  [string]$Key    = 'C:\Users\hongy\AppData\Local\Temp\opencode\id_jizhang',
+  [string]$Key    = '',
   [string]$Remote = '/srv/jizhang',
   [string]$Site   = 'https://jizhang.zhanghongyun.cn',
   [switch]$Force,
@@ -45,7 +48,23 @@ while ($probe -and -not (Test-Path (Join-Path $probe 'docker-compose.yml'))) {
 if (-not $probe) { throw "无法定位仓库根：从 $PSScriptRoot 向上没找到 docker-compose.yml" }
 $RepoRoot = $probe
 
-if (-not (Test-Path $Key)) { throw "找不到 SSH 私钥: $Key （用 -Key 指定）" }
+# ---------- 选择 SSH 私钥（显式 -Key 优先，否则查找候选文件）----------
+$KeyCandidates = @(
+  'C:\Users\hongy\AppData\Local\Temp\opencode\id_jizhang',
+  'C:\Users\Administrator\Documents\1'
+)
+if ([string]::IsNullOrWhiteSpace($Key)) {
+  foreach ($candidate in $KeyCandidates) {
+    if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+      $Key = $candidate
+      break
+    }
+  }
+  if ([string]::IsNullOrWhiteSpace($Key)) {
+    throw "未找到 SSH 私钥，已检查: $($KeyCandidates -join ', ') （用 -Key 指定）"
+  }
+}
+if (-not (Test-Path -LiteralPath $Key -PathType Leaf)) { throw "找不到 SSH 私钥: $Key （用 -Key 指定）" }
 $SshOpts = @('-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-i', $Key)
 $Tmp = [System.IO.Path]::GetTempPath()
 
@@ -104,7 +123,7 @@ $targets = @(
 #   dist/tsbuildinfo 是编译产物；shots/downloads/preview 是 e2e 副产物（preview 84MB 的截图）
 # 漏掉 package-lock.json 会让服务器拿到新 package.json + 旧 lock，npm ci 直接报 out of sync
 # 这份模式针对正斜杠相对路径，同时由远端 diff.sh 用 grep -E 复用——改一处等于两侧都改
-$exclude = 'node_modules|/dist/|/bin/|/vendor/|\.git/|/coverage/|/shots/|/downloads/|/preview/|tsbuildinfo'
+$exclude = 'node_modules|/dist/|/bin/|/vendor/|\.git/|/coverage/|/shots/|/downloads/|/preview/|tsbuildinfo|(^|/)server(\.exe)?$'
 
 $rows = @()
 foreach ($t in $targets) {
@@ -210,9 +229,16 @@ if ($services.Count -eq 0) {
   Write-Host '[3/4] 改动不涉及构建产物（如 openspec/README），跳过重建。'
 }
 else {
-  Write-Host "[3/4] docker compose --profile app up -d --build --wait $($services -join ' ')"
+  Write-Host "[3/4] 构建、迁移保护与健康切换 $($services -join ' ')"
   # --wait 阻塞到 healthcheck 通过；不等的话紧接着的 verify 会看到 running/starting 而误判 FAIL
-  $build = Invoke-Ssh "cd $Remote && docker compose --profile app up -d --build --wait --wait-timeout 180 $($services -join ' ')"
+  $latestMigration = (Get-ChildItem -LiteralPath (Join-Path $RepoRoot 'backend\migrations') -Filter '*.up.sql' | Sort-Object Name | Select-Object -Last 1).Name -replace '_.*$', ''
+  $latestMigration = [int]$latestMigration
+  $releaseName = 'jizhang_release_' + [guid]::NewGuid().ToString('N') + '.sh'
+  $releaseLocal = Join-Path $Tmp $releaseName
+  Write-Lf $releaseLocal (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'release.sh') -Raw)
+  Send-ToServer $releaseLocal ("/tmp/" + $releaseName)
+  $build = Invoke-Ssh "bash /tmp/$releaseName '$Remote' $latestMigration $($services -join ' ')"
+  $build | Where-Object { "$_" -match '^RELEASE:' } | ForEach-Object { Write-Host "      $_" }
   $build | Select-Object -Last 8 | ForEach-Object { Write-Host "      $_" }
 }
 
