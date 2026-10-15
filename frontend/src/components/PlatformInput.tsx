@@ -7,6 +7,7 @@ import { errMsg } from '../api/client';
 import { popupInParent } from '../lib/popup';
 import SelectionSheet, { SelectionTrigger } from './SelectionSheet';
 import { useSelectionActive } from './SelectionScope';
+import { useAuth } from '../stores/auth';
 
 interface Props {
   id?: string;
@@ -146,10 +147,12 @@ export default function PlatformInput({
     if (!option.create || inFlight.current) return;
     const requestGeneration = generation.current;
     const requestValue = currentValue.current;
+    const requestEpoch = useAuth.getState().epoch;
     inFlight.current = true;
     try {
       const row = await create.mutateAsync(selected);
       if (
+        useAuth.getState().epoch === requestEpoch &&
         generation.current === requestGeneration &&
         currentValue.current === requestValue
       ) {
@@ -159,7 +162,8 @@ export default function PlatformInput({
         setSheetSearch('');
       }
     } catch (err) {
-      if (generation.current === requestGeneration) message.error(errMsg(err));
+      if (useAuth.getState().epoch === requestEpoch && generation.current === requestGeneration)
+        message.error(errMsg(err));
     } finally {
       inFlight.current = false;
     }

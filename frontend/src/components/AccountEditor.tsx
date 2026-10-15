@@ -25,7 +25,6 @@ interface FormValues {
   statement_day?: number;
   repayment_month_offset?: number;
   principal_remainder?: PrincipalRemainder;
-  sort?: number;
   status?: boolean;
 }
 
@@ -150,7 +149,6 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
       type: 'asset',
       asset_class: fundOnly ? 'fund' : 'cash',
       opening_balance: '0',
-      sort: 0,
       liability_type: defaultType,
       statement_day: 31,
       repayment_day: 10,
@@ -174,7 +172,6 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
       statement_day: a.billing_enabled ? undefined : 31,
       repayment_month_offset: 1,
       principal_remainder: a.principal_remainder ?? 'last',
-      sort: a.sort,
       status: a.status === 'active',
     });
     setOpen(true);
@@ -201,7 +198,6 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
           type: v.type,
           asset_class: v.type === 'asset' ? v.asset_class || 'cash' : undefined,
           opening_balance: v.opening_balance ?? '0',
-          sort: v.sort ?? 0,
           status: v.status === false ? 'disabled' : 'active',
         };
         if (input.asset_class === 'fund') input.opening_balance = '0';
@@ -445,9 +441,6 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
                   </>
                 ) : null
               }
-            </Form.Item>
-            <Form.Item name="sort" label="排序（小在前）">
-              <InputNumber style={{ width: '100%' }} />
             </Form.Item>
             {editing && (
               <Form.Item name="status" label="启用" valuePropName="checked">

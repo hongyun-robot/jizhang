@@ -1,0 +1,35 @@
+.sort-handle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+.sort-handle:hover, .sort-handle:focus-visible { color: var(--text); background: var(--bg); }
+.sort-handle:active { cursor: grabbing; }
+.sort-handle:disabled { opacity: .35; cursor: default; }
+[data-dragging] { position: relative; z-index: 1100; box-shadow: var(--shadow-2); }
+.order-status { margin-bottom: 12px; font-size: 12px; }
+.order-status.ant-alert { flex-wrap: wrap; gap: 8px; }
+.cat-root-trigger { width: 100%; text-align: left; border: 0; padding: 4px 0; color: inherit; background: transparent; cursor: pointer; }
+.cat-root-line .cat-root-name { max-width: calc(100% - 52px); height: auto; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.cat-children .ant-tag { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.acct-name { overflow-wrap: anywhere; }
+.cat-child-list { max-height: min(56vh, 520px); overflow-y: auto; overscroll-behavior: contain; }
+.cat-child-row { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.cat-child-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cat-child-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 767px) { .sort-handle { width: 44px; height: 44px; } .cat-child-row { gap: 4px; } }
+@media (max-width: 767px) {
+  .platform-row { column-gap: 8px; }
+  .platform-row .platform-name { flex: 1 1 calc(100% - 60px); }
+  .platform-row .platform-actions { padding-left: 52px; }
+}

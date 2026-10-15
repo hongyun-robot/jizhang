@@ -118,7 +118,7 @@ await withFixture(base, async (browser) => {
       await modal.getByRole('button', { name: /取\s*消/, exact: true }).click();
       assert.equal((await api('GET', `/accounts/${account.id}/liability`)).plans.length, 1);
       assert.deepEqual(errors, []);
-      console.log(`PASS ${viewport.width}px: shared platform picker and creation guards; one amount column with exact totals and muted fees; credit fee attribution`);
+      console.log(`PASS ${viewport.width}px: personal platform picker and creation guards; one amount column with exact totals and muted fees; credit fee attribution`);
     } catch (error) {
       await shot(page, `liability-totals-failure-${viewport.width}`).catch(() => {});
       throw error;

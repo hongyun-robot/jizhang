@@ -4,6 +4,10 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import type { Category, CategoryForest } from './types';
 import { readApi as unwrap, writeApi } from './request';
 import { queryKeys, useScope } from './keys';
+import { useCatalogReorder } from './ordering';
+import type { CategoryKind } from './types';
+
+export const useReorderCategories = (scope?: { kind: CategoryKind; parent_id: number | null }) => useCatalogReorder('categories', scope);
 
 export function useCategoryForest() {
   const scope = useScope();

@@ -366,6 +366,7 @@ export interface NotifListResp {
 
 export type VoucherAction = 'purchase' | 'redeem' | 'refund' | 'writeoff';
 export interface VoucherPlatform {
+  sort: number;
   id: number;
   name: string;
 }

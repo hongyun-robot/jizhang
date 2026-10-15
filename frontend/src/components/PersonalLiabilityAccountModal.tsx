@@ -127,7 +127,6 @@ export default function PersonalLiabilityAccountModal({
           repayment_month_offset: v.repayment_month_offset,
           principal_remainder: v.principal_remainder,
           status: v.status ? ('active' as const) : ('disabled' as const),
-          sort: detail?.account.sort ?? 10,
         };
         if (
           detail?.account.billing_enabled &&

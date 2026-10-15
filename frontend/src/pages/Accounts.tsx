@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { App, Button, Card, Grid, Popconfirm, Table, Tag } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { useAccounts, useAccountMutations } from '../api/accounts';
+import { useAccounts, useAccountMutations, useReorderAccounts } from '../api/accounts';
 import { useLiabilityTypes } from '../api/liability';
 import type { Account, AccountType } from '../api/types';
 import { errMsg } from '../api/client';
@@ -10,6 +10,8 @@ import { cents, money } from '../lib/money';
 import Money from '../components/Money';
 import AccountEditor from '../components/AccountEditor';
 import { QueryBoundary } from '../components/QueryState';
+import { useCatalogOrder } from '../hooks/useCatalogOrder';
+import { OrderStatus, SortableCollection, SortableHandle, SortableItem, SortableTableRow } from '../components/sorting/SortableCollection';
 
 export default function Accounts() {
   const navigate = useNavigate();
@@ -17,14 +19,17 @@ export default function Accounts() {
   const isMobile = !Grid.useBreakpoint().md;
   const accounts = useAccounts();
   const { remove } = useAccountMutations();
+  const reorder = useReorderAccounts();
+  const order = useCatalogOrder(accounts.data ?? [], 'accounts', reorder.mutateAsync, accounts.refetch);
+  const blocked = order.busy || reorder.directoryBusy || remove.isPending;
   const types = useLiabilityTypes();
   const labels = Object.fromEntries((types.data ?? []).map((t) => [t.code, t.name]));
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Account | null>(null);
-  const openCreate = () => { setEditing(null); setOpen(true); };
-  const openEdit = (account: Account) => { setEditing(account); setOpen(true); };
+  const openCreate = () => { if (!blocked) { setEditing(null); setOpen(true); } };
+  const openEdit = (account: Account) => { if (!blocked) { setEditing(account); setOpen(true); } };
   const doDelete = async (a: Account) => {
-    if (remove.isPending) return; // 防重：确认进行中忽略重复触发
+    if (blocked) return;
     try {
       await remove.mutateAsync(a.id);
       message.success(`已删除「${a.name}」`);
@@ -49,6 +54,7 @@ export default function Accounts() {
   };
 
   const columns = [
+    { title: '', key: 'sort', width: 44, render: (_: unknown, a: Account) => <SortableHandle name={a.name} /> },
     {
       title: '账户',
       dataIndex: 'name',
@@ -109,7 +115,7 @@ export default function Accounts() {
       align: 'right' as const,
       render: (_: unknown, a: Account) => (
         <>
-          <Button type="link" size="small" onClick={() => openEdit(a)}>
+          <Button type="link" size="small" disabled={blocked} onClick={() => openEdit(a)}>
             编辑
           </Button>
           <Popconfirm
@@ -120,7 +126,7 @@ export default function Accounts() {
               disabled: remove.isPending,
             }}
           >
-            <Button type="link" size="small" danger>
+            <Button type="link" size="small" danger disabled={blocked}>
               删除
             </Button>
           </Popconfirm>
@@ -138,17 +144,20 @@ export default function Accounts() {
           </div>
           <h2>账户管理</h2>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+        <Button type="primary" icon={<PlusOutlined />} disabled={blocked} onClick={openCreate}>
           新建账户
         </Button>
       </div>
 
       <QueryBoundary query={accounts}>
         <Card size="small" className="panel panel--measure">
+          <OrderStatus {...order} />
+          <SortableCollection ids={order.ids} disabled={blocked || open} onOrder={order.commit}>
           {isMobile ? (
             <div className="acct-list">
-              {(accounts.data ?? []).map((a) => (
-                <div className="acct-row" key={a.id}>
+              {order.rows.map((a) => (
+                <SortableItem id={a.id} className="acct-row" key={a.id}>
+                  <SortableHandle name={a.name} />
                   {/* 行级点击语义化：与 CategoryPicker 同样的 role/键盘处理，焦点环由通配 :focus-visible 兜底 */}
                   <div
                     className="acct-main"
@@ -199,12 +208,12 @@ export default function Accounts() {
                         disabled: remove.isPending,
                       }}
                     >
-                      <Button type="link" size="small" danger>
+                      <Button type="link" size="small" danger disabled={blocked}>
                         删除
                       </Button>
                     </Popconfirm>
                   </div>
-                </div>
+                </SortableItem>
               ))}
             </div>
           ) : (
@@ -212,11 +221,13 @@ export default function Accounts() {
               rowKey="id"
               size="small"
               loading={accounts.isLoading}
-              dataSource={accounts.data ?? []}
+              dataSource={order.rows}
+              components={{ body: { row: SortableTableRow } }}
               columns={columns}
               pagination={false}
             />
           )}
+          </SortableCollection>
         </Card>
       </QueryBoundary>
 

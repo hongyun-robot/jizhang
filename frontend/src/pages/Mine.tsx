@@ -14,6 +14,7 @@ import {
   UserOutlined,
   GiftOutlined,
   CreditCardOutlined,
+  ShopOutlined,
 } from '@ant-design/icons';
 
 import { session } from '../auth/session';
@@ -56,8 +57,8 @@ function Tile({
   );
 }
 
-/** 我的：身份信息 + 外观主题 + 记账入口（周期记账对可记账角色可见）
- *  + 管理入口（账户/分类/用户仅管理员可见）+ 退出登录。 */
+/** 我的：身份与主题、按资格显示的记账入口、全角色本人目录管理，
+ * 以及管理员设置和退出登录。 */
 export default function Mine() {
   const navigate = useNavigate();
   const user = useAuth((s) => s.user);
@@ -143,6 +144,11 @@ export default function Mine() {
               icon={<TagsOutlined />}
               label="分类管理"
               onClick={() => navigate('/categories')}
+            />
+            <Tile
+              icon={<ShopOutlined />}
+              label="平台 / 商家管理"
+              onClick={() => navigate('/platforms')}
             />
         </div>
       </Card>

@@ -18,6 +18,7 @@ const FundPositionDetail = lazy(() => import('./pages/FundPositionDetail'));
 const Liabilities = lazy(() => import('./pages/Liabilities'));
 const LiabilityDetail = lazy(() => import('./pages/LiabilityDetail'));
 const Categories = lazy(() => import('./pages/Categories'));
+const Platforms = lazy(() => import('./pages/Platforms'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Audit = lazy(() => import('./pages/Audit'));
 const Budgets = lazy(() => import('./pages/Budgets'));
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="/records" element={<Records />} />
             <Route path="/stats" element={<Stats />} />
             <Route path="/mine" element={<Mine />} />
+            <Route path="/platforms" element={<Platforms />} />
             <Route path="/funds" element={<Funds />} />
             <Route path="/funds/:id" element={<Funds />} />
             <Route path="/fund-positions/:id" element={<FundPositionDetail />} />
@@ -52,7 +54,7 @@ export default function App() {
             <Route path="/budgets" element={<Budgets />} />
             {/* 提醒列表：四档角色可读可标已读（specs/notifications，任务 10.3） */}
             <Route path="/notifications" element={<Notifications />} />
-            {/* 管理页：入口仅管理员可见，路由级再拦一道（3.4 显隐要求） */}
+            {/* 个人目录对全部登录角色开放，设置与审计继续按管理员门禁执行。 */}
             <Route
               path="/accounts"
               element={

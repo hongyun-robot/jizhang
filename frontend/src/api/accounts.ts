@@ -4,6 +4,9 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import type { Account, PrincipalRemainder } from './types';
 import { readApi as unwrap, writeApi } from './request';
 import { queryKeys, useScope } from './keys';
+import { useCatalogReorder } from './ordering';
+
+export const useReorderAccounts = () => useCatalogReorder('accounts');
 
 // ---------- 查询 ----------
 

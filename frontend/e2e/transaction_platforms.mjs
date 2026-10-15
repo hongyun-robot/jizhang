@@ -103,7 +103,7 @@ try {
   assert.equal((await api('GET', `/transactions?keyword=${encodeURIComponent(prefix)}`)).items[0].platform, '');
   assert.equal(Number((await api('GET', '/accounts'))[0].balance), Number(balanceBefore) - 20);
   assert.deepEqual(errors, []);
-  console.log('PASS transaction platform: all modes, shared options, inline creation, save, edit, search, CSV, desktop/mobile clearing, unchanged amount effects');
+  console.log('PASS transaction platform: all modes, personal options, inline creation, save, edit, search, CSV, desktop/mobile clearing, unchanged amount effects');
 } catch (error) {
   await page.screenshot({ path: path.join(shots, 'transaction-platform-failure.png') }).catch(() => {});
   throw error;

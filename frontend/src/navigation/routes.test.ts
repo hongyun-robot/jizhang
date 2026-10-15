@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { returnTarget, activeKey } from './routes';
+import { returnTarget, activeKey, canVisit } from './routes';
 import { rememberSearch, clearNavigationMemory, navTarget } from './memory';
 
 describe('session navigation', () => {
@@ -35,5 +35,14 @@ describe('session navigation', () => {
     expect(navTarget('/records', '/records?page=3')).toBeNull();
     clearNavigationMemory();
     expect(navTarget('/records', '/stats')).toBe('/records');
+  });
+  it('keeps personal platform management available to all roles under Mine', () => {
+    for (const role of ['admin', 'recorder', 'member', 'viewer'] as const) {
+      expect(canVisit('/platforms', role)).toBe(true);
+      expect(returnTarget('/platforms?search=JD#catalog', role)).toBe('/platforms?search=JD#catalog');
+    }
+    expect(returnTarget('/jizhang/platforms', 'viewer', '/jizhang')).toBe('/platforms');
+    expect(activeKey('/platforms')).toBe('mine');
+    expect(canVisit('/settings', 'viewer')).toBe(false);
   });
 });

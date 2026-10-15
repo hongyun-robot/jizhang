@@ -90,19 +90,19 @@ try {
   }
   const balanceBefore = (await api('GET', '/accounts'))[0].balance;
   const statsBefore = await api('GET', '/stats/compare');
-  let sharedId;
+  const personalIds = new Set();
   for (const role of ['admin', 'recorder', 'member', 'viewer']) {
     const row = await api('POST', '/voucher-platforms', { name: `  ${prefix}-全员  ` }, role);
-    if (sharedId) assert.equal(row.id, sharedId);
-    sharedId = row.id;
-    assert((await api('GET', '/voucher-platforms', undefined, role)).some((item) => item.id === sharedId));
+    assert(!personalIds.has(row.id));
+    personalIds.add(row.id);
+    assert((await api('GET', '/voucher-platforms', undefined, role)).some((item) => item.id === row.id));
     await api('POST', '/voucher-platforms', { name: '   ' }, role, 400);
   }
   await api('POST', '/vouchers', {}, 'viewer', 403);
   await api('POST', '/transactions', { kind: 'expense', amount: '1', entry_date: '2026-10-10', account_id: (await api('GET', '/accounts'))[0].id, category_id: 1 }, 'viewer', 403);
   assert.equal((await api('GET', '/accounts'))[0].balance, balanceBefore);
   assert.deepEqual(await api('GET', '/stats/compare'), statsBefore);
-  console.log('PASS API: all roles, shared identity, validation, authentication, financial permissions unchanged');
+  console.log('PASS API: all roles, independent same-name identities, validation, authentication, financial permissions unchanged');
 
   await page.goto(base + '/login');
   await page.getByPlaceholder('用户名').fill('voucher-member');
@@ -181,7 +181,7 @@ try {
   await sheet.getByRole('button', { name: '创建「' + mobileName + '」', exact: true }).click();
   await sheet.waitFor({ state: 'hidden' });
   await cancel();
-  console.log('PASS mobile: shared options, selection, creation, bottom sheet placement');
+  console.log('PASS mobile: personal options, selection, creation, bottom sheet placement');
   await page.setViewportSize({ width: 1139, height: 884 });
 
   // 读取失败保留输入，仍能直接提交券。

@@ -13,6 +13,8 @@
 @import './styles/records.css';
 @import './styles/accounts.css';
 @import './styles/categories.css';
+@import './styles/platforms.css';
+@import './styles/ordering.css';
 @import './styles/transaction-form.css';
 @import './styles/mine.css';
 @import './styles/budgets.css';

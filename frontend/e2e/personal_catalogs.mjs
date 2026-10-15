@@ -44,11 +44,11 @@ await withFixture(base, async (browser, cleanup) => {
     await client.request('PUT', `/categories/${other.category.id}`, { name: '越权' }, 403);
     await client.request('POST', '/categories', { kind: 'expense', name: '越权子分类', parent_id: other.category.id }, 403);
   }
-  const merchant = prefix + '-共享商家';
+  const merchant = prefix + '-个人商家';
   await clients[0].request('POST', '/voucher-platforms', { name: merchant });
-  for (const client of clients) assert((await client.request('GET', '/voucher-platforms')).some((row) => row.name === merchant));
+  for (const [index, client] of clients.entries()) assert.equal((await client.request('GET', '/voucher-platforms')).some((row) => row.name === merchant), index === 0);
   for (const endpoint of ['/accounts', '/categories']) assert.equal((await fetch(base + '/api/v1' + endpoint)).status, 401);
-  console.log('PASS four-role personal CRUD, cross-account denial, account creation replay, viewer funds restriction, shared merchants and anonymous denial');
+  console.log('PASS four-role personal CRUD, cross-account denial, account creation replay, viewer funds restriction, private merchants and anonymous denial');
 
   const viewerContext = await browser.newContext({ viewport: { width: 390, height: 900 } });
   const viewerPage = await viewerContext.newPage();

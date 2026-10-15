@@ -12,14 +12,21 @@ import { readApi as unwrap, writeApi as voucherWrite } from './request';
 import { useFinancialInvalidate as useVoucherInvalidate } from './cache';
 import { qs } from './query';
 import { queryKeys, useScope } from './keys';
+import { requestJson } from './request';
+import { updatePlatformCache } from './platformCache';
+import { useCatalogReorder } from './ordering';
+
+export const useReorderVoucherPlatforms = () => useCatalogReorder('voucher-platforms');
 
 // ---------- 券 ----------
 export function useVoucherPlatforms(enabled: boolean) {
   const scope = useScope();
   return useQuery({
     queryKey: queryKeys.key('voucher-platforms', scope),
-    queryFn: ({ signal }) =>
-      unwrap<VoucherPlatform[]>('/voucher-platforms', signal),
+    queryFn: ({ signal }) => {
+      const options = { signal, _epoch: scope };
+      return requestJson<VoucherPlatform[]>('/voucher-platforms', options);
+    },
     enabled,
     retry: false,
     staleTime: 0,
@@ -30,23 +37,38 @@ export function useCreateVoucherPlatform() {
   const scope = useScope();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) =>
-      voucherWrite<VoucherPlatform>('post', '/voucher-platforms', { name }),
-    onSuccess: async (row) => {
-      await qc.cancelQueries({
-        queryKey: queryKeys.root('voucher-platforms', scope),
-      });
-      qc.setQueryData<VoucherPlatform[]>(
-        queryKeys.key('voucher-platforms', scope),
-        (rows = []) =>
-          [...rows.filter((item) => item.id !== row.id), row].sort((a, b) =>
-            a.name < b.name ? -1 : a.name > b.name ? 1 : a.id - b.id
-          )
-      );
-      void qc.invalidateQueries({
-        queryKey: queryKeys.root('voucher-platforms', scope),
-      });
+    mutationFn: (name: string) => {
+      const options = { method: 'post', data: { name }, _epoch: scope };
+      return requestJson<VoucherPlatform>('/voucher-platforms', options);
     },
+    onSuccess: (row) => updatePlatformCache(qc, scope,
+      (rows) => [...rows.filter((item) => item.id !== row.id), row]),
+  });
+}
+
+export function useRenameVoucherPlatform() {
+  const scope = useScope();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) => {
+      const options = { method: 'put', data: { name }, _epoch: scope };
+      return requestJson<VoucherPlatform>(`/voucher-platforms/${id}`, options);
+    },
+    onSuccess: (row) => updatePlatformCache(qc, scope,
+      (rows) => [...rows.filter((item) => item.id !== row.id), row]),
+  });
+}
+
+export function useDeleteVoucherPlatform() {
+  const scope = useScope();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => {
+      const options = { method: 'delete', _epoch: scope };
+      return requestJson.empty(`/voucher-platforms/${id}`, options);
+    },
+    onSuccess: (_, id) => updatePlatformCache(qc, scope,
+      (rows) => rows.filter((item) => item.id !== id)),
   });
 }
 

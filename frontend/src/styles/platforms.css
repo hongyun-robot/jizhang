@@ -1,0 +1,28 @@
+.platform-page .page-head p {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+.platform-search { margin-bottom: 16px; }
+.platform-list { margin: 0; padding: 0; list-style: none; }
+.platform-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.platform-row:last-child { border-bottom: 0; }
+.platform-name {
+  flex: 1 1 180px;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.platform-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.platform-note { font-size: 13px; line-height: 1.7; }
+@media (max-width: 767px) {
+  .platform-name { flex-basis: 100%; }
+  .platform-actions .ant-btn { min-height: 40px; }
+  .platform-page .page-head > .ant-btn { min-height: 44px; }
+}
