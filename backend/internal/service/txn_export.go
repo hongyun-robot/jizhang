@@ -72,6 +72,10 @@ func purposeLabel(p model.TxnPurpose) string {
 		return "券作废"
 	case model.PurposeFundPurchase:
 		return "基金买入付款"
+	case model.PurposeGoldPurchase:
+		return "建行积存金买入"
+	case model.PurposeGoldRedemption:
+		return "建行积存金卖出"
 	case model.PurposeFundRedemption:
 		return "基金赎回到账"
 	case model.PurposeFundDividend:

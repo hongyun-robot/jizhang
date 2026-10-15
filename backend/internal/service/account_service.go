@@ -38,7 +38,8 @@ var validAccountTypes = map[model.AccountType]bool{
 type AccountService struct {
 	repo *repository.AccountRepo
 	// OnWrite 写成功后的钩子（用于统计缓存主动失效）。
-	OnWrite func()
+	OnWrite       func()
+	OnGoldCreated func()
 }
 
 func (s *AccountService) fireWrite() {
@@ -151,6 +152,9 @@ func (s *AccountService) Create(in CreateAccountInput) (out *model.Account, err 
 	})
 	if err == nil {
 		s.fireWrite()
+		if out != nil && out.IsGold() && s.OnGoldCreated != nil {
+			s.OnGoldCreated()
+		}
 	}
 	return
 }
@@ -164,10 +168,10 @@ func (s *AccountService) accountWrite(fn func(*gorm.DB) error) error {
 }
 
 func validateAccountInput(in CreateAccountInput) error {
-	if (in.Type == model.AccountLiability && in.AssetClass != "") || (in.Type == model.AccountAsset && in.AssetClass != "" && in.AssetClass != "cash" && in.AssetClass != "fund") {
+	if (in.Type == model.AccountLiability && in.AssetClass != "") || (in.Type == model.AccountAsset && in.AssetClass != "" && in.AssetClass != "cash" && in.AssetClass != "fund" && in.AssetClass != "gold") {
 		return ErrInvalidAccountType
 	}
-	if in.AssetClass == "fund" && !in.OpeningBalance.IsZero() {
+	if (in.AssetClass == "fund" || in.AssetClass == "gold") && !in.OpeningBalance.IsZero() {
 		return ErrInvalidAmount
 	}
 	if in.PrincipalRemainder != "" && (in.Type != model.AccountLiability || (in.PrincipalRemainder != "first" && in.PrincipalRemainder != "last")) {

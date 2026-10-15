@@ -16,4 +16,6 @@ export const VOUCHER_PURPOSE_LABEL: Partial<Record<TxnPurpose, string>> = {
   fund_purchase: '基金买入付款',
   fund_redemption: '基金赎回到账',
   fund_dividend: '基金分红到账',
+  gold_purchase: '建行积存金买入',
+  gold_redemption: '建行积存金卖出',
 };

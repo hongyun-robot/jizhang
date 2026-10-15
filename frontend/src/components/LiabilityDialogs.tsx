@@ -105,7 +105,7 @@ export default function LiabilityDialogs({
   );
   const editable = (id: number) => canModifyOwnedRecord(user, id);
   const assets = (accounts.data ?? [])
-    .filter((a) => a.type === 'asset' && a.asset_class !== 'fund' && a.status === 'active')
+    .filter((a) => a.type === 'asset' && (!a.asset_class || a.asset_class === 'cash') && a.status === 'active')
     .map((a) => ({ value: a.id, label: a.name }));
   const feeAccounts = [
     { value: d.account.id, label: `${d.account.name} · 计入欠款` },

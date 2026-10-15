@@ -26,7 +26,7 @@ export interface AccountInput {
   request_key?: string;
   name: string;
   type: 'asset' | 'liability';
-  asset_class?: 'cash' | 'fund';
+  asset_class?: 'cash' | 'fund' | 'gold';
   opening_balance?: string;
   repayment_day?: number;
   liability_type?: string;

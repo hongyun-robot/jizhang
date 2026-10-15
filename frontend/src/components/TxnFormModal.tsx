@@ -1,3 +1,5 @@
+import GoldForm from '../features/gold/GoldForm';
+import { useScope } from '../api/keys';
 import SelectionScope from './SelectionScope';
 import DatePicker from './DatePicker';
 import AccountSelect from './AccountSelect';
@@ -83,6 +85,9 @@ export default function TxnFormModal({
   refill,
 }: Props) {
   const submitGate = submissionRef(submissionGate());
+  const [goldMode, setGoldMode] = useState<'ordinary' | 'buy' | 'sell'>('ordinary');
+  const goldScope = useScope();
+  useEffect(() => { setGoldMode('ordinary'); }, [open, goldScope]);
   const [creatingAccount, setCreatingAccount] = useState(false);
   const editor = useEditorSession(
     open,
@@ -343,7 +348,7 @@ export default function TxnFormModal({
               overflowY: 'auto',
             },
           }}
-          footer={[
+          footer={goldMode !== 'ordinary' ? null : [
             <Button key="cancel" onClick={close}>
               取消
             </Button>,
@@ -358,7 +363,9 @@ export default function TxnFormModal({
             </Button>,
           ]}
         >
-          <div className="txn-form">
+          {!editing && canRecord(user?.role) && <div className="gold-mode-picker"><Segmented block value={goldMode} options={[{ value: 'ordinary', label: '普通记账' }, { value: 'buy', label: '买入黄金' }, { value: 'sell', label: '卖出黄金' }]} onChange={(value) => setGoldMode(value as 'ordinary' | 'buy' | 'sell')} /></div>}
+          {!editing && <div hidden={goldMode === 'ordinary'}><GoldForm kind={goldMode === 'sell' ? 'sell' : 'buy'} open={open} active={goldMode !== 'ordinary'} onSaved={close} /></div>}
+          <div className="txn-form" style={{display: goldMode !== 'ordinary' ? 'none' : undefined}}>
             {/* body 顶部受控错误 Alert：提交未通过 validate() 时出现，修好后自动消失，Modal 不关闭 */}
             {fieldErr && (
               <Alert

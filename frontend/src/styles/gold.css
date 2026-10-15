@@ -1,0 +1,20 @@
+.gold-account-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px}
+.gold-account-summary{padding:24px}
+.gold-amount{font-size:28px;font-variant-numeric:tabular-nums}
+.gold-overview{padding:24px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px}
+.gold-overview>div,.gold-quote-prices>div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.gold-overview strong{font-size:20px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.gold-quote{padding:18px 0;border-block:1px solid var(--border-color,#e6e4df);margin:16px 0}
+.gold-quote-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.gold-quote-prices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
+.gold-quote-prices span{font-size:12px;color:var(--text-secondary,#777)}
+.gold-quote-prices strong{font-size:22px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.gold-quote-prices small{font-size:12px;font-weight:400}
+.gold-form .ant-form{margin-top:18px}.gold-form .ant-select,.gold-form .ant-picker{width:100%}
+.gold-form input,.gold-form textarea{font-size:16px!important}
+.gold-form .ant-alert+.ant-alert{margin-top:12px}
+.gold-mode-picker{margin-bottom:18px}
+.gold-event{padding:18px 0;border-bottom:1px solid var(--border-color,#e6e4df);display:flex;gap:16px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.gold-event>div{min-width:0;overflow-wrap:anywhere}
+.gold-page h3{margin-top:28px}
+@media(max-width:767px){.gold-overview{grid-template-columns:repeat(2,minmax(0,1fr));padding:18px;gap:20px 12px}.gold-overview strong{font-size:18px}.gold-quote-prices strong{font-size:20px}.gold-event{align-items:flex-start}.gold-event>div{flex:1 1 140px}}

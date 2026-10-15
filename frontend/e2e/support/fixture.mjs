@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { firefox, chromium } from 'playwright-core';
 
-export async function assertFixture(base, expected = ['voucher-browser', 'liability-browser', 'fund-browser']) {
+export async function assertFixture(base, expected = ['voucher-browser', 'liability-browser', 'fund-browser', 'gold-browser']) {
   const url = new URL(base);
   assert(['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname), 'tests require a local isolated fixture');
   const response = await fetch(base + '/api/v1/__test__/info');

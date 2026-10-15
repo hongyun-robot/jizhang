@@ -40,7 +40,7 @@ export default function Accounts() {
 
   /** 负债欠款按红字“欠款”呈现；资产为负同样红字。 */
   const renderBalance = (a: Account) => {
-    if (a.asset_class === 'fund' && a.valuation_status === 'no_price') return <span className="muted">暂无法估值</span>;
+    if ((a.asset_class === 'fund' || a.asset_class === 'gold') && a.valuation_status === 'no_price') return <span className="muted">暂无法估值</span>;
     const n = cents(a.balance ?? '0');
     if (n < 0n) {
       return (
@@ -61,7 +61,7 @@ export default function Accounts() {
       key: 'name',
       width: '38%',
       render: (name: string, a: Account) =>
-        a.asset_class === 'fund' ? <Button type="link" onClick={() => navigate(`/funds/${a.id}`)}>{name}</Button> : a.type === 'liability' ? (
+        a.asset_class === 'gold' ? <Button type="link" onClick={() => navigate(`/gold/${a.id}`)}>{name}</Button> : a.asset_class === 'fund' ? <Button type="link" onClick={() => navigate(`/funds/${a.id}`)}>{name}</Button> : a.type === 'liability' ? (
           <>
             <Button
               type="link"
@@ -195,6 +195,7 @@ export default function Accounts() {
                           账单与分期
                         </Button>
                       )}
+                      {a.asset_class === 'gold' && <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); navigate(`/gold/${a.id}`); }}>黄金持仓与盈亏</Button>}
                       {a.asset_class === 'fund' && <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); navigate(`/funds/${a.id}`); }}>持仓与盈亏</Button>}
                     </div>
                   </div>

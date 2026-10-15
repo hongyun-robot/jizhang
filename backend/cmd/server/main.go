@@ -12,6 +12,7 @@ import (
 	"github.com/robfig/cron/v3"
 
 	"jizhang/internal/cache"
+	"jizhang/internal/ccb"
 	"jizhang/internal/config"
 	"jizhang/internal/database"
 	"jizhang/internal/fuyao"
@@ -79,6 +80,9 @@ func main() {
 	fundSvc := service.NewFundService(db, txnSvc, fuyao.New(cfg.FuyaoAPIKey))
 	fundSvc.BindAccounts(accountRepo)
 	fundSvc.OnWrite = statsSvc.InvalidateAll
+	goldSvc := service.NewGoldService(db, txnSvc, ccb.New())
+	goldSvc.BindAccounts(accountRepo)
+	goldSvc.OnWrite = statsSvc.InvalidateAll
 	closingSvc := service.NewClosingService(service.ClosingDeps{
 		Closings: repository.NewClosingRepo(db),
 		Audits:   repository.NewAuditRepo(db),
@@ -142,6 +146,7 @@ func main() {
 		VoucherSvc:   voucherSvc,
 		LiabilitySvc: liabilitySvc,
 		FundSvc:      fundSvc,
+		GoldSvc:      goldSvc,
 
 		BackupStatusFile: cfg.BackupStatusFile,
 	})
@@ -165,6 +170,18 @@ func main() {
 		}
 	}
 	go ensureFunds()
+	ensureGold := func() {
+		ctx, cancel := context.WithTimeout(fundCtx, 2*time.Minute)
+		defer cancel()
+		if err := goldSvc.Ensure(ctx); err != nil {
+			logger.L().Warn("gold quote/valuation sync incomplete", zap.Error(err))
+		}
+	}
+	if _, err := recurringCron.AddFunc(service.GoldHourlyCron, ensureGold); err != nil {
+		logger.L().Fatal("gold cron schedule failed", zap.Error(err))
+	}
+	go ensureGold()
+	accountSvc.OnGoldCreated = func() { go ensureGold() }
 	ensureVouchers := func() {
 		result, err := voucherSvc.EnsureDue(time.Now())
 		if err != nil {

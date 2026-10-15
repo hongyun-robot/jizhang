@@ -13,7 +13,9 @@ export type TxnPurpose =
   | 'voucher_writeoff'
   | 'fund_purchase'
   | 'fund_redemption'
-  | 'fund_dividend';
+  | 'fund_dividend'
+  | 'gold_purchase'
+  | 'gold_redemption';
 export type CategoryKind = 'expense' | 'income';
 export type PrincipalRemainder = 'first' | 'last';
 
@@ -21,7 +23,7 @@ export interface Account {
   id: number;
   name: string;
   type: AccountType;
-  asset_class?: 'cash' | 'fund';
+  asset_class?: 'cash' | 'fund' | 'gold';
   valuation_status?: string;
   nav_date?: string;
   owner_id?: number | null;
@@ -34,7 +36,7 @@ export interface Account {
   sort: number;
   status: Status;
   /** 仅列表接口返回：期初 + 流水净额 */
-  balance?: string;
+  balance?: string | null;
 }
 
 /** 系统用户（单账本共享，不开放注册；无物理删除，spec identity/user-management）。 */
@@ -59,6 +61,7 @@ export interface CategoryTreeNode extends Category {
 export type CategoryForest = CategoryTreeNode[];
 
 export interface Transaction {
+  gold_event_id?: number | null;
   fund_event_id?: number | null;
   fund_position_id?: number | null;
   fund_code?: string;
@@ -184,7 +187,7 @@ export interface AssetAcct {
   name: string;
   type: AccountType;
   balance: string | null;
-  asset_class?: 'cash' | 'fund';
+  asset_class?: 'cash' | 'fund' | 'gold';
   nav_date?: string;
 }
 export interface AssetPoint {

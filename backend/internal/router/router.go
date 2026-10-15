@@ -27,6 +27,7 @@ type Deps struct {
 	VoucherSvc   *service.VoucherService
 	LiabilitySvc *service.LiabilityService
 	FundSvc      *service.FundService
+	GoldSvc      *service.GoldService
 	// BackupStatusFile 备份状态文件路径（health 暴露最近备份时间，任务 11.3）。
 	BackupStatusFile string
 }
@@ -78,6 +79,21 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 			accounts.DELETE("/:id", accth.Delete)
 		}
 
+		if d.GoldSvc != nil {
+			gh := handler.NewGold(d.GoldSvc)
+			gold := v1.Group("/gold", middleware.Auth(d.AuthSvc))
+			gold.GET("/quote", gh.Quote)
+			gold.POST("/quote/refresh", gh.Refresh)
+			gold.GET("/accounts", gh.Accounts)
+			gold.GET("/accounts/:id", gh.Account)
+			gold.POST("/accounts/:id/opening", gh.Write(true, false))
+			gold.PUT("/accounts/:id/opening", gh.Write(true, true))
+			gold.POST("/accounts/:id/events", gh.Write(false, false))
+			gold.GET("/accounts/:id/events", gh.Events)
+			gold.POST("/accounts/:id/events/:eventId/undo", gh.Undo)
+			gold.GET("/accounts/:id/valuations", gh.Valuations)
+			gold.GET("/accounts/:id/audits", gh.Audits)
+		}
 		if d.FundSvc != nil {
 			fh := handler.NewFund(d.FundSvc)
 			funds := v1.Group("/funds", middleware.Auth(d.AuthSvc))

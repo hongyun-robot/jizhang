@@ -107,7 +107,7 @@ func (s *RecurringService) validate(in *RuleInput) error {
 	if acc == nil || acc.Status != model.StatusActive {
 		return ErrRuleAccountInvalid
 	}
-	if acc.IsFund() {
+	if acc.IsInvestment() {
 		return ErrRuleAccountInvalid
 	}
 	cat, err := s.deps.Cats.GetByID(in.CategoryID)

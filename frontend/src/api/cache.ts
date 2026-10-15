@@ -13,8 +13,10 @@ const views = {
     'closings',
     'voucher-platforms',
     'funds',
+    'gold',
   ],
-  account: ['accounts', 'liabilities', 'stats', 'notifications'],
+  account: ['accounts', 'liabilities', 'stats', 'notifications', 'gold'],
+  gold: ['gold', 'accounts', 'stats', 'txns', 'notifications'],
   fund: ['funds', 'accounts', 'stats', 'txns', 'notifications'],
   category: [
     'categories',
@@ -25,7 +27,7 @@ const views = {
     'vouchers',
     'liabilities',
   ],
-  closing: ['closings', 'audit', 'txns', 'stats', 'budgets', 'notifications'],
+  closing: ['closings', 'audit', 'txns', 'stats', 'budgets', 'notifications', 'gold'],
 };
 
 export async function invalidateFinancialViews(

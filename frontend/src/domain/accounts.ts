@@ -12,7 +12,7 @@ export function accountOptions(
 ) {
   return (accounts ?? [])
     .filter((account) => {
-      if (account.asset_class === 'fund') return false;
+      if (account.type === 'asset' && account.asset_class && account.asset_class !== 'cash') return false;
       if (options.assetOnly && account.type !== 'asset') return false;
       if (
         account.type === 'liability' &&

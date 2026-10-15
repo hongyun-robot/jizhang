@@ -18,7 +18,7 @@ import dayjs from 'dayjs';
 interface FormValues {
   name: string;
   type: AccountType;
-  asset_class?: 'cash' | 'fund';
+  asset_class?: 'cash' | 'fund' | 'gold';
   opening_balance?: string;
   repayment_day?: number;
   liability_type?: string;
@@ -34,11 +34,12 @@ export interface AccountEditorProps {
   assetOnly?: boolean;
   allowFunds?: boolean;
   fundOnly?: boolean;
+  goldOnly?: boolean;
   onClose: () => void;
   onCreated?: (account: Account) => void;
   onPending?: (pending: boolean) => void;
 }
-export default function AccountEditor({ account, initialName = '', assetOnly = false, allowFunds = false, fundOnly = false, onClose, onCreated, onPending }: AccountEditorProps) {
+export default function AccountEditor({ account, initialName = '', assetOnly = false, allowFunds = false, fundOnly = false, goldOnly = false, onClose, onCreated, onPending }: AccountEditorProps) {
   const scope = useScope();
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
@@ -147,7 +148,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
     form.setFieldsValue({
       name: initialName,
       type: 'asset',
-      asset_class: fundOnly ? 'fund' : 'cash',
+      asset_class: goldOnly ? 'gold' : fundOnly ? 'fund' : 'cash',
       opening_balance: '0',
       liability_type: defaultType,
       statement_day: 31,
@@ -200,7 +201,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
           opening_balance: v.opening_balance ?? '0',
           status: v.status === false ? 'disabled' : 'active',
         };
-        if (input.asset_class === 'fund') input.opening_balance = '0';
+        if ((input.asset_class === 'fund' || input.asset_class === 'gold')) input.opening_balance = '0';
         if (v.type === 'liability') {
           const rules = editingDetail.data?.rules;
           const last = rules?.at(-1);
@@ -274,7 +275,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
             </Form.Item>
             <Form.Item name="type" label="类型">
               <Segmented
-                disabled={assetOnly || fundOnly || !!editing?.has_financial_history}
+                disabled={assetOnly || fundOnly || goldOnly || !!editing?.has_financial_history}
                 onChange={(value) => {
                   if (value === 'liability')
                     form.setFieldsValue({
@@ -292,8 +293,9 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
                 ]}
               />
             </Form.Item>
-            {values?.type === 'asset' && (allowFunds || fundOnly || editing?.asset_class === 'fund') && <Form.Item name="asset_class" label="资产类别"><Segmented disabled={fundOnly || !!editing?.has_financial_history} options={[{ value: 'cash', label: '现金资产' }, { value: 'fund', label: '基金账户' }]} onChange={(value) => { if (value === 'fund') form.setFieldValue('opening_balance', '0'); }} /></Form.Item>}
+            {values?.type === 'asset' && (allowFunds || fundOnly || goldOnly || editing?.asset_class === 'fund' || editing?.asset_class === 'gold') && <Form.Item name="asset_class" label="资产类别"><Segmented disabled={fundOnly || goldOnly || !!editing?.has_financial_history} options={[{ value: 'cash', label: '现金资产' }, { value: 'fund', label: '基金账户' }, ...(!fundOnly ? [{ value: 'gold', label: '建行积存金' }] : [])]} onChange={(value) => { if (value === 'fund' || value === 'gold') form.setFieldValue('opening_balance', '0'); }} /></Form.Item>}
             {values?.asset_class === 'fund' && values?.type === 'asset' && <Alert type="info" title="在基金详情添加持仓" description="基金账户从零现金开始，市值按确认份额和最新有效净值计算。" />}
+            {values?.asset_class === 'gold' && <Alert type="info" title="在黄金详情录入克数和成本" description="建行积存金按赎回价估值；普通现金期初为零。" />}
             <Form.Item
               name="opening_balance"
               label="期初余额（新负债账户从零开始）"
@@ -303,7 +305,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
                 inputMode="decimal"
                 disabled={
                   !!editing?.has_financial_history ||
-                  values?.type === 'liability' || values?.asset_class === 'fund'
+                  values?.type === 'liability' || values?.asset_class === 'fund' || values?.asset_class === 'gold'
                 }
               />
             </Form.Item>

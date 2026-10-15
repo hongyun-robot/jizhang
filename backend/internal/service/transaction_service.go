@@ -143,6 +143,9 @@ func (s *TransactionService) validate(in *TxnInput) error {
 	if acc == nil || acc.Status != model.StatusActive {
 		return ErrTxnAccountInvalid
 	}
+	if acc.IsGold() {
+		return ErrGoldManaged
+	}
 	if acc.IsFund() {
 		return ErrFundManaged
 	}
@@ -160,6 +163,9 @@ func (s *TransactionService) validate(in *TxnInput) error {
 		}
 		if tAcc == nil || tAcc.Status != model.StatusActive {
 			return ErrTxnAccountInvalid
+		}
+		if tAcc.IsGold() {
+			return ErrGoldManaged
 		}
 		if tAcc.IsFund() {
 			return ErrFundManaged
@@ -367,6 +373,9 @@ func (s *TransactionService) update(actor *model.User, id int64, in TxnInput) (*
 	if t.IsVoucher() {
 		return nil, ErrTxnVoucherManaged
 	}
+	if t.IsGoldManaged() {
+		return nil, ErrGoldManaged
+	}
 	if t.FundEventID != nil {
 		return nil, ErrFundManaged
 	}
@@ -445,6 +454,9 @@ func (s *TransactionService) delete(actor *model.User, id int64) error {
 	}
 	if t.IsVoucher() {
 		return ErrTxnVoucherManaged
+	}
+	if t.IsGoldManaged() {
+		return ErrGoldManaged
 	}
 	if t.FundEventID != nil {
 		return ErrFundManaged

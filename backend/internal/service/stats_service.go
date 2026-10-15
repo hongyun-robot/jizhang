@@ -541,6 +541,33 @@ func (s *StatsService) Assets(start, end string) (json.RawMessage, bool, error) 
 			}
 		}
 
+		goldIDs := []int64{}
+		for _, a := range accounts {
+			if a.IsGold() {
+				goldIDs = append(goldIDs, a.ID)
+			}
+		}
+		if len(goldIDs) > 0 {
+			if s.accts.GoldValues == nil {
+				return nil, ErrGoldInvalid
+			}
+			dates := []time.Time{}
+			for d := st; !d.After(en); d = d.AddDate(0, 0, 1) {
+				dates = append(dates, d)
+			}
+			goldValues, e := s.accts.GoldValues(s.accts.DB(), goldIDs, dates)
+			if e != nil {
+				return nil, e
+			}
+			for day, rows := range goldValues {
+				if fundValues[day] == nil {
+					fundValues[day] = map[int64]repository.FundAccountValue{}
+				}
+				for id, v := range rows {
+					fundValues[day][id] = v
+				}
+			}
+		}
 		balance := make(map[int64]decimal.Decimal, len(accounts))
 		for _, a := range accounts {
 			balance[a.ID] = a.OpeningBalance
@@ -577,7 +604,7 @@ func (s *StatsService) Assets(start, end string) (json.RawMessage, bool, error) 
 				b := balance[a.ID]
 				known := true
 				navDate := ""
-				if a.IsFund() {
+				if a.IsInvestment() {
 					value := fundValues[dk][a.ID]
 					b = value.Value
 					known = value.Complete

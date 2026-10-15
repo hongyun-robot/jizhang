@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -38,7 +39,21 @@ type Account struct {
 
 func (Account) TableName() string { return "accounts" }
 
-func (a Account) IsFund() bool { return a.Type == AccountAsset && a.AssetClass == "fund" }
+func (a Account) IsFund() bool       { return a.Type == AccountAsset && a.AssetClass == "fund" }
+func (a Account) IsGold() bool       { return a.Type == AccountAsset && a.AssetClass == "gold" }
+func (a Account) IsInvestment() bool { return a.IsFund() || a.IsGold() }
+
+// Unknown gold value is explicitly null on the wire; retain exact decimal internally.
+func (a Account) MarshalJSON() ([]byte, error) {
+	type plain Account
+	if a.IsGold() && a.ValuationStatus == "no_price" {
+		return json.Marshal(struct {
+			plain
+			Balance *decimal.Decimal `json:"balance"`
+		}{plain(a), nil})
+	}
+	return json.Marshal(plain(a))
+}
 func (a Account) IsCash() bool {
 	return a.Type == AccountAsset && (a.AssetClass == "" || a.AssetClass == "cash")
 }

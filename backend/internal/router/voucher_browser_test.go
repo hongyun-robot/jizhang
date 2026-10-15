@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"jizhang/internal/cache"
+	"jizhang/internal/ccb"
 	"jizhang/internal/fuyao"
 	"jizhang/internal/liability"
 	"jizhang/internal/model"
@@ -42,6 +43,7 @@ func TestLiabilityBrowserServer(t *testing.T) {
 
 func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	fundFixture := os.Getenv("FUND_BROWSER_SERVER") == "1"
+	goldFixture := os.Getenv("GOLD_BROWSER_SERVER") == "1"
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatal(err)
@@ -60,6 +62,11 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	}
 	if fundFixture {
 		if err := db.AutoMigrate(&model.FundInstrument{}, &model.FundPosition{}, &model.FundEvent{}, &model.FundMutation{}, &model.FundNAV{}, &model.FundNAVRevision{}, &model.FundValuation{}, &model.FundAudit{}, &model.FundDividend{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if goldFixture {
+		if err := db.AutoMigrate(&model.GoldPosition{}, &model.GoldEvent{}, &model.GoldMutation{}, &model.GoldAudit{}, &model.GoldQuoteObservation{}, &model.GoldQuoteSync{}, &model.GoldValuation{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -106,6 +113,8 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	auth := service.NewAuthService(users, client, "voucher-browser-fixture-only", 30*time.Minute, 24*time.Hour, false, "/api/v1/auth")
 	txn := service.NewTransactionService(service.TxnDeps{Txns: repository.NewTransactionRepo(db), Accounts: accounts, Cats: cats, Closings: closings, Periods: periods})
 	stats := service.NewStatsService(statsRepo, accounts, cats, periods, cache.NewStatsCache(client))
+	var gold *service.GoldService
+	var goldMarket *goldBrowserMarket
 	var funds *service.FundService
 	var fundMarket *fundBrowserMarket
 	budgets := service.NewBudgetService(service.BudgetDeps{Budgets: repository.NewBudgetRepo(db), Stats: statsRepo, Cats: cats, Notifs: notifs, Periods: periods})
@@ -123,6 +132,14 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 		funds.BindAccounts(accounts)
 		funds.OnWrite = stats.InvalidateAll
 	}
+	if goldFixture {
+		browserTime.Store(time.Now().Unix())
+		goldMarket = &goldBrowserMarket{now: func() time.Time { return time.Unix(browserTime.Load(), 0).In(ccb.Shanghai) }}
+		gold = service.NewGoldService(db, txn, goldMarket)
+		gold.Now = goldMarket.now
+		gold.BindAccounts(accounts)
+		gold.OnWrite = stats.InvalidateAll
+	}
 	if liabilityFixture {
 		liab.Now = func() time.Time { return time.Unix(browserTime.Load(), 0).In(liability.Location) }
 	}
@@ -133,7 +150,7 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 			}
 		}
 	}
-	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601", "http://127.0.0.1:5602", "http://127.0.0.1:5603", "http://127.0.0.1:5612"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: service.NewAccountService(accounts), CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn), LiabilitySvc: liab, FundSvc: funds})
+	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601", "http://127.0.0.1:5602", "http://127.0.0.1:5603", "http://127.0.0.1:5612"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: service.NewAccountService(accounts), CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn), LiabilitySvc: liab, FundSvc: funds, GoldSvc: gold})
 	stop := make(chan struct{}, 1)
 	r.GET("/api/v1/__test__/info", func(c *gin.Context) {
 		name := "voucher-browser"
@@ -143,8 +160,36 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 		if fundFixture {
 			name = "fund-browser"
 		}
+		if goldFixture {
+			name = "gold-browser"
+		}
 		c.JSON(http.StatusOK, gin.H{"fixture": name})
 	})
+	if goldFixture {
+		r.POST("/api/v1/__test__/gold-quote", func(c *gin.Context) {
+			var in struct {
+				Buy     string `json:"buy"`
+				Sell    string `json:"sell"`
+				Failure bool   `json:"failure"`
+				Advance int64  `json:"advance"`
+			}
+			if c.ShouldBindJSON(&in) != nil {
+				c.Status(400)
+				return
+			}
+			goldMarket.mu.Lock()
+			goldMarket.buy = in.Buy
+			goldMarket.sell = in.Sell
+			goldMarket.failure = in.Failure
+			goldMarket.mu.Unlock()
+			if in.Advance == 0 {
+				in.Advance = 31
+			}
+			browserTime.Add(in.Advance)
+			c.JSON(200, gin.H{"calls": goldMarket.calls.Load()})
+		})
+		r.GET("/api/v1/__test__/gold-calls", func(c *gin.Context) { c.JSON(200, gin.H{"calls": goldMarket.calls.Load()}) })
+	}
 	if fundFixture {
 		r.POST("/api/v1/__test__/fund-quote", func(c *gin.Context) {
 			var input struct {
@@ -239,6 +284,9 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	}
 	if fundFixture {
 		address = "127.0.0.1:18086"
+	}
+	if goldFixture {
+		address = "127.0.0.1:18087"
 	}
 	if configured := os.Getenv("BROWSER_FIXTURE_ADDR"); configured != "" {
 		host, _, err := net.SplitHostPort(configured)

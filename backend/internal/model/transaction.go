@@ -48,6 +48,7 @@ type Transaction struct {
 	Purpose              TxnPurpose      `gorm:"size:32;not null;default:regular" json:"purpose"`
 	VoucherEventID       *int64          `gorm:"uniqueIndex" json:"voucher_event_id"`
 	FundEventID          *int64          `gorm:"uniqueIndex" json:"fund_event_id,omitempty"`
+	GoldEventID          *int64          `gorm:"uniqueIndex" json:"gold_event_id,omitempty"`
 	FundPositionID       *int64          `gorm:"-" json:"fund_position_id,omitempty"`
 	FundCode             string          `gorm:"-" json:"fund_code,omitempty"`
 	VoucherID            *int64          `gorm:"-" json:"voucher_id"`

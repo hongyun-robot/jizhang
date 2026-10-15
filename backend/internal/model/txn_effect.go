@@ -14,10 +14,15 @@ const (
 	PurposeFundPurchase      TxnPurpose = "fund_purchase"
 	PurposeFundRedemption    TxnPurpose = "fund_redemption"
 	PurposeFundDividend      TxnPurpose = "fund_dividend"
+	PurposeGoldPurchase      TxnPurpose = "gold_purchase"
+	PurposeGoldRedemption    TxnPurpose = "gold_redemption"
 )
 
 func (t Transaction) IsVoucher() bool {
-	return t.VoucherEventID != nil || (t.Purpose != "" && t.Purpose != PurposeRegular && !t.IsFundManaged())
+	return t.VoucherEventID != nil || (t.Purpose != "" && t.Purpose != PurposeRegular && !t.IsFundManaged() && !t.IsGoldManaged())
+}
+func (t Transaction) IsGoldManaged() bool {
+	return t.GoldEventID != nil || t.Purpose == PurposeGoldPurchase || t.Purpose == PurposeGoldRedemption
 }
 
 func (t Transaction) IsFundManaged() bool {

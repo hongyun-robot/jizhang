@@ -54,7 +54,7 @@ export default function RecordActions({
         >
           查看负债记录
         </Button>
-      ) : t.fund_position_id ? <Button type="link" size="small" onClick={() => navigate(`/fund-positions/${t.fund_position_id}`)}>查看基金</Button> : t.voucher_id ? (
+      ) : t.gold_event_id ? <Button type="link" size="small" onClick={() => navigate(`/gold/${t.purpose === 'gold_purchase' ? t.transfer_account_id : t.account_id}?event=${t.gold_event_id}`)}>查看黄金</Button> : t.fund_position_id ? <Button type="link" size="small" onClick={() => navigate(`/fund-positions/${t.fund_position_id}`)}>查看基金</Button> : t.voucher_id ? (
         <Button
           type="link"
           size="small"

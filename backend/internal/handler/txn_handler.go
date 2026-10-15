@@ -31,6 +31,7 @@ type txnReq struct {
 	Purpose              json.RawMessage `json:"purpose"`
 	VoucherEventID       json.RawMessage `json:"voucher_event_id"`
 	FundEventID          json.RawMessage `json:"fund_event_id"`
+	GoldEventID          json.RawMessage `json:"gold_event_id"`
 	VoucherID            json.RawMessage `json:"voucher_id"`
 	Source               json.RawMessage `json:"source"`
 	InstallmentPlanID    json.RawMessage `json:"installment_plan_id"`
@@ -73,7 +74,7 @@ func (r *txnReq) parse() (service.TxnInput, bool) {
 }
 
 func (r *txnReq) hasReservedFields() bool {
-	return len(r.Purpose)+len(r.VoucherEventID)+len(r.FundEventID)+len(r.VoucherID)+len(r.Source)+len(r.InstallmentPlanID)+len(r.LiabilityTermID)+len(r.LiabilityOperationID) > 0
+	return len(r.Purpose)+len(r.VoucherEventID)+len(r.FundEventID)+len(r.GoldEventID)+len(r.VoucherID)+len(r.Source)+len(r.InstallmentPlanID)+len(r.LiabilityTermID)+len(r.LiabilityOperationID) > 0
 }
 
 func mapTxnErr(c *gin.Context, err error) {
@@ -99,7 +100,7 @@ func mapTxnErr(c *gin.Context, err error) {
 		response.Conflict(c, err.Error())
 	case errors.Is(err, service.ErrTxnVoucherManaged):
 		response.Conflict(c, err.Error())
-	case errors.Is(err, service.ErrFundManaged):
+	case errors.Is(err, service.ErrFundManaged), errors.Is(err, service.ErrGoldManaged):
 		response.Conflict(c, err.Error())
 	default:
 		response.Internal(c, "操作失败")
