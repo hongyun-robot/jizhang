@@ -1,4 +1,5 @@
 import ResponsiveSelect from '../../../components/ResponsiveSelect';
+import DatePicker from '../../../components/DatePicker';
 import CategoryPicker from '../../../components/CategoryPicker';
 import AccountSelect from '../../../components/AccountSelect';
 import PlatformInput from '../../../components/PlatformInput';
@@ -6,7 +7,6 @@ import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
 import {
   Alert,
-  DatePicker,
   Form,
   Input,
   InputNumber,

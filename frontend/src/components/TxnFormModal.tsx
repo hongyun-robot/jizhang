@@ -1,4 +1,5 @@
 import SelectionScope from './SelectionScope';
+import DatePicker from './DatePicker';
 import AccountSelect from './AccountSelect';
 import { submissionGate } from '../lib/submission';
 import { useEditorSession } from '../hooks/useEditorSession';
@@ -12,7 +13,6 @@ import {
   Alert,
   App,
   Button,
-  DatePicker,
   Grid,
   Input,
   Modal,

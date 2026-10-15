@@ -70,18 +70,27 @@
     padding-inline: 8px;
   }
 
-  /* 防 iOS 聚焦自动放大：iOS 只要获焦输入框字号 <16px 就整页放大且收起键盘不复位。
-     表单控件字号提到 16px（行高/占位仍随原尺寸），消除「弹键盘页面放大、还要手动缩小」。
-     覆盖普通输入、自动补全输入框（平台/商家）、文本域与下拉搜索框。 */
-  .ant-input,
-  .ant-input-affix-wrapper,
-  .ant-input-affix-wrapper input,
-  .ant-select-selection-search-input,
-  .ant-select-auto-complete .ant-input,
-  textarea.ant-input,
-  .ant-picker-input input,
-  .ant-input-number-input {
-    font-size: 16px;
+  /* 日期范围的两个月份在窄屏上下排列，避免日历移出视口。 */
+  .ant-picker-dropdown .ant-picker-panels {
+    flex-direction: column;
+  }
+  .ant-picker-dropdown .ant-picker-panel-container {
+    max-width: calc(100vw - 16px);
+    max-height: min(50dvh, 440px);
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 
+}
+
+/* 聚焦时使用安全字号，覆盖手机及触屏平板的真实输入元素。
+   直接匹配 input，避免 AntD 组件内部类名变化遗漏日期、数字和搜索输入。 */
+@media (max-width: 767px), (hover: none) and (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='hidden']),
+  textarea.ant-input,
+  textarea,
+  select,
+  [contenteditable='true'] {
+    font-size: 16px;
+  }
 }

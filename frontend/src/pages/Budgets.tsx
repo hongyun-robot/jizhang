@@ -1,6 +1,7 @@
 import { QueryBoundary } from '../components/QueryState';
+import DatePicker from '../components/DatePicker';
 import { useEffect, useRef, useState } from 'react';
-import { App, Button, Card, DatePicker, InputNumber, Tag } from 'antd';
+import { App, Button, Card, InputNumber, Tag } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 
 import { errMsg } from '../api/client';

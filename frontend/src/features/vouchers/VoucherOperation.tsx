@@ -1,4 +1,5 @@
-import { DatePicker, InputNumber, Modal } from 'antd';
+import { InputNumber, Modal } from 'antd';
+import DatePicker from '../../components/DatePicker';
 import type { Dayjs } from 'dayjs';
 import Money from '../../components/Money';
 import type { Voucher, VoucherAction } from '../../api/types';

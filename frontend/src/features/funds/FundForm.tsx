@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { App, Alert, Button, Checkbox, Form, Input, Modal, Space, Switch } from 'antd';
 import dayjs from 'dayjs';
+import { DateInput } from '../../components/DatePicker';
 import type { FundDividend, FundEvent, FundEventKind, FundInput, FundInstrument, FundPosition } from '../../api/funds';
 import { searchFund, useFundMutations } from '../../api/funds';
 import { useAccounts } from '../../api/accounts';
@@ -100,13 +101,13 @@ export default function FundForm({ accountId, position, kind, amend = false, set
           {!isOpening && kind !== 'settlement' && <Form.Item name="amount" label={kind === 'buy' ? '实际总投入（含费用）' : kind === 'redeem' ? '赎回成交金额（未扣费用）' : '实际分红金额'} rules={quantityRules}><Input inputMode="decimal" /></Form.Item>}
           {hasTradePrice && <Form.Item name="trade_nav" label="实际成交净值" rules={quantityRules}><Input inputMode="decimal" /></Form.Item>}
           {hasTradePrice && <Form.Item name="fee" label="实际费用" rules={quantityRules}><Input inputMode="decimal" /></Form.Item>}
-          {kind !== 'cash_dividend' && <Form.Item name="effective_date" label={isOpening ? '持仓生效日期' : kind === 'settlement' ? '实际到账日期' : '份额生效日期'} rules={[{ required: true }]}><Input type="date" /></Form.Item>}
-          {isDividend && <><Form.Item name="rights_date" label="除息 / 权益生效日期" rules={[{ required: true }]}><Input type="date" /></Form.Item><Form.Item name="registration_date" label="权益登记日期（可选）"><Input type="date" /></Form.Item></>}
+          {kind !== 'cash_dividend' && <Form.Item name="effective_date" label={isOpening ? '持仓生效日期' : kind === 'settlement' ? '实际到账日期' : '份额生效日期'} rules={[{ required: true }]}><DateInput /></Form.Item>}
+          {isDividend && <><Form.Item name="rights_date" label="除息 / 权益生效日期" rules={[{ required: true }]}><DateInput /></Form.Item><Form.Item name="registration_date" label="权益登记日期（可选）"><DateInput /></Form.Item></>}
         </div>
         {dividend && <Alert type="info" title={`公告每十份分红 ${dividend.per_ten_cash} 元`} description="请以个人实际权益、金额与分红方式核对，公告不会自动生成个人资金记录。" />}
         {(kind === 'redeem' || kind === 'cash_dividend') && <Form.Item name="settled" label="资金已到账" valuePropName="checked"><Switch /></Form.Item>}
         {hasCash && <>
-          {kind !== 'settlement' && <Form.Item name="cash_date" label={kind === 'buy' ? '实际付款日期' : '实际到账日期'} rules={[{ required: true }]}><Input type="date" /></Form.Item>}
+          {kind !== 'settlement' && <Form.Item name="cash_date" label={kind === 'buy' ? '实际付款日期' : '实际到账日期'} rules={[{ required: true }]}><DateInput /></Form.Item>}
           <Form.Item name="cash_account_id" label={kind === 'buy' ? '付款账户' : '到账账户'} rules={[{ required: true, message: '请选择本人现金资产账户' }]}>
             <AccountSelect assetOnly sheetTitle="本人现金资产账户" active options={(accounts.data ?? []).filter((a) => a.type === 'asset' && a.asset_class !== 'fund' && a.status === 'active').map((a) => ({ value: a.id, label: a.name }))} onCreatingChange={setCreating} loading={accounts.isLoading} errorMessage={accounts.isError ? errMsg(accounts.error) : undefined} onRetry={() => void accounts.refetch()} />
           </Form.Item>

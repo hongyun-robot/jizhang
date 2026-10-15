@@ -1,4 +1,5 @@
 import SelectionScope from './SelectionScope';
+import DatePicker from './DatePicker';
 import AccountSelect from './AccountSelect';
 import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 import { submissionGate } from '../lib/submission';
@@ -12,7 +13,6 @@ import {
   Alert,
   App,
   Checkbox,
-  DatePicker,
   Form,
   Grid,
   Input,

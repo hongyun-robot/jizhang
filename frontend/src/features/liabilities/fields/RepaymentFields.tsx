@@ -1,7 +1,8 @@
 import AccountSelect from '../../../components/AccountSelect';
 import { popupInParent } from '../../../lib/popup';
 import { amountRules } from './amountRules';
-import { DatePicker, Form, Input } from 'antd';
+import { Form, Input } from 'antd';
+import DatePicker from '../../../components/DatePicker';
 
 import type { FieldContext } from './context';
 export default function RepaymentFields({

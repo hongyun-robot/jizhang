@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
-import { Segmented, DatePicker } from 'antd';
+import { Segmented } from 'antd';
+import DatePicker from './DatePicker';
 import type { DateRange } from '../api/types';
 import { matchPreset, presetRange, type PresetKey } from '../lib/dates';
 export { presetRange } from '../lib/dates';

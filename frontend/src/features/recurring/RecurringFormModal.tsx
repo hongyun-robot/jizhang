@@ -1,4 +1,5 @@
 import SelectionScope from '../../components/SelectionScope';
+import DatePicker from '../../components/DatePicker';
 import AccountSelect from '../../components/AccountSelect';
 import { submissionGate } from '../../lib/submission';
 import { useEditorSession } from '../../hooks/useEditorSession';
@@ -11,7 +12,7 @@ import { amountError } from '../../lib/money';
 
 import { useEffect, useMemo, useRef } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
-import { App, Button, DatePicker, Grid, Input, Modal, Segmented } from 'antd';
+import { App, Button, Grid, Input, Modal, Segmented } from 'antd';
 
 import { errMsg } from '../../api/client';
 import { rootsOfKind } from '../../api/category';

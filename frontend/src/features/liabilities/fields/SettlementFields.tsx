@@ -1,7 +1,8 @@
 import AccountSelect from '../../../components/AccountSelect';
 import ResponsiveSelect from '../../../components/ResponsiveSelect';
 import { popupInParent } from '../../../lib/popup';
-import { Button, DatePicker, Form } from 'antd';
+import { Button, Form } from 'antd';
+import DatePicker from '../../../components/DatePicker';
 import dayjs from 'dayjs';
 import Money from '../../../components/Money';
 import LiabilityAmount from '../LiabilityAmount';

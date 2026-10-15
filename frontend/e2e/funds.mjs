@@ -7,6 +7,30 @@ await assertFixture(base, ['fund-browser']);
 const prefix = `基金验收-${Date.now()}`;
 let assertions = 0;
 function check(value, message) { assert(value, message); assertions++; }
+async function chooseDate(page, input, value) {
+  if (!(await input.evaluate((element) => element.readOnly))) {
+    await input.fill(value);
+    await input.press('Enter');
+    return;
+  }
+  await input.click();
+  const panel = page.locator('.ant-picker-dropdown:visible');
+  const year = parseInt(await panel.locator('.ant-picker-year-btn').innerText());
+  const month = parseInt(await panel.locator('.ant-picker-month-btn').innerText());
+  const [targetYear, targetMonth] = value.split('-').map(Number);
+  await page.locator('body').evaluate(async (element) => {
+    await Promise.all(element.getAnimations({ subtree: true })
+      .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+      .map((animation) => animation.finished.catch(() => {})));
+  });
+  const offset = (targetYear - year) * 12 + targetMonth - month;
+  const direction = offset < 0 ? 'prev' : 'next';
+  for (let step = 0; step < Math.abs(offset); step++) {
+    await panel.locator(`.ant-picker-header-${direction}-btn`).click();
+  }
+  await panel.locator(`td[title="${value}"] .ant-picker-cell-inner`).click();
+  await until(() => input.inputValue(), (selected) => selected === value, 'selected fund date');
+}
 const clients = [];
 for (const username of ['voucher-admin', 'voucher-recorder', 'voucher-member', 'voucher-viewer']) {
   const auth = await fetch(base + '/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username, password: 'voucher-test-only' }) });
@@ -43,7 +67,7 @@ await withFixture(base, async (browser) => {
   await opening.getByLabel('基金代码', { exact: true }).fill('023564');
   await opening.getByLabel('已确认持有份额', { exact: true }).fill('5028.62');
   await opening.getByLabel('持仓成本价', { exact: true }).fill('1.4119');
-  await opening.getByLabel('持仓生效日期', { exact: true }).fill('2026-10-09');
+  await chooseDate(page, opening.getByLabel('持仓生效日期', { exact: true }), '2026-10-09');
   await opening.getByRole('button', { name: '保存记录', exact: true }).click();
   await opening.getByText('请确认估值口径', { exact: true }).waitFor();
   check(await opening.getByLabel('已确认持有份额', { exact: true }).inputValue() === '5028.62', 'validation discarded opening draft');
@@ -142,7 +166,7 @@ await withFixture(base, async (browser) => {
   await mobilePage.getByRole('button', { name: '现金分红', exact: true }).click();
   const dividend = mobilePage.getByRole('dialog', { name: '现金分红', exact: true });
   await dividend.getByLabel('实际分红金额', { exact: true }).fill('10');
-  await dividend.getByLabel('除息 / 权益生效日期', { exact: true }).fill('2026-10-13');
+  await chooseDate(mobilePage, dividend.getByLabel('除息 / 权益生效日期', { exact: true }), '2026-10-13');
   await dividend.getByRole('switch').click();
   await dividend.getByRole('button', { name: '保存记录', exact: true }).click();
   await dividend.waitFor({ state: 'hidden' });
@@ -184,8 +208,8 @@ await withFixture(base, async (browser) => {
   await reinvest.getByLabel('实际确认份额', { exact: true }).fill('5');
   await reinvest.getByLabel('实际分红金额', { exact: true }).fill('6');
   await reinvest.getByLabel('实际成交净值', { exact: true }).fill('1.2');
-  await reinvest.getByLabel('份额生效日期', { exact: true }).fill('2026-10-13');
-  await reinvest.getByLabel('除息 / 权益生效日期', { exact: true }).fill('2026-10-13');
+  await chooseDate(mobilePage, reinvest.getByLabel('份额生效日期', { exact: true }), '2026-10-13');
+  await chooseDate(mobilePage, reinvest.getByLabel('除息 / 权益生效日期', { exact: true }), '2026-10-13');
   await reinvest.getByRole('button', { name: '保存记录', exact: true }).click();
   await reinvest.waitFor({ state: 'hidden' });
   const reinvested = await admin.request('GET', `/funds/positions/${second.position_id}`);
