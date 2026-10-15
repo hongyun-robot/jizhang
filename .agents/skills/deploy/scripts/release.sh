@@ -54,8 +54,29 @@ if (( initial_version < LATEST )); then
   db_query "CREATE DATABASE \`$check_db\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" >/dev/null
   gzip -dc "$backup" | docker exec -i -e CHECK_DB="$check_db" jizhang-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot "$CHECK_DB"'
   mapfile -t tables < <(db_query "SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA='$check_db' AND TABLE_TYPE='BASE TABLE' AND TABLE_NAME NOT IN ('users','voucher_platforms','schema_migrations') ORDER BY TABLE_NAME")
+  # Freeze the original columns, not INSERT statements whose shape changes when
+  # a migration adds a nullable association column. All original cell values,
+  # row counts and primary-key ordering remain part of the fingerprint.
+  declare -A original_columns original_order
+  for table in "${tables[@]}"; do
+    [[ "$table" =~ ^[A-Za-z0-9_]+$ ]] || exit 1
+    original_columns[$table]=$(db_query "SET SESSION group_concat_max_len=1048576; SELECT GROUP_CONCAT(CONCAT(CHAR(96),REPLACE(COLUMN_NAME,CHAR(96),REPEAT(CHAR(96),2)),CHAR(96)) ORDER BY ORDINAL_POSITION SEPARATOR ',') FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='$check_db' AND TABLE_NAME='$table'")
+    original_order[$table]=$(db_query "SET SESSION group_concat_max_len=1048576; SELECT GROUP_CONCAT(CONCAT(CHAR(96),REPLACE(COLUMN_NAME,CHAR(96),REPEAT(CHAR(96),2)),CHAR(96)) ORDER BY SEQ_IN_INDEX SEPARATOR ',') FROM information_schema.STATISTICS WHERE TABLE_SCHEMA='$check_db' AND TABLE_NAME='$table' AND INDEX_NAME='PRIMARY'")
+    [[ -n "${original_columns[$table]}" && "${original_columns[$table]}" != NULL ]] || exit 1
+    if [[ -z "${original_order[$table]}" || "${original_order[$table]}" == NULL ]]; then
+      original_order[$table]="SHA2(CAST(JSON_ARRAY(${original_columns[$table]}) AS CHAR),256)"
+    fi
+  done
   financial_hash() {
-    docker exec -e CHECK_DB="$check_db" jizhang-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump --skip-comments --compact --no-create-info --skip-extended-insert --order-by-primary --set-gtid-purged=OFF -uroot "${CHECK_DB:-$MYSQL_DATABASE}" "$@"' sh "${tables[@]}" | sha256sum | cut -d' ' -f1
+    {
+      for table in "${tables[@]}"; do
+        printf '%s:%s\n' "$table" "${original_columns[$table]}"
+        query="SET time_zone='+00:00'; SELECT JSON_ARRAY(${original_columns[$table]}) FROM \`$table\` ORDER BY ${original_order[$table]}"
+        if ! docker exec -e CHECK_DB="$check_db" -e RELEASE_QUERY="$query" jizhang-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --default-character-set=utf8mb4 --batch --raw --skip-column-names -uroot "${CHECK_DB:-$MYSQL_DATABASE}" -e "$RELEASE_QUERY"'; then
+          return 1
+        fi
+      done
+    } | sha256sum | cut -d' ' -f1
   }
   before=$(financial_hash)
   log="backups/jizhang-release-check-$stamp-$$.log"
