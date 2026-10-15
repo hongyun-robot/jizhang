@@ -172,7 +172,7 @@ func (s *VoucherService) Create(actor *model.User, in VoucherInput) (*model.Vouc
 				return ErrVoucherKeyConflict
 			}
 			out = existing
-			return ensureVoucherPlatform(tx, existing.Platform)
+			return ensureVoucherPlatform(tx, actor.ID, existing.Platform)
 		}
 		inner := s.txns.bound(tx)
 		input := TxnInput{Kind: model.TxnExpense, Amount: in.PaidAmount, AccountID: in.AccountID, CategoryID: in.CategoryID, EntryDate: in.PurchaseDate}
@@ -194,7 +194,7 @@ func (s *VoucherService) Create(actor *model.User, in VoucherInput) (*model.Vouc
 		if e := s.project(tx, v, event); e != nil {
 			return e
 		}
-		if e := ensureVoucherPlatform(tx, v.Platform); e != nil {
+		if e := ensureVoucherPlatform(tx, actor.ID, v.Platform); e != nil {
 			return e
 		}
 		out = v
@@ -587,7 +587,7 @@ func (s *VoucherService) Update(actor *model.User, id int64, in VoucherInput) (*
 			return e
 		}
 		out = v
-		return ensureVoucherPlatform(tx, v.Platform)
+		return ensureVoucherPlatform(tx, actor.ID, v.Platform)
 	})
 	if err == nil {
 		s.afterWrite()

@@ -22,9 +22,9 @@ type voucherHandler struct{ svc *service.VoucherService }
 func NewVoucher(svc *service.VoucherService) *voucherHandler { return &voucherHandler{svc: svc} }
 
 func (h *voucherHandler) ListPlatforms(c *gin.Context) {
-	rows, err := h.svc.ListPlatforms()
+	rows, err := h.svc.ListPlatforms(middleware.CurrentUser(c))
 	if err != nil {
-		response.Internal(c, "平台 / 商家选项读取失败")
+		mapPlatformErr(c, err)
 		return
 	}
 	response.OK(c, rows)
@@ -37,16 +37,58 @@ func (h *voucherHandler) CreatePlatform(c *gin.Context) {
 	if !strictVoucherJSON(c, &req) {
 		return
 	}
-	row, err := h.svc.CreatePlatform(req.Name)
+	row, err := h.svc.CreatePlatform(middleware.CurrentUser(c), req.Name)
 	if err != nil {
-		if errors.Is(err, service.ErrVoucherInvalid) {
-			response.Invalid(c, err.Error())
-		} else {
-			response.Internal(c, "平台 / 商家选项创建失败，请重试")
-		}
+		mapPlatformErr(c, err)
 		return
 	}
 	response.OK(c, row)
+}
+
+func mapPlatformErr(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, service.ErrTxnForbidden):
+		response.Forbidden(c, "只能管理自己的平台 / 商家")
+	case errors.Is(err, service.ErrPlatformNotFound):
+		response.NotFound(c, err.Error())
+	case errors.Is(err, service.ErrPlatformDuplicate), errors.Is(err, service.ErrPlatformReferenced):
+		response.Conflict(c, err.Error())
+	case errors.Is(err, service.ErrVoucherInvalid):
+		response.Invalid(c, err.Error())
+	default:
+		response.Internal(c, "平台 / 商家操作失败，请重试")
+	}
+}
+
+func (h *voucherHandler) RenamePlatform(c *gin.Context) {
+	id, ok := pathID(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if !strictVoucherJSON(c, &req) {
+		return
+	}
+	row, err := h.svc.RenamePlatform(middleware.CurrentUser(c), id, req.Name)
+	if err != nil {
+		mapPlatformErr(c, err)
+		return
+	}
+	response.OK(c, row)
+}
+
+func (h *voucherHandler) DeletePlatform(c *gin.Context) {
+	id, ok := pathID(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.DeletePlatform(middleware.CurrentUser(c), id); err != nil {
+		mapPlatformErr(c, err)
+		return
+	}
+	response.OK(c, nil)
 }
 
 func strictVoucherJSON(c *gin.Context, req any) bool {

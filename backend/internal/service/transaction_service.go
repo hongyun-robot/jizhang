@@ -281,7 +281,7 @@ func (s *TransactionService) create(actor *model.User, in TxnInput) (*model.Tran
 			return nil, err
 		}
 	}
-	if err := s.ensurePlatform(t.Platform); err != nil {
+	if err := s.ensurePlatform(actor.ID, t.Platform); err != nil {
 		return nil, err
 	}
 	s.fireWrite()
@@ -417,7 +417,7 @@ func (s *TransactionService) update(actor *model.User, id int64, in TxnInput) (*
 	if err := s.deps.Txns.Update(t); err != nil {
 		return nil, err
 	}
-	if err := s.ensurePlatform(t.Platform); err != nil {
+	if err := s.ensurePlatform(actor.ID, t.Platform); err != nil {
 		return nil, err
 	}
 	s.fireWrite()

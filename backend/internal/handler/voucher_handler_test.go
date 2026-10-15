@@ -31,7 +31,10 @@ func TestVoucherHTTPContract(t *testing.T) {
 	}
 	pool.SetMaxOpenConns(1)
 	defer pool.Close()
-	if err := db.AutoMigrate(&model.Setting{}, &model.Account{}, &model.Category{}, &model.Transaction{}, &model.PeriodClosing{}, &model.Voucher{}, &model.VoucherEvent{}, &model.VoucherPlatform{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Setting{}, &model.Account{}, &model.Category{}, &model.Transaction{}, &model.PeriodClosing{}, &model.Voucher{}, &model.VoucherEvent{}, &model.VoucherPlatform{}, &model.VoucherPlatformTemplate{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&[]model.User{{ID: 1, Username: "http-admin", Role: model.RoleAdmin, Status: model.StatusActive}, {ID: 2, Username: "http-member", Role: model.RoleMember, Status: model.StatusActive}}).Error; err != nil {
 		t.Fatal(err)
 	}
 	owner := int64(1)
@@ -75,6 +78,8 @@ func TestVoucherHTTPContract(t *testing.T) {
 	r.POST("/transactions", th.Create)
 	r.GET("/voucher-platforms", h.ListPlatforms)
 	r.POST("/voucher-platforms", h.CreatePlatform)
+	r.PUT("/voucher-platforms/:id", h.RenamePlatform)
+	r.DELETE("/voucher-platforms/:id", h.DeletePlatform)
 	r.PUT("/transactions/:id", th.Update)
 	r.DELETE("/transactions/:id", th.Delete)
 	request := func(method, path, role string, body any, want int) json.RawMessage {
@@ -108,6 +113,22 @@ func TestVoucherHTTPContract(t *testing.T) {
 	for _, invalid := range []any{map[string]string{"name": "   "}, map[string]string{"name": "名称", "unknown": "no"}, map[string]int{"name": 123}} {
 		request("POST", "/voucher-platforms", "member", invalid, 400)
 	}
+	var ownedPlatform model.VoucherPlatform
+	if err := json.Unmarshal(request("POST", "/voucher-platforms", "viewer", map[string]string{"name": "只读可维护"}, 200), &ownedPlatform); err != nil {
+		t.Fatal(err)
+	}
+	platformPath := fmt.Sprintf("/voucher-platforms/%d", ownedPlatform.ID)
+	request("PUT", platformPath, "member", map[string]string{"name": "不能改他人"}, 403)
+	request("DELETE", platformPath, "member", nil, 403)
+	request("PUT", platformPath, "viewer", map[string]string{"name": "只读已修改"}, 200)
+	request("PUT", platformPath, "viewer", map[string]string{"name": "全员共享"}, 409)
+	request("DELETE", platformPath, "viewer", nil, 200)
+	request("DELETE", platformPath, "viewer", nil, 404)
+	var memberPlatform model.VoucherPlatform
+	if err := json.Unmarshal(request("POST", "/voucher-platforms", "member", map[string]string{"name": "成员私人目录"}, 200), &memberPlatform); err != nil {
+		t.Fatal(err)
+	}
+	request("PUT", fmt.Sprintf("/voucher-platforms/%d", memberPlatform.ID), "admin", map[string]string{"name": "越权"}, 403)
 	var detail service.VoucherDetail
 	if err := json.Unmarshal(request("POST", "/vouchers", "admin", input, 200), &detail); err != nil {
 		t.Fatal(err)

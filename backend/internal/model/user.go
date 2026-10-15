@@ -30,6 +30,7 @@ type User struct {
 	LiabilityAccountsInitialized bool       `json:"-"`
 	AssetAccountsInitialized     bool       `json:"-"`
 	CategoriesInitialized        bool       `json:"-"`
+	VoucherPlatformsInitialized  bool       `json:"-"`
 	CreatedAt                    time.Time  `json:"created_at"`
 	UpdatedAt                    time.Time  `json:"updated_at"`
 }

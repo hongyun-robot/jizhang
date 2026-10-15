@@ -148,7 +148,7 @@ func newLiabilityEnv(t *testing.T) *liabilityEnv {
 	e := newVoucherEnv(t)
 	mustOK(t, e.db.AutoMigrate(append(model.LiabilityModels(), &model.Notification{})...))
 	mustOK(t, e.db.AutoMigrate(&model.User{}))
-	mustOK(t, e.db.Create(&[]model.User{{ID: 1, Username: "admin", Role: model.RoleAdmin, LiabilityAccountsInitialized: true}, {ID: 2, Username: "viewer", Role: model.RoleViewer, LiabilityAccountsInitialized: true}, {ID: 3, Username: "member", Role: model.RoleMember, LiabilityAccountsInitialized: true}}).Error)
+	mustOK(t, e.db.Save(&[]model.User{{ID: 1, Username: "admin", Role: model.RoleAdmin, LiabilityAccountsInitialized: true}, {ID: 2, Username: "viewer", Role: model.RoleViewer, LiabilityAccountsInitialized: true}, {ID: 3, Username: "member", Role: model.RoleMember, LiabilityAccountsInitialized: true}}).Error)
 	mustOK(t, e.db.Create(&[]model.LiabilityAccountType{{Code: "credit_card", Name: "信用卡"}, {Code: "huabei", Name: "花呗", Sort: 1}, {Code: "meituan_monthly", Name: "美团月付", Sort: 2}}).Error)
 	owner := int64(1)
 	card := model.Account{Name: "花呗", Type: model.AccountLiability, OwnerID: &owner, Status: model.StatusActive}

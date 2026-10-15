@@ -11,14 +11,14 @@ import (
 
 func TestVoucherPlatformDirectory(t *testing.T) {
 	e := newVoucherEnv(t)
-	rows, err := e.svc.ListPlatforms()
+	rows, err := e.svc.ListPlatforms(adminUser())
 	mustOK(t, err)
 	if rows == nil || len(rows) != 0 {
 		t.Fatal("empty directory must be an empty slice", rows)
 	}
 	var first int64
 	for _, name := range []string{"美团", "\t 美团 \n", "jd", "JD", strings.Repeat("商", 128)} {
-		row, err := e.svc.CreatePlatform(name)
+		row, err := e.svc.CreatePlatform(adminUser(), name)
 		mustOK(t, err)
 		if strings.TrimSpace(name) == "美团" {
 			if first != 0 && row.ID != first {
@@ -28,14 +28,14 @@ func TestVoucherPlatformDirectory(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"", " \n\t", strings.Repeat("商", 129)} {
-		_, err := e.svc.CreatePlatform(name)
+		_, err := e.svc.CreatePlatform(adminUser(), name)
 		if !errors.Is(err, ErrVoucherInvalid) {
 			t.Fatalf("invalid name accepted: %q: %v", name, err)
 		}
 	}
-	rows, err = e.svc.ListPlatforms()
+	rows, err = e.svc.ListPlatforms(adminUser())
 	mustOK(t, err)
-	if len(rows) != 4 || rows[0].Name != "JD" || rows[1].Name != "jd" {
+	if len(rows) != 4 || rows[0].Name != "美团" || rows[1].Name != "jd" || rows[2].Name != "JD" {
 		t.Fatal("wrong directory or sort", rows)
 	}
 	e.balance(t, "1000")
@@ -48,7 +48,7 @@ func TestVoucherPlatformDirectory(t *testing.T) {
 	}
 	// 非唯一冲突错误不能被当作重复创建而吞掉。
 	mustOK(t, e.db.Exec(`CREATE TRIGGER reject_platform BEFORE INSERT ON voucher_platforms BEGIN SELECT RAISE(ABORT, 'storage rejected'); END`).Error)
-	if _, err := e.svc.CreatePlatform("美团"); err == nil {
+	if _, err := e.svc.CreatePlatform(adminUser(), "美团"); err == nil {
 		t.Fatal("non-unique error was swallowed")
 	}
 }
@@ -64,7 +64,7 @@ func TestVoucherPlatformSaveCompatibility(t *testing.T) {
 	}
 	checkNames := func(want ...string) {
 		t.Helper()
-		rows, err := e.svc.ListPlatforms()
+		rows, err := e.svc.ListPlatforms(adminUser())
 		mustOK(t, err)
 		if len(rows) != len(want) {
 			t.Fatalf("directory=%v want=%v", rows, want)
@@ -108,7 +108,7 @@ func TestVoucherPlatformSaveCompatibility(t *testing.T) {
 
 func TestVoucherPlatformTransactionRollback(t *testing.T) {
 	e := newVoucherEnv(t)
-	_, err := e.svc.CreatePlatform("已明确创建")
+	_, err := e.svc.CreatePlatform(adminUser(), "已明确创建")
 	mustOK(t, err)
 	in := e.input(t, "20", 1, "")
 	in.Platform = "新名称"
@@ -130,7 +130,7 @@ func TestVoucherPlatformTransactionRollback(t *testing.T) {
 			t.Fatalf("rollback left financial data: %T", table)
 		}
 	}
-	rows, err := e.svc.ListPlatforms()
+	rows, err := e.svc.ListPlatforms(adminUser())
 	mustOK(t, err)
 	if len(rows) != 1 || rows[0].Name != "已明确创建" {
 		t.Fatal("explicit creation was lost or failed save left an option", rows)
@@ -149,7 +149,7 @@ func TestVoucherPlatformTransactionRollback(t *testing.T) {
 	}
 	// 名称目录错误会传播，不会回退为“创建成功”。
 	mustOK(t, e.db.Migrator().DropTable(&model.VoucherPlatform{}))
-	if _, err := e.svc.ListPlatforms(); err == nil || errors.Is(err, gorm.ErrRecordNotFound) {
+	if _, err := e.svc.ListPlatforms(adminUser()); err == nil || errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatal("directory read hid storage failure", err)
 	}
 }

@@ -24,7 +24,7 @@ func TestPersonalCatalogPermissionsAndCreation(t *testing.T) {
 	sharedKey := uuid.NewString()
 	for i, role := range roles {
 		actor := &model.User{ID: int64(i + 1), Username: string(role), Role: role, Status: model.StatusActive, LiabilityAccountsInitialized: true}
-		mustOK(t, e.db.Create(actor).Error)
+		mustOK(t, e.db.Save(actor).Error)
 		rows, err := accounts.ListFor(actor)
 		mustOK(t, err)
 		if len(rows) == 0 {

@@ -36,6 +36,13 @@ func (s *CategoryService) CreateFor(actor *model.User, in CreateCategoryInput) (
 			}
 		}
 		in.OwnerID = actor.ID
+		if !in.SortProvided && in.Sort == 0 {
+			position, e := repository.CategoryOrder(tx, actor.ID, in.Kind, in.ParentID).NextPosition()
+			if e != nil {
+				return e
+			}
+			in.Sort = position
+		}
 		var e error
 		out, e = NewCategoryService(repository.NewCategoryRepo(tx)).Create(in)
 		return e
@@ -45,7 +52,7 @@ func (s *CategoryService) CreateFor(actor *model.User, in CreateCategoryInput) (
 	}
 	return
 }
-func (s *CategoryService) UpdateFor(actor *model.User, id int64, name string, sort int) (out *model.Category, err error) {
+func (s *CategoryService) UpdateFor(actor *model.User, id int64, name string, positions ...int) (out *model.Category, err error) {
 	name, err = categoryName(name)
 	if err != nil {
 		return nil, err
@@ -55,7 +62,16 @@ func (s *CategoryService) UpdateFor(actor *model.User, id int64, name string, so
 			return e
 		}
 		var e error
-		out, e = NewCategoryService(repository.NewCategoryRepo(tx)).Update(id, name, sort)
+		repo := repository.NewCategoryRepo(tx)
+		current, e := repo.GetByID(id)
+		if e != nil {
+			return e
+		}
+		position := current.Sort
+		if len(positions) > 0 {
+			position = positions[0]
+		}
+		out, e = NewCategoryService(repo).Update(id, name, position)
 		return e
 	})
 	if err == nil {

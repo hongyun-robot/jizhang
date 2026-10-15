@@ -18,7 +18,7 @@ func TestTransactionPlatformSaveAndEdit(t *testing.T) {
 	if row.Platform != "共享商家" || row.Note != in.Note {
 		t.Fatal("platform was not saved independently", row)
 	}
-	options, err := e.svc.ListPlatforms()
+	options, err := e.svc.ListPlatforms(adminUser())
 	mustOK(t, err)
 	if len(options) != 1 || options[0].Name != row.Platform {
 		t.Fatal("transaction did not populate shared directory", options)
@@ -50,7 +50,7 @@ func TestTransactionPlatformSaveAndEdit(t *testing.T) {
 	if updated.Platform != "" {
 		t.Fatal("platform cannot be cleared")
 	}
-	options, err = e.svc.ListPlatforms()
+	options, err = e.svc.ListPlatforms(adminUser())
 	mustOK(t, err)
 	if len(options) != 2 {
 		t.Fatal("editing removed reusable options")

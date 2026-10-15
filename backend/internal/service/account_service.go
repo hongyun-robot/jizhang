@@ -86,6 +86,7 @@ type CreateAccountInput struct {
 	OpeningBalance       decimal.Decimal
 	RepaymentDay         *int
 	Sort                 int
+	SortProvided         bool `json:"-"`
 	LiabilityType        string
 	StatementDay         *int
 	RepaymentMonthOffset *int
@@ -112,12 +113,22 @@ func (s *AccountService) Create(in CreateAccountInput) (out *model.Account, err 
 		if e != nil {
 			return e
 		}
+		legacyHash := sha256.Sum256(raw)
+		legacyDigest := hex.EncodeToString(legacyHash[:])
+		raw, e = json.Marshal(struct {
+			Version      int
+			Input        CreateAccountInput
+			SortProvided bool
+		}{2, payload, in.SortProvided || in.Sort != 0})
+		if e != nil {
+			return e
+		}
 		hash := sha256.Sum256(raw)
 		digest := hex.EncodeToString(hash[:])
 		var request model.AccountCreateRequest
 		e = tx.Where("owner_id = ? AND request_key = ?", in.ActorID, in.RequestKey).First(&request).Error
 		if e == nil {
-			if request.Digest != digest || request.AccountID == nil {
+			if (request.Digest != digest && request.Digest != legacyDigest) || request.AccountID == nil {
 				return ErrAccountCreateConflict
 			}
 			out, e = repository.NewAccountRepo(tx).GetByID(*request.AccountID)
@@ -197,6 +208,13 @@ func (s *AccountService) createAt(tx *gorm.DB, in CreateAccountInput) (*model.Ac
 	}
 	if in.RepaymentDay != nil && (*in.RepaymentDay < 1 || *in.RepaymentDay > 31) {
 		return nil, ErrInvalidRepaymentDay
+	}
+	if in.ActorID > 0 && !in.SortProvided && in.Sort == 0 {
+		position, err := repository.AccountOrder(tx, in.ActorID).NextPosition()
+		if err != nil {
+			return nil, err
+		}
+		in.Sort = position
 	}
 	a := &model.Account{
 		Name:               in.Name,
@@ -330,7 +348,9 @@ func (s *AccountService) updateAt(tx *gorm.DB, id int64, in CreateAccountInput, 
 	if !a.BillingEnabled {
 		a.LiabilityType = in.LiabilityType
 	}
-	a.Sort = in.Sort
+	if in.SortProvided || in.Sort != 0 {
+		a.Sort = in.Sort
+	}
 	if status == model.StatusActive || status == model.StatusDisabled {
 		a.Status = status
 	}

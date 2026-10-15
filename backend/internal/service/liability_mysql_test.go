@@ -58,6 +58,11 @@ func TestLiabilityMySQL(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("..", "..", "migrations", "*.up.sql"))
 	mustOK(t, err)
 	for _, file := range files {
+		// Exercise the old shared-default migrations before switching this fixture
+		// to personal platform instances after its users have been created.
+		if filepath.Base(file) >= "000015" {
+			break
+		}
 		b, e := os.ReadFile(file)
 		mustOK(t, e)
 		mustOK(t, db.Exec(string(b)).Error)
@@ -109,7 +114,7 @@ func TestLiabilityMySQL(t *testing.T) {
 				return err
 			}
 			platform := model.VoucherPlatform{Name: "美团", CreatedAt: vdate(t, "2026-01-01")}
-			if err := tx.Create(&platform).Error; err != nil {
+			if err := tx.Omit("OwnerID", "Sort").Create(&platform).Error; err != nil {
 				return err
 			}
 			if err := tx.Exec(up).Error; err != nil {
@@ -201,6 +206,8 @@ func TestLiabilityMySQL(t *testing.T) {
 	}
 	mustOK(t, db.Exec("INSERT INTO users(id,username,password_hash,role,status) VALUES(1,'liability-admin','test','admin','active'),(3,'liability-member','test','member','active')").Error)
 	base := seedVoucherEnv(t, db)
+	mustOK(t, db.Exec(migration("000015_personal_voucher_platforms.up.sql")).Error)
+	mustOK(t, db.Exec(migration("000016_catalog_ordering.up.sql")).Error)
 	// The earlier downgrade/re-upgrade exercise resets type columns on the
 	// legacy defaults. Keep that legacy fixture with its administrator before
 	// testing a new member's independent, one-time template initialization.

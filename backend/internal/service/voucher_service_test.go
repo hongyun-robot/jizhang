@@ -30,7 +30,13 @@ func newVoucherEnv(t *testing.T) *voucherEnv {
 	mustOK(t, err)
 	sqlDB.SetMaxOpenConns(1)
 	t.Cleanup(func() { _ = sqlDB.Close() })
-	mustOK(t, db.AutoMigrate(&model.Setting{}, &model.Account{}, &model.Category{}, &model.Transaction{}, &model.PeriodClosing{}, &model.AuditLog{}, &model.Voucher{}, &model.VoucherEvent{}, &model.VoucherPlatform{}))
+	mustOK(t, db.AutoMigrate(&model.User{}, &model.Setting{}, &model.Account{}, &model.Category{}, &model.Transaction{}, &model.PeriodClosing{}, &model.AuditLog{}, &model.Voucher{}, &model.VoucherEvent{}, &model.VoucherPlatform{}, &model.VoucherPlatformTemplate{}))
+	mustOK(t, db.Create(&[]model.User{
+		{ID: 1, Username: "fixture-admin", Role: model.RoleAdmin, Status: model.StatusActive},
+		{ID: 2, Username: "fixture-viewer", Role: model.RoleViewer, Status: model.StatusActive},
+		{ID: 3, Username: "fixture-member", Role: model.RoleMember, Status: model.StatusActive},
+		{ID: 4, Username: "fixture-recorder", Role: model.RoleRecorder, Status: model.StatusActive},
+	}).Error)
 	return seedVoucherEnv(t, db)
 }
 func seedVoucherEnv(t *testing.T, db *gorm.DB) *voucherEnv {

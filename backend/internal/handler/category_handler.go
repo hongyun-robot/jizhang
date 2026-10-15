@@ -27,7 +27,7 @@ func mapCategoryErr(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrCategoryNotFound):
 		response.NotFound(c, err.Error())
 	case errors.Is(err, service.ErrCategoryHasChildren),
-		errors.Is(err,service.ErrCategoryHasReferences),
+		errors.Is(err, service.ErrCategoryHasReferences),
 		errors.Is(err, service.ErrCategoryHasTransactions):
 		response.Conflict(c, err.Error())
 	case errors.Is(err, service.ErrInvalidCategory),
@@ -69,6 +69,7 @@ func (h *categoryHandler) Create(c *gin.Context) {
 	}
 	if req.Sort != nil {
 		in.Sort = *req.Sort
+		in.SortProvided = true
 	}
 	cat, err := h.svc.CreateFor(middleware.CurrentUser(c), in)
 	if err != nil {
@@ -94,11 +95,11 @@ func (h *categoryHandler) Update(c *gin.Context) {
 		response.Invalid(c, "名称必填")
 		return
 	}
-	sort := 0
+	var positions []int
 	if req.Sort != nil {
-		sort = *req.Sort
+		positions = []int{*req.Sort}
 	}
-	cat, err := h.svc.UpdateFor(middleware.CurrentUser(c), id, req.Name, sort)
+	cat, err := h.svc.UpdateFor(middleware.CurrentUser(c), id, req.Name, positions...)
 	if err != nil {
 		mapCategoryErr(c, err)
 		return

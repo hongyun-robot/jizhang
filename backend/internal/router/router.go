@@ -73,6 +73,7 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 			accounts.GET("", accth.List)
 			accounts.GET("/liability-types", accth.LiabilityTypes)
 			accounts.POST("", accth.Create)
+			accounts.PUT("/reorder", accth.Reorder)
 			accounts.PUT("/:id", accth.Update)
 			accounts.DELETE("/:id", accth.Delete)
 		}
@@ -123,6 +124,7 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 		{
 			categories.GET("", cath.Tree)
 			categories.POST("", cath.Create)
+			categories.PUT("/reorder", cath.Reorder)
 			categories.PUT("/:id", cath.Update)
 			categories.DELETE("/:id", cath.Delete)
 		}
@@ -140,10 +142,13 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 
 		// 统计：区间查询全部角色可读；30 秒缓存，写操作主动失效
 		vh := handler.NewVoucher(d.VoucherSvc)
-		// 名称目录不是账务写入，所有已登录角色均可读取和创建。
+		// 个人名称目录不是账务写入，所有已登录角色均可管理本人条目。
 		platforms := v1.Group("/voucher-platforms", middleware.Auth(d.AuthSvc))
 		platforms.GET("", vh.ListPlatforms)
 		platforms.POST("", vh.CreatePlatform)
+		platforms.PUT("/reorder", vh.ReorderPlatforms)
+		platforms.PUT("/:id", vh.RenamePlatform)
+		platforms.DELETE("/:id", vh.DeletePlatform)
 		vouchers := v1.Group("/vouchers", middleware.Auth(d.AuthSvc))
 		{
 			vouchers.GET("", vh.List)

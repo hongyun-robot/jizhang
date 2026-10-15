@@ -59,6 +59,7 @@ func (r *accountReq) parse() (service.CreateAccountInput, bool) {
 	}
 	if r.Sort != nil {
 		in.Sort = *r.Sort
+		in.SortProvided = true
 	}
 	return in, true
 }

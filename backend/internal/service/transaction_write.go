@@ -38,7 +38,7 @@ func (s *TransactionService) bound(tx *gorm.DB) *TransactionService {
 	return inner
 }
 
-func (s *TransactionService) ensurePlatform(name string) error {
+func (s *TransactionService) ensurePlatform(ownerID int64, name string) error {
 	if name == "" {
 		return nil
 	}
@@ -46,7 +46,7 @@ func (s *TransactionService) ensurePlatform(name string) error {
 	if !ok {
 		return nil // 无数据库的测试仓储只保存流水本身。
 	}
-	return ensureVoucherPlatform(provider.DB(), name)
+	return ensureVoucherPlatform(provider.DB(), ownerID, name)
 }
 
 func (s *TransactionService) Create(actor *model.User, in TxnInput) (out *model.Transaction, err error) {

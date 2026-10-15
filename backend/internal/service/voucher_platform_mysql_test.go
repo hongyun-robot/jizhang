@@ -78,8 +78,8 @@ func TestVoucherPlatformMySQL(t *testing.T) {
 	}
 	before := snapshot()
 	migration("000006_voucher_platforms.up.sql")
-	rows, err := e.svc.ListPlatforms()
-	mustOK(t, err)
+	var rows []model.VoucherPlatform
+	mustOK(t, db.Order("BINARY name").Find(&rows).Error)
 	if len(rows) != 3 || rows[0].Name != "JD" || rows[1].Name != "jd" || rows[2].Name != "美团" {
 		t.Fatal("wrong historical backfill", rows)
 	}
@@ -93,6 +93,8 @@ func TestVoucherPlatformMySQL(t *testing.T) {
 		t.Fatal("up changed historical vouchers")
 	}
 	migration("000007_transaction_platform.up.sql")
+	migration("000015_personal_voucher_platforms.up.sql")
+	migration("000016_catalog_ordering.up.sql")
 
 	t.Run("concurrent-create-or-get", func(t *testing.T) {
 		const n = 12
@@ -104,7 +106,7 @@ func TestVoucherPlatformMySQL(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				<-start
-				row, err := e.svc.CreatePlatform("  并发创建  ")
+				row, err := e.svc.CreatePlatform(adminUser(), "  并发创建  ")
 				errs[i] = err
 				if row != nil {
 					ids[i] = row.ID
@@ -126,11 +128,11 @@ func TestVoucherPlatformMySQL(t *testing.T) {
 			if err := tx.Model(&model.VoucherPlatform{}).Count(&count).Error; err != nil {
 				return err
 			}
-			created, err := e.svc.CreatePlatform("快照后新建")
+			created, err := e.svc.CreatePlatform(adminUser(), "快照后新建")
 			if err != nil {
 				return err
 			}
-			row, err := repository.NewVoucherPlatformRepo(tx).Ensure("快照后新建")
+			row, err := repository.NewVoucherPlatformRepo(tx).Ensure(1, "快照后新建")
 			if err == nil && row.ID != created.ID {
 				t.Fatal("snapshot returned wrong identity")
 			}

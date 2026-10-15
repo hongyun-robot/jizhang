@@ -79,6 +79,8 @@ func TestVoucherMySQL(t *testing.T) {
 	// account row shape with the current service without seeding new catalogs.
 	mustOK(t, db.Exec("ALTER TABLE accounts ADD COLUMN owner_id BIGINT NULL, ADD COLUMN asset_class VARCHAR(16) NULL").Error)
 	mustOK(t, db.Exec("ALTER TABLE transactions ADD COLUMN fund_event_id BIGINT NULL").Error)
+	mustOK(t, db.Exec(readMigration("000015_personal_voucher_platforms.up.sql")).Error)
+	mustOK(t, db.Exec(readMigration("000016_catalog_ordering.up.sql")).Error)
 
 	t.Run("double-instance-auto-refund", func(t *testing.T) {
 		mustOK(t, db.AutoMigrate(&model.Category{}))

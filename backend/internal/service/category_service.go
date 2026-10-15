@@ -93,11 +93,12 @@ func (s *CategoryService) Tree() ([]*model.CategoryTreeNode, error) {
 
 // CreateInput 建分类入参：ParentID 为空 = 一级。
 type CreateCategoryInput struct {
-	OwnerID  int64
-	Kind     model.CategoryKind
-	Name     string
-	ParentID *int64
-	Sort     int
+	OwnerID      int64
+	Kind         model.CategoryKind
+	Name         string
+	ParentID     *int64
+	Sort         int
+	SortProvided bool
 }
 
 // Create 新建分类（最多两级：只能挂在一级分类下）。
