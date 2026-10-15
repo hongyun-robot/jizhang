@@ -13,12 +13,12 @@ export async function assertFixture(base, expected = ['voucher-browser', 'liabil
   return info;
 }
 
-export async function launchBrowser(kind = 'firefox') {
+export async function launchBrowser(kind = 'firefox', launchOptions = {}) {
   const executablePath = kind === 'firefox'
     ? process.env.FIREFOX_EXE ?? path.join(process.env.LOCALAPPDATA, 'ms-playwright/firefox-1543/firefox/firefox.exe')
     : process.env.CHROME_EXE ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe';
   assert(fs.existsSync(executablePath), 'browser executable missing: ' + executablePath);
-  return (kind === 'firefox' ? firefox : chromium).launch({ executablePath, headless: true });
+  return (kind === 'firefox' ? firefox : chromium).launch({ ...launchOptions, executablePath, headless: true });
 }
 
 export async function login(page, base, username = 'voucher-admin', password = 'voucher-test-only') {
@@ -61,9 +61,9 @@ export async function until(read, predicate, label, timeout = 10000) {
   assert.fail(label + ': ' + JSON.stringify(value));
 }
 
-export async function withFixture(base, run, kind = 'firefox') {
+export async function withFixture(base, run, kind = 'firefox', launchOptions = {}) {
   await assertFixture(base);
-  const browser = await launchBrowser(kind);
+  const browser = await launchBrowser(kind, launchOptions);
   const cleanup = [];
   let failure;
   let result;

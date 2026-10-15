@@ -136,6 +136,24 @@
   border-radius: 8px;
 }
 
+/* 内层到达滚动边界时，保留外层弹窗、父表单和背景页的位置。 */
+.ant-modal-wrap,
+.ant-modal-body,
+.ant-drawer-content,
+.ant-drawer-body,
+.ant-select-dropdown,
+.ant-select-dropdown-list-holder,
+.ant-modal textarea,
+.ant-drawer textarea {
+  overscroll-behavior-y: contain;
+}
+
+/* 虚拟选项列表使用 overflow:hidden；下拉自身也需要形成滚动容器，
+   才能接住列表在边界放行的原生滚动。 */
+.ant-select-dropdown {
+  overflow-y: auto;
+}
+
 /* 软键盘避让（specs/transactions 软键盘避让）：
    --kb-inset 由 useVisualViewportKeyboard 写入键盘遮挡高度（无键盘/布局已自收缩时为 0）。
    仅 ≤767px 生效：.ant-modal 限高为「可视高度 - 遮挡高度」、body 内部滚动，
