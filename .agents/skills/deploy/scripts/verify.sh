@@ -55,7 +55,7 @@ if [ -s /tmp/_fav ]; then
     [ -z "$f" ] && continue
     code=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$BASE$f")
     ct=$(curl -s -o /dev/null -m 20 -w '%{content_type}' "$BASE$f")
-    ck "$f" "$code/$ct" "200/$(case "$f" in *.svg) echo image/svg+xml;; *) echo image/x-icon;; esac)"
+    ck "$f" "$code/$ct" "200/$(case "$f" in *.svg) echo image/svg+xml;; *.png) echo image/png;; *.webp) echo image/webp;; *.jpg|*.jpeg) echo image/jpeg;; *) echo image/x-icon;; esac)"
   done < /tmp/_fav
 else
   echo "  SKIP  index.html 未引用 favicon"
