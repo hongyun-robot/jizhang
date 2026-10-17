@@ -1,0 +1,51 @@
+{
+  "started_at": "2026-10-16T08:39:21.197Z",
+  "site": "https://jizhang.zhanghongyun.cn",
+  "code": "FBAE68020E",
+  "checks": [
+    "exact Minsheng E product is available",
+    "production native HTTP NAV source succeeds",
+    "NAV source has a fresh production success timestamp",
+    "complete public NAV history is stored",
+    "existing production scheduler posts an automatic return",
+    "posted return matches exact public NAV interval calculation",
+    "account balance increases by the adopted return exactly once",
+    "YuLibao cash policy is selected automatically",
+    "one managed return appears in the ordinary ledger",
+    "ledger balance and consumption effects are correct",
+    "repeat refresh is financially idempotent",
+    "cash and wealth views share one asset"
+  ],
+  "cleanup": {
+    "link_stopped": true,
+    "account_disabled": true,
+    "user_disabled": true,
+    "session_revoked": true
+  },
+  "source": {
+    "product_id": 2,
+    "status": "updated",
+    "last_success": "2026-10-16T16:39:26.56+08:00",
+    "records": 754,
+    "baseline": "2026-10-14",
+    "baseline_nav": "1.068",
+    "latest": "2026-10-15",
+    "latest_nav": "1.068033"
+  },
+  "test_user_id": 20,
+  "test_account_id": 191,
+  "posting": {
+    "baseline": "2026-10-14",
+    "latest": "2026-10-15",
+    "opening": "10000.00",
+    "expected_return": "0.31",
+    "actual_return": "0.31",
+    "balance": "10000.31",
+    "yield_id": 1,
+    "transaction_id": 106,
+    "scheduled_at": "2026-10-16T16:39:53.037+08:00",
+    "repeated_without_duplicate": true
+  },
+  "completed_at": "2026-10-16T08:39:52.528Z",
+  "result": "passed"
+}

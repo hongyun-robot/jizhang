@@ -1,0 +1,9 @@
+{
+  "code": "J07241",
+  "fetched_at": "2026-10-15T16:20:43.656Z",
+  "status": "failed",
+  "error": "source_navigation_rejected",
+  "http_status": 400,
+  "browser_version": "153.0.8010.12",
+  "platform": "linux"
+}

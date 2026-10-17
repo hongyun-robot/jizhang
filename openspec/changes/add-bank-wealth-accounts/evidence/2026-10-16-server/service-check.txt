@@ -1,0 +1,7 @@
+compose_config=valid
+isolated_network_health=200
+service_restart_health=200
+timeout_browser_recycled=true
+{"health":200,"unauthenticated":401,"unknown_product":400,"unexpected_body":400,"live_source_status":502,"live_source_error":"collection_failed","live_source_count":0,"cooldown":429}
+port_bindings={} readonly=true memory_limit=805306368
+evidence_dir=/srv/jizhang/.wealth-probe-20261015t161510z

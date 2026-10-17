@@ -1,0 +1,4 @@
+jizhang-web Up 3 hours (healthy)
+jizhang-api Up 3 hours (healthy)
+jizhang-redis Up 4 days (healthy)
+jizhang-mysql Up 4 days (healthy)

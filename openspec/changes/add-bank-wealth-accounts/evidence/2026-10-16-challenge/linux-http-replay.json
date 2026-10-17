@@ -1,0 +1,518 @@
+{
+  "mode": "normal-ua",
+  "at": "2026-10-16T01:13:29.822Z",
+  "browser": "153.0.8010.12",
+  "requests": [
+    {
+      "id": "10AAA1A88694A896F44AB916D80BD08F",
+      "type": "Document",
+      "method": "GET",
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/lccs/cpxq/J07241",
+        "query": []
+      },
+      "body_fields": []
+    },
+    {
+      "id": "106.2",
+      "type": "Script",
+      "method": "GET",
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/4QbVtADbnLVIc/c.FxJzG50F.263afa9.js",
+        "query": []
+      },
+      "body_fields": []
+    },
+    {
+      "id": "AA39F229FB85CABADC3FD1E3C9D0F19F",
+      "type": "Document",
+      "method": "GET",
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/lccs/cpxq/J07241",
+        "query": []
+      },
+      "body_fields": []
+    },
+    {
+      "id": "106.10",
+      "type": "Script",
+      "method": "GET",
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/4QbVtADbnLVIc/d.FxJzG50F.263afa9.js",
+        "query": []
+      },
+      "body_fields": []
+    },
+    {
+      "id": "106.65",
+      "type": "XHR",
+      "method": "POST",
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/web/fundNav/getNav",
+        "query": [
+          {
+            "name": "XhC8Wb",
+            "length": 96
+          }
+        ]
+      },
+      "body_fields": [
+        {
+          "name": "fundCode",
+          "length": 6
+        },
+        {
+          "name": "dateType",
+          "length": 2
+        },
+        {
+          "name": "rows",
+          "length": 4
+        },
+        {
+          "name": "page",
+          "length": 1
+        }
+      ]
+    },
+    {
+      "id": "106.93",
+      "type": "XHR",
+      "method": "POST",
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/web/fundNav/getNav",
+        "query": [
+          {
+            "name": "XhC8Wb",
+            "length": 96
+          }
+        ]
+      },
+      "body_fields": [
+        {
+          "name": "fundCode",
+          "length": 6
+        },
+        {
+          "name": "dateType",
+          "length": 3
+        },
+        {
+          "name": "rows",
+          "length": 4
+        },
+        {
+          "name": "page",
+          "length": 1
+        }
+      ]
+    }
+  ],
+  "responses": [
+    {
+      "status": 412,
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/lccs/cpxq/J07241",
+        "query": []
+      },
+      "type": "document",
+      "server": "trp",
+      "content_type": "text/html; charset=utf-8",
+      "cookie_names": [
+        "FSSBBIl1UgzbN7NO"
+      ],
+      "body_bytes": 16027,
+      "body_sha256": "8f7189d9b82a39751ecb7cafde87932657393d12be9c990953a07e60f70ea6a5",
+      "challenge_markers": {
+        "ts_nsd": true,
+        "ts_cd": true,
+        "meta_names": [],
+        "script_paths": [
+          "/4QbVtADbnLVIc/c.FxJzG50F.263afa9.js"
+        ]
+      }
+    },
+    {
+      "status": 200,
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/4QbVtADbnLVIc/c.FxJzG50F.263afa9.js",
+        "query": []
+      },
+      "type": "script",
+      "server": "NRPd",
+      "content_type": "text/javascript; charset=UTF-8",
+      "cookie_names": [],
+      "body_bytes": 203868,
+      "body_sha256": "eb56126b3cdb98a94c651c42ed9154d572ddda4d8c17675e6d89e67bc1fbc5a6",
+      "challenge_markers": {
+        "ts_nsd": false,
+        "ts_cd": false,
+        "meta_names": [],
+        "script_paths": []
+      }
+    },
+    {
+      "status": 200,
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/lccs/cpxq/J07241",
+        "query": []
+      },
+      "type": "document",
+      "server": "NRPd",
+      "content_type": "text/html;charset=UTF-8",
+      "cookie_names": [
+        "JSESSIONID"
+      ],
+      "body_bytes": 69576,
+      "body_sha256": "6529ee9a0d81aa3afee07a4c08595b4dbb91c8b7191206a0e0d955eca49f04e9",
+      "challenge_markers": {
+        "ts_nsd": true,
+        "ts_cd": true,
+        "meta_names": [
+          "viewport",
+          "keywords",
+          "description"
+        ],
+        "script_paths": [
+          "/4QbVtADbnLVIc/d.FxJzG50F.263afa9.js",
+          "/v2/static/js/mobile-util.js",
+          "/v2/static/js/wow.min.js",
+          "/v2/static/js/jquery.min.js",
+          "/v2/static/js/bootstrap.min.js",
+          "/v2/static/js/bootstrap-datetimepicker.min.js",
+          "/v2/static/js/echarts.min.js",
+          "/v2/static/js/main.js",
+          "/v2/static/js/md5.js",
+          "/v2/static/js/common.js",
+          "/v2/static/js/common.js"
+        ]
+      }
+    },
+    {
+      "status": 200,
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/4QbVtADbnLVIc/d.FxJzG50F.263afa9.js",
+        "query": []
+      },
+      "type": "script",
+      "server": "NRPd",
+      "content_type": "text/javascript; charset=UTF-8",
+      "cookie_names": [],
+      "body_bytes": 146028,
+      "body_sha256": "ed4026e4607780716b480b2af3e452231a8c47a461d591b81a1c851c70f5f0ab",
+      "challenge_markers": {
+        "ts_nsd": false,
+        "ts_cd": false,
+        "meta_names": [],
+        "script_paths": []
+      }
+    },
+    {
+      "status": 200,
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/web/fundNav/getNav",
+        "query": [
+          {
+            "name": "XhC8Wb",
+            "length": 96
+          }
+        ]
+      },
+      "type": "xhr",
+      "server": "NRPd",
+      "content_type": "application/json;charset=UTF-8",
+      "cookie_names": [
+        "JSESSIONID"
+      ]
+    },
+    {
+      "status": 200,
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/web/fundNav/getNav",
+        "query": [
+          {
+            "name": "XhC8Wb",
+            "length": 96
+          }
+        ]
+      },
+      "type": "xhr",
+      "server": "trp",
+      "content_type": "application/json;charset=UTF-8",
+      "cookie_names": [
+        "JSESSIONID"
+      ]
+    }
+  ],
+  "cookies": [
+    {
+      "name": "FSSBBIl1UgzbN7NO",
+      "length": 87,
+      "domain": "www.suyinwealth.com",
+      "path": "/",
+      "secure": true,
+      "httpOnly": true
+    },
+    {
+      "name": "JSESSIONID",
+      "length": 32,
+      "domain": "www.suyinwealth.com",
+      "path": "/",
+      "secure": false,
+      "httpOnly": true
+    },
+    {
+      "name": "FSSBBIl1UgzbN7NP",
+      "length": 406,
+      "domain": "www.suyinwealth.com",
+      "path": "/",
+      "secure": true,
+      "httpOnly": false
+    }
+  ],
+  "reached_product": true,
+  "environment": {
+    "webdriver": false,
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "platform": "Linux x86_64",
+    "language": "zh-CN",
+    "hardwareConcurrency": 4,
+    "plugins": 5,
+    "timezone": "Asia/Shanghai",
+    "screen": {
+      "width": 1280,
+      "height": 720
+    },
+    "outer": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "nav_result": {
+    "status": 200,
+    "code": "0000",
+    "count": 265,
+    "latest": {
+      "date": "2026-10-15",
+      "unit_nav": "1.02142"
+    }
+  },
+  "http_replay": [
+    {
+      "label": "generated_signature",
+      "status": 400,
+      "content_type": "text/html",
+      "business_code": null,
+      "count": 0
+    },
+    {
+      "label": "without_signature",
+      "status": 200,
+      "content_type": "application/json;charset=UTF-8",
+      "business_code": "0000",
+      "count": 265
+    }
+  ],
+  "direct_http": [
+    {
+      "label": "all_cookies",
+      "cookie_names": [
+        "FSSBBIl1UgzbN7NO",
+        "JSESSIONID",
+        "FSSBBIl1UgzbN7NP"
+      ],
+      "status": 200,
+      "content_type": "application/json;charset=UTF-8",
+      "business_code": "0000",
+      "count": 265
+    },
+    {
+      "label": "challenge_cookies",
+      "cookie_names": [
+        "FSSBBIl1UgzbN7NO",
+        "FSSBBIl1UgzbN7NP"
+      ],
+      "status": 412,
+      "content_type": "text/html; charset=utf-8",
+      "business_code": null,
+      "count": 0
+    },
+    {
+      "label": "no_cookies",
+      "cookie_names": [],
+      "status": 412,
+      "content_type": "text/html; charset=utf-8",
+      "business_code": null,
+      "count": 0
+    }
+  ],
+  "request_extra": [
+    {
+      "id": "10AAA1A88694A896F44AB916D80BD08F",
+      "cookie_header": [],
+      "associated_cookies": []
+    },
+    {
+      "id": "106.2",
+      "cookie_header": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87
+        }
+      ],
+      "associated_cookies": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87,
+          "blocked": []
+        }
+      ]
+    },
+    {
+      "id": "AA39F229FB85CABADC3FD1E3C9D0F19F",
+      "cookie_header": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87
+        },
+        {
+          "name": "FSSBBIl1UgzbN7NP",
+          "length": 235
+        }
+      ],
+      "associated_cookies": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87,
+          "blocked": []
+        },
+        {
+          "name": "FSSBBIl1UgzbN7NP",
+          "length": 235,
+          "blocked": []
+        }
+      ]
+    },
+    {
+      "id": "106.10",
+      "cookie_header": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87
+        },
+        {
+          "name": "FSSBBIl1UgzbN7NP",
+          "length": 235
+        },
+        {
+          "name": "JSESSIONID",
+          "length": 32
+        }
+      ],
+      "associated_cookies": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87,
+          "blocked": []
+        },
+        {
+          "name": "FSSBBIl1UgzbN7NP",
+          "length": 235,
+          "blocked": []
+        },
+        {
+          "name": "JSESSIONID",
+          "length": 32,
+          "blocked": []
+        }
+      ]
+    },
+    {
+      "id": "106.65",
+      "cookie_header": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87
+        },
+        {
+          "name": "JSESSIONID",
+          "length": 32
+        },
+        {
+          "name": "FSSBBIl1UgzbN7NP",
+          "length": 235
+        }
+      ],
+      "associated_cookies": [
+        {
+          "name": "enable_FSSBBIl1UgzbN7N",
+          "length": 4,
+          "blocked": [
+            "NotOnPath"
+          ]
+        },
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87,
+          "blocked": []
+        },
+        {
+          "name": "JSESSIONID",
+          "length": 32,
+          "blocked": []
+        },
+        {
+          "name": "FSSBBIl1UgzbN7NP",
+          "length": 235,
+          "blocked": []
+        }
+      ]
+    },
+    {
+      "id": "106.93",
+      "cookie_header": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87
+        },
+        {
+          "name": "JSESSIONID",
+          "length": 32
+        },
+        {
+          "name": "FSSBBIl1UgzbN7NP",
+          "length": 406
+        }
+      ],
+      "associated_cookies": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87,
+          "blocked": []
+        },
+        {
+          "name": "JSESSIONID",
+          "length": 32,
+          "blocked": []
+        },
+        {
+          "name": "FSSBBIl1UgzbN7NP",
+          "length": 406,
+          "blocked": []
+        }
+      ]
+    }
+  ]
+}

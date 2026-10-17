@@ -1,0 +1,13 @@
+CHECK_TIME 2026-10-16T17:30:47+08:00
+/jizhang-web running/healthy image=sha256:82622482db243d1e6249d6d1b1050efaf1dfc810728da98401d914159ab78aab started=2026-10-16T08:37:28.996981648Z restarts=0
+/jizhang-api running/healthy image=sha256:e642aeab9aaeff1217195b7c65eddf01c4cc070a7537fb18ab6b7f7584c799f0 started=2026-10-16T08:37:23.342153478Z restarts=0
+/jizhang-mysql running/healthy image=sha256:8d132912e9d3c985237567595ec2aeae04936044eb1f9336e8e4da2326238b84 started=2026-10-11T15:53:58.166054954Z restarts=0
+/jizhang-redis running/healthy image=sha256:487efc0616382465781b8fdc3d6d1db449e6fd80ae23bf48432a2da6b6929908 started=2026-10-11T15:53:58.182571487Z restarts=0
+/jizhang-wealth-collector running/healthy image=sha256:8e6d93b8a3d2fc5f23e610a89aa8b95c1c5b57b2a223eddd8155ee576b543f1b started=2026-10-16T08:36:51.778918422Z restarts=0
+/jizhang-wealth-qualification-20261016t014727z running/none image=sha256:922da80d0af479b2e5b4b4b24eb40580718100cddfa531ed113324e6f329abf4 started=2026-10-16T01:47:42.781152787Z restarts=1
+SCHEMA 21:0
+ACCOUNTS 190
+TRANSACTIONS 60
+PRODUCT J07241 enabled
+PRODUCT FBAE68020E enabled
+/dev/vda2        40G   32G  5.9G  85% /

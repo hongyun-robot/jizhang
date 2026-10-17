@@ -1,0 +1,22 @@
+{
+  "observed_at": "2026-10-16T05:53:03.946948+00:00",
+  "product": "J07241",
+  "configured": true,
+  "schema": "19:0",
+  "new_order_routes": "input_validation_400",
+  "admission_status": "enabled",
+  "sync_status": "no_new_nav",
+  "last_success": "2026-10-16T13:53:03.621+08:00",
+  "public_nav_count": 265,
+  "earliest_nav_date": "2025-09-02",
+  "latest_nav_date": "2026-10-15",
+  "latest_unit_nav": "1.02142000",
+  "collector_health": "healthy",
+  "collector_image": "sha256:126671bc05867ea46b188a3ae6d8e4ad6549a36775e9a10c8a74fa509e5dfcaa",
+  "collector_started_at": "2026-10-16T03:35:16.161139683Z",
+  "qualification_run": "20261016t014727z",
+  "qualification_status": "running",
+  "qualification_restart_count": 1,
+  "qualification_image": "sha256:922da80d0af479b2e5b4b4b24eb40580718100cddfa531ed113324e6f329abf4",
+  "real_sampling_passed": false
+}

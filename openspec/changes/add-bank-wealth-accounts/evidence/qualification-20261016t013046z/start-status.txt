@@ -1,0 +1,131 @@
+/jizhang-wealth-qualification-20261016t013046z status=running restarts=1 image=sha256:6c8055c25a2ff7c6717fa245a0b39ebb243e2cc05b76724934756f13e853a817
+{
+  "format_version": 1,
+  "product": "J07241",
+  "timezone": "Asia/Shanghai",
+  "started_at": "2026-10-16T01:30:50.608Z",
+  "source_version": "20261016t013046z",
+  "boots": [
+    "2026-10-16T01:30:50.609Z",
+    "2026-10-16T01:31:01.547Z"
+  ],
+  "status": "running",
+  "slots": [
+    {
+      "id": "2026-10-17/8",
+      "due_at": "2026-10-17T00:00:00.000Z",
+      "state": "pending"
+    },
+    {
+      "id": "2026-10-17/12",
+      "due_at": "2026-10-17T04:00:00.000Z",
+      "state": "pending"
+    },
+    {
+      "id": "2026-10-17/18",
+      "due_at": "2026-10-17T10:00:00.000Z",
+      "state": "pending"
+    },
+    {
+      "id": "2026-10-17/22",
+      "due_at": "2026-10-17T14:00:00.000Z",
+      "state": "pending"
+    },
+    {
+      "id": "2026-10-18/8",
+      "due_at": "2026-10-18T00:00:00.000Z",
+      "state": "pending"
+    },
+    {
+      "id": "2026-10-18/12",
+      "due_at": "2026-10-18T04:00:00.000Z",
+      "state": "pending"
+    },
+    {
+      "id": "2026-10-18/18",
+      "due_at": "2026-10-18T10:00:00.000Z",
+      "state": "pending"
+    },
+    {
+      "id": "2026-10-18/22",
+      "due_at": "2026-10-18T14:00:00.000Z",
+      "state": "pending"
+    },
+    {
+      "id": "2026-10-19/8",
+      "due_at": "2026-10-19T00:00:00.000Z",
+      "state": "pending"
+    },
+    {
+      "id": "2026-10-19/12",
+      "due_at": "2026-10-19T04:00:00.000Z",
+      "state": "pending"
+    },
+    {
+      "id": "2026-10-19/18",
+      "due_at": "2026-10-19T10:00:00.000Z",
+      "state": "pending"
+    },
+    {
+      "id": "2026-10-19/22",
+      "due_at": "2026-10-19T14:00:00.000Z",
+      "state": "pending"
+    }
+  ],
+  "proofs": {
+    "fresh_anonymous_history": true,
+    "cold_start": true,
+    "process_restart": false
+  },
+  "checks": [
+    {
+      "id": "cold-start",
+      "started_at": "2026-10-16T01:30:50.610Z",
+      "state": "succeeded",
+      "attempts": [
+        {
+          "result": "valid",
+          "finished_at": "2026-10-16T01:31:01.126Z"
+        }
+      ],
+      "count": 265,
+      "earliest": "2025-09-02",
+      "latest": {
+        "date": "2026-10-15",
+        "nav": "1.02142",
+        "total_nav": "1.02142"
+      },
+      "sha256": "9c6d7e1f7c8088a306c54d59f781da4cef0dbdc2262f0b6188cb7dde88118063",
+      "public_envelope": "public-001.json",
+      "finished_at": "2026-10-16T01:31:01.158Z"
+    },
+    {
+      "id": "restart-fresh-context",
+      "started_at": "2026-10-16T01:31:51.649Z",
+      "state": "failed",
+      "attempts": [
+        {
+          "result": "failed",
+          "code": "product_identity_mismatch",
+          "http_status": null,
+          "finished_at": "2026-10-16T01:31:59.416Z"
+        },
+        {
+          "result": "failed",
+          "code": "product_identity_mismatch",
+          "http_status": null,
+          "finished_at": "2026-10-16T01:32:05.931Z"
+        }
+      ],
+      "finished_at": "2026-10-16T01:32:06.038Z"
+    }
+  ],
+  "updated_at": "2026-10-16T01:32:06.039Z"
+}
+{"event":"qualification_check","id":"cold-start","state":"succeeded","latest":"2026-10-15","count":265}
+{"event":"qualification_check","id":"restart-fresh-context","state":"failed"}
+jizhang-wealth-qualification-20261016t013046z Up 13 minutes
+jizhang-web Up 12 hours (healthy)
+jizhang-api Up 12 hours (healthy)
+jizhang-redis Up 4 days (healthy)
+jizhang-mysql Up 4 days (healthy)

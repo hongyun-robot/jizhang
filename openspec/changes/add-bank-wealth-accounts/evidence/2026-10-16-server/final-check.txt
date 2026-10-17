@@ -1,0 +1,8 @@
+temporary_containers_and_networks_removed=true
+/jizhang-web started=2026-10-15T13:32:04.017808122Z restarts=0 health=healthy
+/jizhang-api started=2026-10-15T13:31:58.355010029Z restarts=0 health=healthy
+/jizhang-redis started=2026-10-11T15:53:58.182571487Z restarts=0 health=healthy
+/jizhang-mysql started=2026-10-11T15:53:58.166054954Z restarts=0 health=healthy
+Filesystem     1048576-blocks  Used Available Capacity Mounted on
+/dev/vda2               40204 32262      6186      84% /
+temporary_credentials_removed=true

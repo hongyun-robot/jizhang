@@ -1,0 +1,190 @@
+{
+  "mode": "automation-flag",
+  "at": "2026-10-16T01:11:12.404Z",
+  "browser": "155.0.8059.40",
+  "requests": [
+    {
+      "id": "FDF48348AA738655F454B1DD97D06595",
+      "type": "Document",
+      "method": "GET",
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/lccs/cpxq/J07241",
+        "query": []
+      },
+      "body_fields": []
+    },
+    {
+      "id": "38316.2",
+      "type": "Script",
+      "method": "GET",
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/4QbVtADbnLVIc/c.FxJzG50F.263afa9.js",
+        "query": []
+      },
+      "body_fields": []
+    },
+    {
+      "id": "91F71E1BC97DBAC818186BD277428E2E",
+      "type": "Document",
+      "method": "GET",
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/lccs/cpxq/J07241",
+        "query": []
+      },
+      "body_fields": []
+    }
+  ],
+  "responses": [
+    {
+      "status": 412,
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/lccs/cpxq/J07241",
+        "query": []
+      },
+      "type": "document",
+      "server": "NRPd",
+      "content_type": "text/html; charset=utf-8",
+      "cookie_names": [
+        "FSSBBIl1UgzbN7NO"
+      ],
+      "body_bytes": 16103,
+      "body_sha256": "8bfe586e628608325d38f8c36fcc441de6a6eb099689360b9fa57de56633d167",
+      "challenge_markers": {
+        "ts_nsd": true,
+        "ts_cd": true,
+        "meta_names": [],
+        "script_paths": [
+          "/4QbVtADbnLVIc/c.FxJzG50F.263afa9.js"
+        ]
+      }
+    },
+    {
+      "status": 200,
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/4QbVtADbnLVIc/c.FxJzG50F.263afa9.js",
+        "query": []
+      },
+      "type": "script",
+      "server": "NRPd",
+      "content_type": "text/javascript; charset=UTF-8",
+      "cookie_names": [],
+      "body_bytes": 203868,
+      "body_sha256": "eb56126b3cdb98a94c651c42ed9154d572ddda4d8c17675e6d89e67bc1fbc5a6",
+      "challenge_markers": {
+        "ts_nsd": false,
+        "ts_cd": false,
+        "meta_names": [],
+        "script_paths": []
+      }
+    },
+    {
+      "status": 400,
+      "url": {
+        "origin": "https://www.suyinwealth.com",
+        "path": "/lccs/cpxq/J07241",
+        "query": []
+      },
+      "type": "document",
+      "server": "NRPd",
+      "content_type": "text/html",
+      "cookie_names": [],
+      "body_bytes": 6,
+      "body_sha256": "aea52d27230b89ca1b732866afbe137a98e65100049a56b3293def8d5fe7dda0",
+      "challenge_markers": {
+        "ts_nsd": false,
+        "ts_cd": false,
+        "meta_names": [],
+        "script_paths": []
+      }
+    }
+  ],
+  "cookies": [
+    {
+      "name": "FSSBBIl1UgzbN7NO",
+      "length": 87,
+      "domain": "www.suyinwealth.com",
+      "path": "/",
+      "secure": true,
+      "httpOnly": true
+    },
+    {
+      "name": "FSSBBIl1UgzbN7NP",
+      "length": 235,
+      "domain": "www.suyinwealth.com",
+      "path": "/",
+      "secure": true,
+      "httpOnly": false
+    }
+  ],
+  "reached_product": false,
+  "environment": {
+    "webdriver": false,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+    "platform": "Win32",
+    "language": "zh-CN",
+    "hardwareConcurrency": 12,
+    "plugins": 5,
+    "timezone": "Asia/Shanghai",
+    "screen": {
+      "width": 1280,
+      "height": 720
+    },
+    "outer": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "request_extra": [
+    {
+      "id": "FDF48348AA738655F454B1DD97D06595",
+      "cookie_header": [],
+      "associated_cookies": []
+    },
+    {
+      "id": "38316.2",
+      "cookie_header": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87
+        }
+      ],
+      "associated_cookies": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87,
+          "blocked": []
+        }
+      ]
+    },
+    {
+      "id": "91F71E1BC97DBAC818186BD277428E2E",
+      "cookie_header": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87
+        },
+        {
+          "name": "FSSBBIl1UgzbN7NP",
+          "length": 235
+        }
+      ],
+      "associated_cookies": [
+        {
+          "name": "FSSBBIl1UgzbN7NO",
+          "length": 87,
+          "blocked": []
+        },
+        {
+          "name": "FSSBBIl1UgzbN7NP",
+          "length": 235,
+          "blocked": []
+        }
+      ]
+    }
+  ]
+}

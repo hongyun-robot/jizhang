@@ -1,0 +1,15 @@
+{
+  "product": "J07241",
+  "registration_code": "Z7003125000238",
+  "decision": "enable_selection_before_sampling_complete",
+  "authorization": "本线程用户明确要求：J07241 这个改为开放可选择",
+  "authorized_on": "2026-10-16",
+  "timezone": "Asia/Shanghai",
+  "qualification_run": "20261016t014727z",
+  "qualification_status": "running",
+  "qualification_passed": false,
+  "scope": "仅开放 J07241 的期初和申购选择；不改变资金、份额、净值及其他产品准入",
+  "evidence_kind": "user_authorized_admission_exception",
+  "automatic_collector_configured_at_decision": false,
+  "follow_up": "三天公开净值采样继续，1.4 和最终验收汇总继续未完成；本决定不能作为采样通过证明"
+}
