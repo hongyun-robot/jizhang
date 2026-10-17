@@ -116,14 +116,14 @@ $targets = @(
   'frontend/tsconfig.json', 'frontend/vite.config.ts',
   'frontend/Dockerfile', 'frontend/nginx.conf', 'frontend/.dockerignore',
   'frontend/e2e',
-  'backend', 'docker', 'docker-compose.yml', 'openspec', 'README.md',
+  'backend', 'docker', 'docker-compose.yml', 'docker-compose.wealth.yml', 'collector', 'openspec', 'docs', 'README.md',
   '.env.example', 'generate-favicon.mjs'
 )
 # 构建产物与可再生文件不入清单：
 #   dist/tsbuildinfo 是编译产物；shots/downloads/preview 是 e2e 副产物（preview 84MB 的截图）
 # 漏掉 package-lock.json 会让服务器拿到新 package.json + 旧 lock，npm ci 直接报 out of sync
 # 这份模式针对正斜杠相对路径，同时由远端 diff.sh 用 grep -E 复用——改一处等于两侧都改
-$exclude = 'node_modules|/dist/|/bin/|/vendor/|\.git/|/coverage/|/shots/|/downloads/|/preview/|tsbuildinfo|(^|/)server(\.exe)?$'
+$exclude = 'node_modules|/dist/|/bin/|/vendor/|\.git/|/coverage/|/shots/|/downloads/|/preview/|^collector/evidence/|tsbuildinfo|(^|/)server(\.exe)?$'
 
 $rows = @()
 foreach ($t in $targets) {
@@ -219,11 +219,13 @@ if ($Purge) {
 
 # ---------- 阶段 3/4：按改动范围重建 ----------
 $needWeb = [bool]($changes | Where-Object { $_ -match '^(frontend/|docker/|docker-compose\.yml$)' })
-$needApi = [bool]($changes | Where-Object { $_ -match '^(backend/|docker/|docker-compose\.yml$)' })
+$needApi = [bool]($changes | Where-Object { $_ -match '^(backend/|docker/|docker-compose(\.wealth)?\.yml$)' })
+$needCollector = [bool]($changes | Where-Object { $_ -match '^(collector/(Dockerfile|package(-lock)?\.json|products\.json|collector\.mjs|server\.mjs|smoke\.mjs|challenge-diagnostic\.mjs|qualification\.mjs)$|docker-compose\.wealth\.yml$|docker/playwright-seccomp\.json$)' })
 $services = @()
 if ($needWeb) { $services += 'web' }
 if ($needApi) { $services += 'api' }
 if ($Force) { $services = @('web', 'api') }
+if ($needCollector) { $services += 'wealth-collector' }
 
 if ($services.Count -eq 0) {
   Write-Host '[3/4] 改动不涉及构建产物（如 openspec/README），跳过重建。'

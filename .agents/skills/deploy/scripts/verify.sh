@@ -36,7 +36,13 @@ else
 fi
 
 echo "===== 2. 容器健康 ====="
-for c in jizhang-web jizhang-api jizhang-mysql jizhang-redis; do
+containers=(jizhang-web jizhang-api jizhang-mysql jizhang-redis)
+if (cd "$ROOT" && docker compose --profile app config --services 2>/dev/null | grep -qx wealth-collector); then
+  containers+=(jizhang-wealth-collector)
+  configured=$(docker exec jizhang-api sh -c 'test "$WEALTH_COLLECTOR_URL" = "http://wealth-collector:8091" && test "${#WEALTH_COLLECTOR_KEY}" -ge 24 && wget -qO- "$WEALTH_COLLECTOR_URL/health" >/dev/null && echo ready' 2>/dev/null || echo unavailable)
+  ck "API collector configuration and connectivity" "$configured" "ready"
+fi
+for c in "${containers[@]}"; do
   s=$(docker inspect --format '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$c" 2>/dev/null || echo missing)
   ck "$c" "$s" "running/healthy"
 done

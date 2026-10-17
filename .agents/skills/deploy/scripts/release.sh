@@ -57,9 +57,23 @@ if (( initial_version < LATEST )); then
   # Freeze the original columns, not INSERT statements whose shape changes when
   # a migration adds a nullable association column. All original cell values,
   # row counts and primary-key ordering remain part of the fingerprint.
-  declare -A original_columns original_order
+  declare -A original_columns original_order original_filter
   for table in "${tables[@]}"; do
     [[ "$table" =~ ^[A-Za-z0-9_]+$ ]] || exit 1
+    original_filter[$table]=""
+    # Product admission migrations may append public identities. Protect every
+    # original catalog row while allowing the reviewed new product to exist.
+    # Personal accounts, transactions and every other original table remain
+    # checked in full, including counts and all original cell values.
+    if [[ "$table" == wealth_products ]]; then
+      product_ids=$(db_query "SET SESSION group_concat_max_len=1048576; SELECT GROUP_CONCAT(id ORDER BY id SEPARATOR ',') FROM \`$check_db\`.wealth_products")
+      if [[ -z "$product_ids" || "$product_ids" == NULL ]]; then
+        original_filter[$table]=' WHERE 1=0'
+      else
+        [[ "$product_ids" =~ ^[0-9]+(,[0-9]+)*$ ]] || exit 1
+        original_filter[$table]=" WHERE id IN ($product_ids)"
+      fi
+    fi
     original_columns[$table]=$(db_query "SET SESSION group_concat_max_len=1048576; SELECT GROUP_CONCAT(CONCAT(CHAR(96),REPLACE(COLUMN_NAME,CHAR(96),REPEAT(CHAR(96),2)),CHAR(96)) ORDER BY ORDINAL_POSITION SEPARATOR ',') FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='$check_db' AND TABLE_NAME='$table'")
     original_order[$table]=$(db_query "SET SESSION group_concat_max_len=1048576; SELECT GROUP_CONCAT(CONCAT(CHAR(96),REPLACE(COLUMN_NAME,CHAR(96),REPEAT(CHAR(96),2)),CHAR(96)) ORDER BY SEQ_IN_INDEX SEPARATOR ',') FROM information_schema.STATISTICS WHERE TABLE_SCHEMA='$check_db' AND TABLE_NAME='$table' AND INDEX_NAME='PRIMARY'")
     [[ -n "${original_columns[$table]}" && "${original_columns[$table]}" != NULL ]] || exit 1
@@ -71,7 +85,7 @@ if (( initial_version < LATEST )); then
     {
       for table in "${tables[@]}"; do
         printf '%s:%s\n' "$table" "${original_columns[$table]}"
-        query="SET time_zone='+00:00'; SELECT JSON_ARRAY(${original_columns[$table]}) FROM \`$table\` ORDER BY ${original_order[$table]}"
+        query="SET time_zone='+00:00'; SELECT JSON_ARRAY(${original_columns[$table]}) FROM \`$table\`${original_filter[$table]} ORDER BY ${original_order[$table]}"
         if ! docker exec -e CHECK_DB="$check_db" -e RELEASE_QUERY="$query" jizhang-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --default-character-set=utf8mb4 --batch --raw --skip-column-names -uroot "${CHECK_DB:-$MYSQL_DATABASE}" -e "$RELEASE_QUERY"'; then
           return 1
         fi
@@ -114,6 +128,10 @@ if (( initial_version < LATEST )); then
   [[ "$(db_query 'SELECT CONCAT(version,":",dirty) FROM schema_migrations')" == "$LATEST:0" ]] || exit 1
   [[ "$before" == "$(financial_hash)" ]] || { echo 'RELEASE: live migration financial data changed' >&2; exit 1; }
   echo 'RELEASE: live migration passed; original financial tables unchanged'
+fi
+# API readiness cannot stand in for Chromium startup and collector health.
+if [[ " ${services[*]} " == *' wealth-collector '* ]]; then
+  docker compose --profile app up -d --no-deps --no-build --wait --wait-timeout 180 wealth-collector
 fi
 docker compose --profile app up -d --no-build --wait --wait-timeout 180 "${services[@]}"
 paused=0
