@@ -69,7 +69,7 @@ func (s *LiabilityService) Reverse(actor *model.User, id int64, in ReverseInput)
 			if e := tx.First(&t, txnID).Error; e != nil {
 				return result, e
 			}
-			if prior.Kind == "repayment" {
+			if prior.Kind == "repayment" && original.RepaymentScope != unbilledOrdinary {
 				if e := inner.guardSettlementFunds(&t); e != nil {
 					return result, e
 				}

@@ -1,7 +1,8 @@
 import { writeApi } from './request';
-import type { SettlementPreview } from './liability';
+import type { OrdinaryRepaymentPreview, SettlementPreview } from './liability';
 import type {
   LiabilityCommand,
+  RepaymentInput,
   LiabilityResult,
   SettlementInput,
   InstallmentRepaymentInput,
@@ -58,6 +59,9 @@ export function createLiabilityClient(send = writeApi) {
             command.input
           );
       }
+    },
+    ordinaryPreview(input: RepaymentInput): Promise<OrdinaryRepaymentPreview> {
+      return send('post', '/liabilities/repayments/preview', input);
     },
     preview(
       planId: number,

@@ -85,6 +85,9 @@ func RepaymentSnapshot(db *gorm.DB) (RepaymentState, error) {
 	}
 	for _, account := range accounts {
 		d := details[account.ID]
+		if err := ValidateAdvanceAllocations(d); err != nil {
+			return out, err
+		}
 		for _, operation := range d.Operations {
 			if operation.ID > out.OperationID {
 				out.OperationID = operation.ID

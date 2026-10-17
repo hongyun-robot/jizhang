@@ -156,7 +156,7 @@ export function PaymentHistory({ context }: { context: RecordContext }) {
           title: '分配',
           render: (_, c) => (
             <>
-              {c.mode === 'auto'
+              {c.mode === 'ordinary_advance' ? '未出账普通消费提前还款' : c.mode === 'auto'
                 ? '按到期日'
                 : c.mode === 'settlement'
                   ? '整期分配'
@@ -169,6 +169,7 @@ export function PaymentHistory({ context }: { context: RecordContext }) {
                     )?.cycle_end
                   }{' '}
                   · <Money value={a.amount} />
+                  {c.mode === 'ordinary_advance' && sourceButton(index.items.get(a.debt_item_id)?.source_id ?? 0)}
                 </div>
               ))}
             </>
@@ -181,7 +182,10 @@ export function PaymentHistory({ context }: { context: RecordContext }) {
             return (
               <Space>
                 {sourceButton(c.source_id)}
-                {t && c.mode !== 'settlement' && !t.liability_operation_id && editable(t.created_by) && (
+                {t && c.mode === 'ordinary_advance' && t.liability_operation_id && editable(t.created_by) && (
+                  <Button size="small" onClick={() => open({ mode: 'reverse', operationId: t.liability_operation_id! })}>撤销并恢复</Button>
+                )}
+                {t && c.mode !== 'ordinary_advance' && c.mode !== 'settlement' && !t.liability_operation_id && editable(t.created_by) && (
                   <Button
                     size="small"
                     onClick={() => open({ mode: 'allocation', txnId: t.id })}
@@ -217,7 +221,7 @@ export function OperationHistory({ context }: { context: RecordContext }) {
           title: '操作',
           render: (_, o) => (
             <>
-              {opNames[o.kind] || o.kind}
+              {historySnapshot(o.result_json).repayment_scope === 'unbilled_ordinary' ? '未出账普通消费提前还款' : opNames[o.kind] || o.kind}
               {o.reversed_at && <Tag>已撤销</Tag>}
             </>
           ),

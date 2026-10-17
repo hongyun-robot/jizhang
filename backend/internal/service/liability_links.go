@@ -12,7 +12,7 @@ func (s *TransactionService) guardSettlementFunds(t *model.Transaction) error {
 		return nil
 	}
 	var count int64
-	if err := provider.DB().Model(&model.LiabilityCreditEvent{}).Where("source_id = ? AND active = ? AND mode = ?", t.ID, true, "settlement").Count(&count).Error; err != nil {
+	if err := provider.DB().Model(&model.LiabilityCreditEvent{}).Where("source_id = ? AND active = ? AND mode IN ?", t.ID, true, []string{"settlement", liability.OrdinaryAdvance}).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {

@@ -5,6 +5,7 @@ import type {
   LiabilityBill,
   InstallmentPlan,
   SettlementPreview,
+  OrdinaryRepaymentPreview,
 } from '../../../api/liability';
 import type {
   CategoryTreeNode,
@@ -27,6 +28,10 @@ export interface ScheduleRow {
 type Option = { value: number; label: string };
 /** Private presentation context; callers use the four-input dialog interface. */
 export interface FieldContext {
+  ordinaryPreview: OrdinaryRepaymentPreview | null;
+  ordinaryAvailable: string;
+  ordinaryPreviewing: boolean;
+  loadOrdinaryPreview: () => Promise<void>;
   saving: boolean;
   setCreatingAccount: (creating: boolean) => void;
   setCreatingPlatform: (creating: boolean) => void;

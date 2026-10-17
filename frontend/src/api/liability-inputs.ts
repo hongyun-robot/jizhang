@@ -12,7 +12,10 @@ export interface AllocationInput extends OperationInput {
   mode: AllocationMode;
   targets: AllocationTarget[];
 }
+export type RepaymentScope = 'issued' | 'unbilled_ordinary';
 export interface RepaymentInput extends AllocationInput {
+  scope?: RepaymentScope;
+  quote_signature?: string;
   account_id: number;
   from_account_id: number;
   amount: string;
@@ -77,6 +80,9 @@ export interface InstallmentRepaymentInput extends OperationInput {
 }
 export type SettlementInput = InstallmentRepaymentInput;
 export interface LiabilityResult {
+  repayment_scope?: RepaymentScope;
+  allocation_mode?: AllocationMode;
+  repayment_targets?: { statement_id: number; debt_item_id: number; source_id: number; amount: string }[];
   operation_id: number;
   plan_id?: number;
   version?: number;

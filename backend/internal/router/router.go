@@ -124,6 +124,7 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 			liabilities.GET("", lh.List)
 			liabilities.POST("/ensure", lh.Ensure)
 			liabilities.POST("/repayments", lh.Repay)
+			liabilities.POST("/repayments/preview", lh.OrdinaryRepaymentPreview)
 			liabilities.PUT("/repayments/:id/allocations", lh.Allocate)
 			liabilities.POST("/installments", lh.CreatePlan)
 			liabilities.GET("/installments/:id", lh.Plan)

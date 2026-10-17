@@ -204,3 +204,12 @@ export function useEnsureLiabilities() {
     },
   });
 }
+
+export interface OrdinaryRepaymentPreview {
+  scope: 'unbilled_ordinary';
+  available_amount: string;
+  amount: string;
+  bills: { statement_id: number; cycle_start: string; cycle_end: string; due_date: string; available_amount: string }[];
+  allocations: { statement_id: number; debt_item_id: number; source_id: number; amount: string }[];
+  quote_signature: string;
+}

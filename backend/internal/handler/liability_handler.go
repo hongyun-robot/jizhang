@@ -115,14 +115,35 @@ func (h *liabilityHandler) Reconcile(c *gin.Context) {
 	x, e := h.svc.Reconcile(middleware.CurrentUser(c), id, in)
 	liabilityReply(c, x, e)
 }
-func (h *liabilityHandler) Repay(c *gin.Context) {
+func ordinaryRepaymentInput(c *gin.Context) (service.LiabilityRepaymentInput, bool) {
 	var in service.LiabilityRepaymentInput
-	if e := c.ShouldBindJSON(&in); e != nil {
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&in); err != nil {
 		response.Invalid(c, "还款输入无效")
+		return in, false
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		response.Invalid(c, "还款输入无效")
+		return in, false
+	}
+	return in, true
+}
+func (h *liabilityHandler) Repay(c *gin.Context) {
+	in, ok := ordinaryRepaymentInput(c)
+	if !ok {
 		return
 	}
-	x, e := h.svc.Repay(middleware.CurrentUser(c), in)
-	liabilityReply(c, x, e)
+	x, err := h.svc.Repay(middleware.CurrentUser(c), in)
+	liabilityReply(c, x, err)
+}
+func (h *liabilityHandler) OrdinaryRepaymentPreview(c *gin.Context) {
+	in, ok := ordinaryRepaymentInput(c)
+	if !ok {
+		return
+	}
+	x, err := h.svc.OrdinaryRepaymentPreview(middleware.CurrentUser(c), in)
+	liabilityReply(c, x, err)
 }
 func (h *liabilityHandler) Allocate(c *gin.Context) {
 	id, ok := pathID(c)

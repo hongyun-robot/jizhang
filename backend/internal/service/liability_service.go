@@ -29,19 +29,22 @@ func NewLiabilityService(db *gorm.DB, txns *TransactionService) *LiabilityServic
 }
 
 type LiabilityResult struct {
-	OperationID      int64                   `json:"operation_id"`
-	PlanID           int64                   `json:"plan_id,omitempty"`
-	Version          int                     `json:"version,omitempty"`
-	TransactionIDs   []int64                 `json:"transaction_ids"`
-	CreditSignatures map[int64]string        `json:"credit_signatures,omitempty"`
-	ChangedPeriods   []string                `json:"-"`
-	Assignments      []LiabilityAssignment   `json:"assignments,omitempty"`
-	PlanSnapshot     *model.InstallmentPlan  `json:"plan_snapshot,omitempty"`
-	TermIDs          []int64                 `json:"term_ids,omitempty"`
-	PlanIDs          []int64                 `json:"plan_ids,omitempty"`
-	PlanSnapshots    []model.InstallmentPlan `json:"plan_snapshots,omitempty"`
-	ManagedSourceIDs []int64                 `json:"managed_source_ids,omitempty"`
-	PostingSnapshots []model.Transaction     `json:"transaction_snapshots,omitempty"`
+	RepaymentScope   string                        `json:"repayment_scope,omitempty"`
+	AllocationMode   string                        `json:"allocation_mode,omitempty"`
+	RepaymentTargets []liability.AdvanceAllocation `json:"repayment_targets,omitempty"`
+	OperationID      int64                         `json:"operation_id"`
+	PlanID           int64                         `json:"plan_id,omitempty"`
+	Version          int                           `json:"version,omitempty"`
+	TransactionIDs   []int64                       `json:"transaction_ids"`
+	CreditSignatures map[int64]string              `json:"credit_signatures,omitempty"`
+	ChangedPeriods   []string                      `json:"-"`
+	Assignments      []LiabilityAssignment         `json:"assignments,omitempty"`
+	PlanSnapshot     *model.InstallmentPlan        `json:"plan_snapshot,omitempty"`
+	TermIDs          []int64                       `json:"term_ids,omitempty"`
+	PlanIDs          []int64                       `json:"plan_ids,omitempty"`
+	PlanSnapshots    []model.InstallmentPlan       `json:"plan_snapshots,omitempty"`
+	ManagedSourceIDs []int64                       `json:"managed_source_ids,omitempty"`
+	PostingSnapshots []model.Transaction           `json:"transaction_snapshots,omitempty"`
 }
 type LiabilityAssignment struct {
 	ItemID   int64           `json:"item_id"`
@@ -283,18 +286,29 @@ func (s *LiabilityService) Settings(actor *model.User, id int64, in LiabilitySet
 }
 
 type LiabilityRepaymentInput struct {
-	AccountID     int64              `json:"account_id"`
-	FromAccountID int64              `json:"from_account_id"`
-	Amount        decimal.Decimal    `json:"amount"`
-	EntryDate     string             `json:"entry_date"`
-	RequestKey    string             `json:"request_key"`
-	Mode          string             `json:"mode"`
-	Targets       []liability.Target `json:"targets"`
-	Reason        string             `json:"reason"`
+	AccountID      int64              `json:"account_id"`
+	FromAccountID  int64              `json:"from_account_id"`
+	Amount         decimal.Decimal    `json:"amount"`
+	EntryDate      string             `json:"entry_date"`
+	RequestKey     string             `json:"request_key"`
+	Mode           string             `json:"mode"`
+	Targets        []liability.Target `json:"targets"`
+	Reason         string             `json:"reason"`
+	Scope          string             `json:"scope,omitempty"`
+	QuoteSignature string             `json:"quote_signature,omitempty"`
 }
 
 func (s *LiabilityService) Repay(actor *model.User, in LiabilityRepaymentInput) (LiabilityResult, error) {
+	if in.Scope == "issued" {
+		in.Scope = ""
+	}
+	if in.Scope != "" && in.Scope != unbilledOrdinary {
+		return LiabilityResult{}, liability.ErrInvalid
+	}
 	return s.operation(actor, in.AccountID, "repayment", in.RequestKey, in.Reason, in, func(tx *gorm.DB, op *model.LiabilityOperation) (LiabilityResult, error) {
+		if in.Scope == unbilledOrdinary {
+			return s.repayOrdinaryAdvance(tx, actor, in, op)
+		}
 		date, e := liability.Parse(in.EntryDate)
 		if e != nil || !liability.ValidAmount(in.Amount, false) {
 			return LiabilityResult{}, liability.ErrInvalid

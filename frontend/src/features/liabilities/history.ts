@@ -93,6 +93,7 @@ export function historySnapshot(raw: string) {
         ];
   });
   return {
+    repayment_scope: text(source.repayment_scope),
     amount: amount && parseCents(amount) !== null ? amount : undefined,
     entry_date: text(source.entry_date),
     rule:

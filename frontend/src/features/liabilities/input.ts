@@ -2,6 +2,7 @@ import type { Dayjs } from 'dayjs';
 import type { LiabilityDetail } from '../../api/liability';
 import type {
   AllocationMode,
+  RepaymentScope,
   FeeMode,
   LiabilityCommand,
   SettlementInput,
@@ -19,6 +20,7 @@ export interface TermValue {
 }
 export interface LiabilityValues {
   amount?: string;
+  scope?: RepaymentScope;
   entry_date?: Dayjs;
   from_account_id?: number;
   mode?: AllocationMode;
@@ -99,6 +101,7 @@ export function liabilityCommand(
           ),
           mode: mode(),
           targets: mode() === 'manual' ? (value.targets ?? []) : [],
+          ...(value.scope === 'unbilled_ordinary' ? { scope: value.scope, quote_signature: value.quote_signature } : {}),
         },
       };
     case 'allocation':
