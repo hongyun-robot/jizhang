@@ -208,6 +208,13 @@ func TestLiabilityMySQL(t *testing.T) {
 	base := seedVoucherEnv(t, db)
 	mustOK(t, db.Exec(migration("000015_personal_voucher_platforms.up.sql")).Error)
 	mustOK(t, db.Exec(migration("000016_catalog_ordering.up.sql")).Error)
+	// Keep the historical migration checks above, then bring financial writes
+	// up to the current transaction schema before exercising runtime models.
+	for _, file := range files {
+		if filepath.Base(file) >= "000017" {
+			mustOK(t, db.Exec(migration(filepath.Base(file))).Error)
+		}
+	}
 	// The earlier downgrade/re-upgrade exercise resets type columns on the
 	// legacy defaults. Keep that legacy fixture with its administrator before
 	// testing a new member's independent, one-time template initialization.
