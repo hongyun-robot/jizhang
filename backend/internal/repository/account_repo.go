@@ -12,12 +12,13 @@ import (
 
 // AccountRepo accounts 表数据访问。
 type AccountRepo struct {
-	db          *gorm.DB
-	ownerID     int64
-	accountType model.AccountType
-	FundValues  func(*gorm.DB, []int64, []time.Time) (map[string]map[int64]FundAccountValue, error)
-	GoldValues  func(*gorm.DB, []int64, []time.Time) (map[string]map[int64]FundAccountValue, error)
-	Now         func() time.Time
+	db           *gorm.DB
+	ownerID      int64
+	accountType  model.AccountType
+	FundValues   func(*gorm.DB, []int64, []time.Time) (map[string]map[int64]FundAccountValue, error)
+	GoldValues   func(*gorm.DB, []int64, []time.Time) (map[string]map[int64]FundAccountValue, error)
+	WealthValues func(*gorm.DB, []int64, []time.Time) (map[string]map[int64]FundAccountValue, error)
+	Now          func() time.Time
 }
 
 type FundAccountValue struct {
@@ -32,13 +33,13 @@ func NewAccountRepo(db *gorm.DB) *AccountRepo { return &AccountRepo{db: db} }
 
 func (r *AccountRepo) DB() *gorm.DB { return r.db }
 func (r *AccountRepo) ForOwner(id int64) *AccountRepo {
-	return &AccountRepo{db: r.db, ownerID: id, accountType: r.accountType, FundValues: r.FundValues, GoldValues: r.GoldValues, Now: r.Now}
+	return &AccountRepo{db: r.db, ownerID: id, accountType: r.accountType, FundValues: r.FundValues, GoldValues: r.GoldValues, WealthValues: r.WealthValues, Now: r.Now}
 }
 
 // ForType lets liability operations load their balances without valuing
 // unrelated investment accounts inside a financial transaction.
 func (r *AccountRepo) ForType(kind model.AccountType) *AccountRepo {
-	return &AccountRepo{db: r.db, ownerID: r.ownerID, accountType: kind, FundValues: r.FundValues, GoldValues: r.GoldValues, Now: r.Now}
+	return &AccountRepo{db: r.db, ownerID: r.ownerID, accountType: kind, FundValues: r.FundValues, GoldValues: r.GoldValues, WealthValues: r.WealthValues, Now: r.Now}
 }
 
 // netRow 中间聚合结果。
@@ -51,7 +52,7 @@ type netRow struct {
 func (r *AccountRepo) List() ([]model.Account, error) {
 	var rows []model.Account
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		bound := &AccountRepo{db: tx, ownerID: r.ownerID, accountType: r.accountType, FundValues: r.FundValues, GoldValues: r.GoldValues, Now: r.Now}
+		bound := &AccountRepo{db: tx, ownerID: r.ownerID, accountType: r.accountType, FundValues: r.FundValues, GoldValues: r.GoldValues, WealthValues: r.WealthValues, Now: r.Now}
 		var e error
 		rows, e = bound.list()
 		return e
@@ -111,6 +112,12 @@ func (r *AccountRepo) list() ([]model.Account, error) {
 	historySQL += `) h`
 	if r.db.Migrator().HasTable(&model.FundPosition{}) {
 		historySQL = `SELECT DISTINCT aid FROM (` + historySQL + ` UNION ALL SELECT account_id AS aid FROM fund_positions) fh`
+	}
+	if r.db.Migrator().HasTable(&model.WealthPosition{}) {
+		historySQL = `SELECT DISTINCT aid FROM (` + historySQL + ` UNION ALL SELECT account_id AS aid FROM wealth_positions) wh`
+	}
+	if r.db.Migrator().HasTable(&model.WealthCashLink{}) {
+		historySQL = `SELECT DISTINCT aid FROM (` + historySQL + ` UNION ALL SELECT account_id AS aid FROM wealth_cash_links) wc`
 	}
 	var history []struct{ Aid int64 }
 	if r.db.Migrator().HasTable(&model.GoldPosition{}) {
@@ -181,6 +188,37 @@ func (r *AccountRepo) list() ([]model.Account, error) {
 			}
 		}
 	}
+	wealthIDs := []int64{}
+	for _, a := range accounts {
+		if a.IsWealth() {
+			wealthIDs = append(wealthIDs, a.ID)
+		}
+	}
+	if len(wealthIDs) > 0 {
+		if r.WealthValues == nil {
+			return nil, errors.New("理财估值服务未初始化")
+		}
+		now := time.Now()
+		if r.Now != nil {
+			now = r.Now()
+		}
+		values, e := r.WealthValues(r.db, wealthIDs, []time.Time{now})
+		if e != nil {
+			return nil, e
+		}
+		for i := range accounts {
+			if accounts[i].IsWealth() {
+				v := values[now.Format("2006-01-02")][accounts[i].ID]
+				accounts[i].Balance = v.Value.Round(2)
+				if !v.Complete {
+					known := v.Value.Round(2)
+					accounts[i].KnownBalance = &known
+				}
+				accounts[i].ValuationStatus = v.Status
+				accounts[i].NAVDate = v.NAVDate
+			}
+		}
+	}
 	return accounts, nil
 }
 
@@ -202,6 +240,21 @@ func (r *AccountRepo) Update(a *model.Account) error { return r.db.Save(a).Error
 
 // HasTransactions 该账户是否仍被流水引用（有流水不可删）。
 func (r *AccountRepo) HasTransactions(id int64) (bool, error) {
+	if r.db.Migrator().HasTable(&model.WealthCashLink{}) {
+		var count int64
+		if err := r.db.Model(&model.WealthCashLink{}).Where("account_id = ?", id).Count(&count).Error; err != nil { return false, err }
+		if count > 0 { return true, nil }
+	}
+	if r.db.Migrator().HasTable(&model.WealthPosition{}) {
+		var n int64
+		if err := r.db.Model(&model.WealthPosition{}).Where("account_id = ?", id).Count(&n).Error; err != nil {
+			return false, err
+		}
+		if n > 0 {
+			return true, nil
+		}
+	}
+
 	if r.db.Migrator().HasTable(&model.GoldPosition{}) {
 		var n int64
 		if e := r.db.Model(&model.GoldPosition{}).Where("account_id = ?", id).Count(&n).Error; e != nil {

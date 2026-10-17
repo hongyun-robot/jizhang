@@ -51,6 +51,9 @@ func kindLabel(k model.TxnKind) string {
 }
 
 func sourceLabel(s model.TxnSource) string {
+	if s == model.SourceWealthAuto {
+		return "理财零钱收益"
+	}
 	if s == model.SourceVoucherAuto {
 		return "券到期自动退款"
 	}
@@ -80,6 +83,14 @@ func purposeLabel(p model.TxnPurpose) string {
 		return "基金赎回到账"
 	case model.PurposeFundDividend:
 		return "基金分红到账"
+	case model.PurposeWealthPurchase:
+		return "理财申购付款"
+	case model.PurposeWealthRedemption:
+		return "理财赎回到账"
+	case model.PurposeWealthDividend:
+		return "理财分红到账"
+	case model.PurposeWealthCashYield:
+		return "理财零钱收益"
 	}
 	return "普通记账"
 }

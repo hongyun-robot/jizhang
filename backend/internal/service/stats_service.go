@@ -78,6 +78,16 @@ func (s *StatsService) InvalidateAll() {
 	}
 }
 
+// Personal NAV overlays invalidate only their persisted owner's cache namespace.
+func (s *StatsService) InvalidateOwner(owner int64) {
+	if s.cache == nil || owner <= 0 {
+		return
+	}
+	if err := s.cache.DelByPrefix(fmt.Sprintf("stats:user:%d:", owner)); err != nil {
+		logger.L().Warn("invalidate owner stats cache failed", zap.Error(err))
+	}
+}
+
 // resolveRange 解析自由区间：两者皆空默认当前账期（含端点闭区间）。
 func (s *StatsService) resolveRange(start, end string) (time.Time, time.Time, error) {
 	if start == "" && end == "" {
@@ -482,9 +492,10 @@ type assetAcct struct {
 }
 
 type assetPoint struct {
-	Date     string           `json:"date"`
-	Total    *decimal.Decimal `json:"total"`
-	Accounts []assetAcct      `json:"accounts"`
+	Date          string           `json:"date"`
+	Total         *decimal.Decimal `json:"total"`
+	Accounts      []assetAcct      `json:"accounts"`
+	KnownSubtotal decimal.Decimal  `json:"known_subtotal"`
 }
 
 type assetResponse struct {
@@ -568,6 +579,33 @@ func (s *StatsService) Assets(start, end string) (json.RawMessage, bool, error) 
 				}
 			}
 		}
+		wealthIDs := []int64{}
+		for _, a := range accounts {
+			if a.IsWealth() {
+				wealthIDs = append(wealthIDs, a.ID)
+			}
+		}
+		if len(wealthIDs) > 0 {
+			if s.accts.WealthValues == nil {
+				return nil, ErrWealthPrice
+			}
+			dates := []time.Time{}
+			for d := st; !d.After(en); d = d.AddDate(0, 0, 1) {
+				dates = append(dates, d)
+			}
+			wealthValues, e := s.accts.WealthValues(s.accts.DB(), wealthIDs, dates)
+			if e != nil {
+				return nil, e
+			}
+			for day, rows := range wealthValues {
+				if fundValues[day] == nil {
+					fundValues[day] = map[int64]repository.FundAccountValue{}
+				}
+				for id, v := range rows {
+					fundValues[day][id] = v
+				}
+			}
+		}
 		balance := make(map[int64]decimal.Decimal, len(accounts))
 		for _, a := range accounts {
 			balance[a.ID] = a.OpeningBalance
@@ -623,7 +661,7 @@ func (s *StatsService) Assets(start, end string) (json.RawMessage, bool, error) 
 			if complete {
 				ending = decimalPointer(total.Round(2))
 			}
-			points = append(points, assetPoint{Date: dk, Total: ending, Accounts: acctOut})
+			points = append(points, assetPoint{Date: dk, Total: ending, Accounts: acctOut, KnownSubtotal: total.Round(2)})
 		}
 		return assetResponse{
 			Start: st.Format("2006-01-02"), End: en.Format("2006-01-02"),

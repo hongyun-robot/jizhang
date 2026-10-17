@@ -81,6 +81,7 @@ func (s *TransactionService) Delete(actor *model.User, id int64) error {
 func (s *TransactionService) fillEffects(rows []model.Transaction) {
 	s.fillLiabilityLinks(rows)
 	s.fillFundLinks(rows)
+	s.fillWealthLinks(rows)
 	var ids []int64
 	for i := range rows {
 		rows[i].FillEffects()
@@ -104,6 +105,39 @@ func (s *TransactionService) fillEffects(rows []model.Transaction) {
 		if rows[i].VoucherEventID != nil {
 			if id, ok := byID[*rows[i].VoucherEventID]; ok {
 				rows[i].VoucherID = &id
+			}
+		}
+	}
+}
+
+func (s *TransactionService) fillWealthLinks(rows []model.Transaction) {
+	provider, ok := s.deps.Txns.(interface{ DB() *gorm.DB })
+	if !ok {
+		return
+	}
+	ids := []int64{}
+	for _, row := range rows {
+		if row.WealthEventID != nil {
+			ids = append(ids, *row.WealthEventID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	links, err := repository.NewWealthRepo(provider.DB()).CashLinks(ids)
+	if err != nil {
+		return
+	}
+	byID := map[int64]repository.WealthCashLink{}
+	for _, link := range links {
+		byID[link.EventID] = link
+	}
+	for i := range rows {
+		if rows[i].WealthEventID != nil {
+			if link, ok := byID[*rows[i].WealthEventID]; ok {
+				id := link.PositionID
+				rows[i].WealthPositionID = &id
+				rows[i].WealthCode = link.Code
 			}
 		}
 	}

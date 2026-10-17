@@ -23,23 +23,25 @@ func NewAccount(svc *service.AccountService) *accountHandler {
 }
 
 type accountReq struct {
-	Name                 string            `json:"name" binding:"required,max=64"`
-	RequestKey           string            `json:"request_key"`
-	Type                 model.AccountType `json:"type" binding:"required"`
-	AssetClass           *string           `json:"asset_class"`
-	OpeningBalance       *string           `json:"opening_balance"`
-	RepaymentDay         *int              `json:"repayment_day"`
-	LiabilityType        string            `json:"liability_type"`
-	StatementDay         *int              `json:"statement_day"`
-	RepaymentMonthOffset *int              `json:"repayment_month_offset"`
-	PrincipalRemainder   string            `json:"principal_remainder"`
-	Sort                 *int              `json:"sort"`
-	Status               model.UserStatus  `json:"status"`
+	Name                 string                        `json:"name" binding:"required,max=64"`
+	RequestKey           string                        `json:"request_key"`
+	Type                 model.AccountType             `json:"type" binding:"required"`
+	AssetClass           *string                       `json:"asset_class"`
+	OpeningBalance       *string                       `json:"opening_balance"`
+	RepaymentDay         *int                          `json:"repayment_day"`
+	LiabilityType        string                        `json:"liability_type"`
+	StatementDay         *int                          `json:"statement_day"`
+	RepaymentMonthOffset *int                          `json:"repayment_month_offset"`
+	PrincipalRemainder   string                        `json:"principal_remainder"`
+	Sort                 *int                          `json:"sort"`
+	Status               model.UserStatus              `json:"status"`
+	WealthCash           *service.WealthCashSetupInput `json:"wealth_cash"`
 }
 
 func (r *accountReq) parse() (service.CreateAccountInput, bool) {
 	in := service.CreateAccountInput{
 		Name:               r.Name,
+		WealthCash:         r.WealthCash,
 		RequestKey:         r.RequestKey,
 		Type:               r.Type,
 		PrincipalRemainder: r.PrincipalRemainder,
@@ -71,6 +73,10 @@ func mapAccountErr(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrAccountCreateConflict):
 		response.Conflict(c, err.Error())
 	case errors.Is(err, service.ErrAccountNameInvalid):
+		response.Invalid(c, err.Error())
+	case errors.Is(err, service.ErrWealthCashSetup):
+		response.Invalid(c, err.Error())
+	case errors.Is(err, service.ErrWealthInvalid), errors.Is(err, service.ErrWealthCode):
 		response.Invalid(c, err.Error())
 	case errors.Is(err, liability.ErrSetup), errors.Is(err, liability.ErrConflict), errors.Is(err, liability.ErrManaged):
 		response.Conflict(c, err.Error())

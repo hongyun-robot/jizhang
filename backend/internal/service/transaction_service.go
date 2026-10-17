@@ -91,6 +91,8 @@ type TxnInput struct {
 	Note              string
 	Platform          string
 	RelatedTxnID      int64 // 关联原支出流水（退款用，0=无）
+	WealthCash        *WealthCashFlowInput
+	WealthCashTimings []WealthCashFlowInput
 }
 
 // validate 校验并规整入参；返回错误供 handler 映射。
@@ -128,6 +130,9 @@ func (s *TransactionService) validate(in *TxnInput) error {
 		if orig.IsVoucher() {
 			return ErrTxnVoucherManaged
 		}
+		if orig.IsWealthManaged() {
+			return ErrWealthManaged
+		}
 		if in.AccountID == 0 {
 			in.AccountID = orig.AccountID
 		}
@@ -145,6 +150,9 @@ func (s *TransactionService) validate(in *TxnInput) error {
 	}
 	if acc.IsGold() {
 		return ErrGoldManaged
+	}
+	if acc.IsWealth() {
+		return ErrWealthManaged
 	}
 	if acc.IsFund() {
 		return ErrFundManaged
@@ -166,6 +174,9 @@ func (s *TransactionService) validate(in *TxnInput) error {
 		}
 		if tAcc.IsGold() {
 			return ErrGoldManaged
+		}
+		if tAcc.IsWealth() {
+			return ErrWealthManaged
 		}
 		if tAcc.IsFund() {
 			return ErrFundManaged
@@ -290,6 +301,9 @@ func (s *TransactionService) create(actor *model.User, in TxnInput) (*model.Tran
 	if err := s.ensurePlatform(actor.ID, t.Platform); err != nil {
 		return nil, err
 	}
+	if err := s.saveCashInputs(t, in); err != nil {
+		return nil, err
+	}
 	s.fireWrite()
 	s.firePeriods(periodKey)
 	return t, nil
@@ -344,6 +358,9 @@ func (s *TransactionService) createFromRule(rule *model.RecurringRule, date time
 	if err := s.deps.Txns.Create(t); err != nil {
 		return nil, err
 	}
+	if err := s.saveCashFlow(t, nil); err != nil {
+		return nil, err
+	}
 	s.fireWrite()
 	s.firePeriods(periodKey)
 	return t, nil
@@ -375,6 +392,9 @@ func (s *TransactionService) update(actor *model.User, id int64, in TxnInput) (*
 	}
 	if t.IsGoldManaged() {
 		return nil, ErrGoldManaged
+	}
+	if t.IsWealthManaged() {
+		return nil, ErrWealthManaged
 	}
 	if t.FundEventID != nil {
 		return nil, ErrFundManaged
@@ -426,6 +446,9 @@ func (s *TransactionService) update(actor *model.User, id int64, in TxnInput) (*
 	if err := s.deps.Txns.Update(t); err != nil {
 		return nil, err
 	}
+	if err := s.saveCashInputs(t, in); err != nil {
+		return nil, err
+	}
 	if err := s.ensurePlatform(actor.ID, t.Platform); err != nil {
 		return nil, err
 	}
@@ -458,6 +481,9 @@ func (s *TransactionService) delete(actor *model.User, id int64) error {
 	if t.IsGoldManaged() {
 		return ErrGoldManaged
 	}
+	if t.IsWealthManaged() {
+		return ErrWealthManaged
+	}
 	if t.FundEventID != nil {
 		return ErrFundManaged
 	}
@@ -483,6 +509,9 @@ func (s *TransactionService) delete(actor *model.User, id int64) error {
 	if err := s.deps.Txns.Delete(id); err != nil {
 		return err
 	}
+	if err := s.deleteCashFlow(id); err != nil {
+		return err
+	}
 	s.fireWrite()
 	s.firePeriods(t.PeriodKey)
 	return nil
@@ -500,6 +529,9 @@ func (s *TransactionService) List(actor *model.User, f repository.TxnFilter) ([]
 	}
 	s.fillRefunded(list)
 	s.fillEffects(list)
+	if err = s.fillCashFlows(list); err != nil {
+		return nil, 0, err
+	}
 	if e := s.redactHistory(actor, list); e != nil {
 		return nil, 0, e
 	}

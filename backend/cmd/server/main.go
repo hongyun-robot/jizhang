@@ -13,6 +13,7 @@ import (
 
 	"jizhang/internal/cache"
 	"jizhang/internal/ccb"
+	"jizhang/internal/cmbcwm"
 	"jizhang/internal/config"
 	"jizhang/internal/database"
 	"jizhang/internal/fuyao"
@@ -22,6 +23,8 @@ import (
 	"jizhang/internal/router"
 	"jizhang/internal/seed"
 	"jizhang/internal/service"
+	"jizhang/internal/suyin"
+	"jizhang/internal/wealthdata"
 
 	"go.uber.org/zap"
 )
@@ -83,6 +86,13 @@ func main() {
 	goldSvc := service.NewGoldService(db, txnSvc, ccb.New())
 	goldSvc.BindAccounts(accountRepo)
 	goldSvc.OnWrite = statsSvc.InvalidateAll
+	wealthMarket := wealthdata.NewRouter(map[string]wealthdata.Source{
+		"suyin":  suyin.New(cfg.WealthCollectorURL, cfg.WealthCollectorKey),
+		"cmbcwm": cmbcwm.New(),
+	})
+	wealthSvc := service.NewWealthService(db, txnSvc, wealthMarket)
+	wealthSvc.BindAccounts(accountRepo)
+	wealthSvc.OnWrite = statsSvc.InvalidateOwner
 	closingSvc := service.NewClosingService(service.ClosingDeps{
 		Closings: repository.NewClosingRepo(db),
 		Audits:   repository.NewAuditRepo(db),
@@ -147,6 +157,7 @@ func main() {
 		LiabilitySvc: liabilitySvc,
 		FundSvc:      fundSvc,
 		GoldSvc:      goldSvc,
+		WealthSvc:    wealthSvc,
 
 		BackupStatusFile: cfg.BackupStatusFile,
 	})
@@ -182,6 +193,17 @@ func main() {
 	}
 	go ensureGold()
 	accountSvc.OnGoldCreated = func() { go ensureGold() }
+	ensureWealth := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		if err := wealthSvc.Ensure(ctx); err != nil {
+			logger.L().Warn("wealth quote/valuation sync incomplete", zap.Error(err))
+		}
+	}
+	if _, err := recurringCron.AddFunc("@every 30s", ensureWealth); err != nil {
+		logger.L().Fatal("wealth schedule failed", zap.Error(err))
+	}
+	go ensureWealth()
 	ensureVouchers := func() {
 		result, err := voucherSvc.EnsureDue(time.Now())
 		if err != nil {

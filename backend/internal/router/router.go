@@ -28,6 +28,7 @@ type Deps struct {
 	LiabilitySvc *service.LiabilityService
 	FundSvc      *service.FundService
 	GoldSvc      *service.GoldService
+	WealthSvc    *service.WealthService
 	// BackupStatusFile 备份状态文件路径（health 暴露最近备份时间，任务 11.3）。
 	BackupStatusFile string
 }
@@ -111,6 +112,36 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 			funds.GET("/positions/:id/valuations", fh.Valuations)
 			funds.GET("/positions/:id/dividends", fh.Dividends)
 			funds.GET("/positions/:id/audits", fh.Audits)
+		}
+		if d.WealthSvc != nil {
+			fh := handler.NewWealth(d.WealthSvc)
+			wealth := v1.Group("/wealth", middleware.Auth(d.AuthSvc))
+			wealth.GET("/products", fh.Catalog)
+			wealth.GET("/cash-accounts", fh.CashAccounts)
+			wealth.GET("/cash-accounts/:id", fh.CashAccount)
+			wealth.PUT("/cash-accounts/:id", fh.ConfigureCash)
+			wealth.POST("/cash-accounts/:id/refresh", fh.RefreshCash)
+			wealth.GET("/cash-yields/:id", fh.CashYield)
+			wealth.PUT("/cash-yields/:id", fh.EditCashYield)
+			wealth.GET("/products/:id/navs", fh.Quotes)
+			wealth.GET("/products/:id/manual-navs", fh.ManualNAVs)
+			wealth.POST("/products/:id/manual-navs", fh.WriteManual)
+			wealth.GET("/products/:id/manual-audits", fh.ManualAudits)
+			wealth.POST("/products/:id/refresh", fh.RefreshProduct)
+			wealth.GET("/accounts", fh.Accounts)
+			wealth.GET("/accounts/:id", fh.Account)
+			wealth.POST("/accounts/:id/positions", fh.Opening)
+			wealth.POST("/accounts/:id/events", fh.FirstBuy)
+			wealth.POST("/accounts/:id/orders", fh.Subscribe)
+			wealth.POST("/accounts/:id/refresh", fh.Refresh)
+			wealth.GET("/positions/:id", fh.Position)
+			wealth.PUT("/positions/:id", fh.Amend)
+			wealth.GET("/positions/:id/events", fh.Events)
+			wealth.POST("/positions/:id/events", fh.Operate)
+			wealth.POST("/positions/:id/order-preview", fh.OrderPreview)
+			wealth.POST("/positions/:id/events/:eventId/undo", fh.Undo)
+			wealth.GET("/positions/:id/valuations", fh.Valuations)
+			wealth.GET("/positions/:id/audits", fh.Audits)
 		}
 		// 分类：读全部角色，写仅管理员
 		if d.LiabilitySvc != nil {

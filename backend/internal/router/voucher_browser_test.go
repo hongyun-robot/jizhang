@@ -44,6 +44,7 @@ func TestLiabilityBrowserServer(t *testing.T) {
 func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	fundFixture := os.Getenv("FUND_BROWSER_SERVER") == "1"
 	goldFixture := os.Getenv("GOLD_BROWSER_SERVER") == "1"
+	wealthFixture := os.Getenv("WEALTH_BROWSER_SERVER") == "1"
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatal(err)
@@ -60,6 +61,11 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	if err := db.AutoMigrate(model.LiabilityModels()...); err != nil {
 		t.Fatal(err)
 	}
+	if os.Getenv("WEALTH_BROWSER_SERVER") == "1" {
+		if err := db.AutoMigrate(&model.WealthCashLink{}, &model.WealthCashFlow{}, &model.WealthCashYield{}, &model.WealthCashAudit{}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if fundFixture {
 		if err := db.AutoMigrate(&model.FundInstrument{}, &model.FundPosition{}, &model.FundEvent{}, &model.FundMutation{}, &model.FundNAV{}, &model.FundNAVRevision{}, &model.FundValuation{}, &model.FundAudit{}, &model.FundDividend{}); err != nil {
 			t.Fatal(err)
@@ -67,6 +73,11 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	}
 	if goldFixture {
 		if err := db.AutoMigrate(&model.GoldPosition{}, &model.GoldEvent{}, &model.GoldMutation{}, &model.GoldAudit{}, &model.GoldQuoteObservation{}, &model.GoldQuoteSync{}, &model.GoldValuation{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if wealthFixture {
+		if err := db.AutoMigrate(&model.WealthProduct{}, &model.WealthPosition{}, &model.WealthEvent{}, &model.WealthMutation{}, &model.WealthAudit{}, &model.WealthNAV{}, &model.WealthNAVRevision{}, &model.WealthManualNAV{}, &model.WealthManualAudit{}, &model.WealthSeries{}, &model.WealthValuation{}, &model.WealthSyncSlot{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -115,6 +126,8 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	stats := service.NewStatsService(statsRepo, accounts, cats, periods, cache.NewStatsCache(client))
 	var gold *service.GoldService
 	var goldMarket *goldBrowserMarket
+	var wealth *service.WealthService
+	var wealthMarket *wealthBrowserMarket
 	var funds *service.FundService
 	var fundMarket *fundBrowserMarket
 	budgets := service.NewBudgetService(service.BudgetDeps{Budgets: repository.NewBudgetRepo(db), Stats: statsRepo, Cats: cats, Notifs: notifs, Periods: periods})
@@ -140,6 +153,17 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 		gold.BindAccounts(accounts)
 		gold.OnWrite = stats.InvalidateAll
 	}
+	if wealthFixture {
+		browserTime.Store(time.Now().Unix())
+		wealthMarket = &wealthBrowserMarket{now: func() time.Time { return time.Unix(browserTime.Load(), 0) }}
+		wealth = service.NewWealthService(db, txn, wealthMarket)
+		wealth.Now = wealthMarket.now
+		wealth.BindAccounts(accounts)
+		wealth.OnWrite = stats.InvalidateOwner
+		if err := db.Create(&model.WealthProduct{ID: 1, Issuer: "suyin", RegistrationCode: "Z7003125000238", Code: "J07241", Name: "苏银理财恒源日申周赎1号A", Currency: "CNY", ValuationBasis: "cny_wealth_unit_nav", InceptionDate: time.Date(2025, 8, 29, 0, 0, 0, 0, time.UTC), SourceAdapter: "suyin", SourceCode: "Y0408Ux", AdmissionStatus: "pending_validation"}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
 	if liabilityFixture {
 		liab.Now = func() time.Time { return time.Unix(browserTime.Load(), 0).In(liability.Location) }
 	}
@@ -150,7 +174,10 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 			}
 		}
 	}
-	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601", "http://127.0.0.1:5602", "http://127.0.0.1:5603", "http://127.0.0.1:5612"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: service.NewAccountService(accounts), CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn), LiabilitySvc: liab, FundSvc: funds, GoldSvc: gold})
+	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601", "http://127.0.0.1:5602", "http://127.0.0.1:5603", "http://127.0.0.1:5612"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: service.NewAccountService(accounts), CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn), LiabilitySvc: liab, FundSvc: funds, GoldSvc: gold, WealthSvc: wealth})
+	if wealthFixture {
+		wealthBrowserRoutes(r, db, wealthMarket, &browserTime, wealth)
+	}
 	stop := make(chan struct{}, 1)
 	r.GET("/api/v1/__test__/info", func(c *gin.Context) {
 		name := "voucher-browser"
@@ -162,6 +189,9 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 		}
 		if goldFixture {
 			name = "gold-browser"
+		}
+		if wealthFixture {
+			name = "wealth-browser"
 		}
 		c.JSON(http.StatusOK, gin.H{"fixture": name})
 	})
@@ -279,6 +309,9 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 		}
 	})
 	address := "127.0.0.1:18084"
+	if wealthFixture {
+		address = "127.0.0.1:18088"
+	}
 	if liabilityFixture {
 		address = "127.0.0.1:18085"
 	}

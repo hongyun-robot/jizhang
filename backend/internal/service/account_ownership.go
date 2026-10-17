@@ -119,6 +119,12 @@ func (s *AccountService) CreateFor(actor *model.User, in CreateAccountInput) (*m
 	if !CanView(actor) {
 		return nil, ErrTxnForbidden
 	}
+	if in.AssetClass == "wealth_cash" && in.Type != model.AccountAsset {
+		return nil, ErrInvalidAccountType
+	}
+	if in.WealthCash != nil && in.AssetClass != "wealth_cash" {
+		return nil, ErrWealthInvalid
+	}
 	if in.Type == model.AccountLiability {
 		if err := s.EnsurePersonalLiabilities(actor); err != nil {
 			return nil, err

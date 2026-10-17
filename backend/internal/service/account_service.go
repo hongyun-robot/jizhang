@@ -27,6 +27,7 @@ var (
 	ErrAccountCreateConflict     = errors.New("账户创建请求已使用，或创建的账户已删除，请核对结果")
 	ErrAccountNameInvalid        = errors.New("账户名称须为 1–64 字")
 	ErrPrincipalRemainderInvalid = errors.New("分期本金尾差须选择首期或最后一期")
+	ErrWealthCashSetup           = errors.New("理财零钱需选择产品及基准日；现有账户请从理财零钱入口调整关联")
 )
 
 var validAccountTypes = map[model.AccountType]bool{
@@ -40,6 +41,7 @@ type AccountService struct {
 	// OnWrite 写成功后的钩子（用于统计缓存主动失效）。
 	OnWrite       func()
 	OnGoldCreated func()
+	Now           func() time.Time
 }
 
 func (s *AccountService) fireWrite() {
@@ -49,7 +51,7 @@ func (s *AccountService) fireWrite() {
 }
 
 func NewAccountService(repo *repository.AccountRepo) *AccountService {
-	return &AccountService{repo: repo}
+	return &AccountService{repo: repo, Now: time.Now}
 }
 
 // List 全部账户（含实时余额）。
@@ -94,6 +96,7 @@ type CreateAccountInput struct {
 	PrincipalRemainder   string
 	ActorID              int64
 	RequestKey           string
+	WealthCash           *WealthCashSetupInput `json:"wealth_cash,omitempty"`
 }
 
 // Create 新建账户（管理员）。
@@ -139,6 +142,13 @@ func (s *AccountService) Create(in CreateAccountInput) (out *model.Account, err 
 			if out == nil {
 				return ErrAccountCreateConflict
 			}
+			if out.IsWealthCash() {
+				out.HasFinancialHistory = true
+				out.Balance, e = repository.NewWealthCashRepo(tx).Balance(*out, wealthToday(s.cashClock()))
+				if e != nil {
+					return e
+				}
+			}
 			return nil
 		}
 		if !errors.Is(e, gorm.ErrRecordNotFound) {
@@ -168,10 +178,10 @@ func (s *AccountService) accountWrite(fn func(*gorm.DB) error) error {
 }
 
 func validateAccountInput(in CreateAccountInput) error {
-	if (in.Type == model.AccountLiability && in.AssetClass != "") || (in.Type == model.AccountAsset && in.AssetClass != "" && in.AssetClass != "cash" && in.AssetClass != "fund" && in.AssetClass != "gold") {
+	if (in.Type == model.AccountLiability && in.AssetClass != "") || (in.Type == model.AccountAsset && in.AssetClass != "" && in.AssetClass != "cash" && in.AssetClass != "fund" && in.AssetClass != "gold" && in.AssetClass != "wealth" && in.AssetClass != "wealth_cash") {
 		return ErrInvalidAccountType
 	}
-	if (in.AssetClass == "fund" || in.AssetClass == "gold") && !in.OpeningBalance.IsZero() {
+	if (in.AssetClass == "fund" || in.AssetClass == "gold" || in.AssetClass == "wealth") && !in.OpeningBalance.IsZero() {
 		return ErrInvalidAmount
 	}
 	if in.PrincipalRemainder != "" && (in.Type != model.AccountLiability || (in.PrincipalRemainder != "first" && in.PrincipalRemainder != "last")) {
@@ -201,6 +211,12 @@ func validateAccountInput(in CreateAccountInput) error {
 }
 
 func (s *AccountService) createAt(tx *gorm.DB, in CreateAccountInput) (*model.Account, error) {
+	if in.AssetClass == "wealth_cash" {
+		return s.createCashAt(tx, in)
+	}
+	if in.WealthCash != nil {
+		return nil, ErrWealthInvalid
+	}
 	if e := validateAccountInput(in); e != nil {
 		return nil, e
 	}
@@ -270,6 +286,9 @@ func (s *AccountService) Update(id int64, in CreateAccountInput, status model.Us
 	return
 }
 func (s *AccountService) updateAt(tx *gorm.DB, id int64, in CreateAccountInput, status model.UserStatus) (*model.Account, error) {
+	if in.WealthCash != nil {
+		return nil, ErrWealthCashSetup
+	}
 	if e := validateAccountInput(in); e != nil {
 		return nil, e
 	}
@@ -283,6 +302,9 @@ func (s *AccountService) updateAt(tx *gorm.DB, id int64, in CreateAccountInput, 
 	}
 	if a == nil {
 		return nil, ErrAccountNotFound
+	}
+	if (in.AssetClass == "wealth_cash" && !a.IsWealthCash()) || (a.IsWealthCash() && in.AssetClassProvided && in.AssetClass != "wealth_cash") {
+		return nil, ErrWealthCashSetup
 	}
 	if !in.AssetClassProvided && in.AssetClass == "" && in.Type == model.AccountAsset && a.Type == model.AccountAsset {
 		in.AssetClass = a.AssetClass

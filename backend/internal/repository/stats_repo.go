@@ -50,7 +50,7 @@ func (r *StatsRepo) DailyTotals(start, end time.Time) ([]DailyRow, error) {
 		       SUM(CASE WHEN kind = 'income'  THEN amount ELSE 0 END) AS income,
 		       SUM(` + expenseEffectSQL("") + `) AS expense
 		FROM transactions
-		WHERE kind IN ('income', 'expense', 'refund')
+		WHERE kind IN ('income', 'expense', 'refund') AND purpose <> 'wealth_cash_yield'
 		  AND entry_date >= ? AND entry_date <= ?
 		GROUP BY entry_date
 		ORDER BY entry_date`
@@ -77,7 +77,7 @@ func (r *StatsRepo) CategoryTotals(start, end time.Time) ([]CategoryRow, error) 
 		FROM transactions t
 		LEFT JOIN categories c ON c.id = t.category_id
 		LEFT JOIN categories p ON p.id = c.parent_id
-		WHERE t.kind IN ('income', 'expense', 'refund')
+		WHERE t.kind IN ('income', 'expense', 'refund') AND t.purpose <> 'wealth_cash_yield'
 		  AND t.entry_date >= ? AND t.entry_date <= ?
 		GROUP BY COALESCE(p.id, c.id), CASE WHEN t.kind = 'refund' THEN 'expense' ELSE t.kind END`
 	var rows []CategoryRow
@@ -99,7 +99,7 @@ func (r *StatsRepo) PeriodTotals(year int) ([]PeriodRow, error) {
 		       SUM(CASE WHEN kind = 'income'  THEN amount ELSE 0 END) AS income,
 		       SUM(` + expenseEffectSQL("") + `) AS expense
 		FROM transactions
-		WHERE kind IN ('income', 'expense', 'refund') AND period_key LIKE ?
+		WHERE kind IN ('income', 'expense', 'refund') AND purpose <> 'wealth_cash_yield' AND period_key LIKE ?
 		GROUP BY period_key`
 	var rows []PeriodRow
 	err := r.query(sql, fmt.Sprintf("%04d-%%", year)).Scan(&rows).Error
@@ -113,7 +113,7 @@ func (r *StatsRepo) SumByPeriod(periodKey string) (PeriodRow, error) {
 		SELECT COALESCE(SUM(CASE WHEN kind = 'income'  THEN amount END), 0) AS income,
 		       COALESCE(SUM(` + expenseEffectSQL("") + `), 0) AS expense
 		FROM transactions
-		WHERE kind IN ('income', 'expense', 'refund') AND period_key = ?`
+		WHERE kind IN ('income', 'expense', 'refund') AND purpose <> 'wealth_cash_yield' AND period_key = ?`
 	var row PeriodRow
 	err := r.query(sql, periodKey).Scan(&row).Error
 	row.PeriodKey = periodKey

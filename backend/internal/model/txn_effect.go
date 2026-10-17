@@ -16,10 +16,17 @@ const (
 	PurposeFundDividend      TxnPurpose = "fund_dividend"
 	PurposeGoldPurchase      TxnPurpose = "gold_purchase"
 	PurposeGoldRedemption    TxnPurpose = "gold_redemption"
+	PurposeWealthPurchase    TxnPurpose = "wealth_purchase"
+	PurposeWealthRedemption  TxnPurpose = "wealth_redemption"
+	PurposeWealthDividend    TxnPurpose = "wealth_dividend"
+	PurposeWealthCashYield   TxnPurpose = "wealth_cash_yield"
 )
 
 func (t Transaction) IsVoucher() bool {
-	return t.VoucherEventID != nil || (t.Purpose != "" && t.Purpose != PurposeRegular && !t.IsFundManaged() && !t.IsGoldManaged())
+	return t.VoucherEventID != nil || (t.Purpose != "" && t.Purpose != PurposeRegular && !t.IsFundManaged() && !t.IsGoldManaged() && !t.IsWealthManaged())
+}
+func (t Transaction) IsWealthManaged() bool {
+	return t.WealthEventID != nil || t.WealthCashYieldID != nil || t.Purpose == PurposeWealthPurchase || t.Purpose == PurposeWealthRedemption || t.Purpose == PurposeWealthDividend || t.Purpose == PurposeWealthCashYield
 }
 func (t Transaction) IsGoldManaged() bool {
 	return t.GoldEventID != nil || t.Purpose == PurposeGoldPurchase || t.Purpose == PurposeGoldRedemption
@@ -32,6 +39,11 @@ func (t Transaction) IsFundManaged() bool {
 // Effects 返回行所属账户的资金影响和消费支出影响。转账的转入侧由账户聚合另计。
 func (t Transaction) Effects() (decimal.Decimal, decimal.Decimal) {
 	switch t.Purpose {
+	case PurposeWealthCashYield:
+		if t.Kind == TxnExpense {
+			return t.Amount.Neg(), decimal.Zero
+		}
+		return t.Amount, decimal.Zero
 	case PurposeVoucherPurchase:
 		return t.Amount.Neg(), decimal.Zero
 	case PurposeVoucherRedemption, PurposeVoucherWriteoff:

@@ -1,0 +1,1 @@
+ALTER TABLE wealth_events ADD COLUMN order_json LONGTEXT NOT NULL DEFAULT ('');

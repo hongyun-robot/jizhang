@@ -105,7 +105,9 @@ func TestFundMySQLMigration(t *testing.T) {
 func TestFundMySQLConcurrentFinancialAndQuoteWrites(t *testing.T) {
 	r, migrate := fundMySQLSchema(t)
 	db := r.DB()
-	migrate("000014_personal_fund_accounts.up.sql")
+	for _, file := range []string{"000014_personal_fund_accounts.up.sql", "000015_personal_voucher_platforms.up.sql", "000016_catalog_ordering.up.sql", "000017_ccb_gold_accounts.up.sql", "000018_bank_wealth_accounts.up.sql"} {
+		migrate(file)
+	}
 	owner := int64(1)
 	actor := &model.User{ID: owner, Role: model.RoleAdmin, Status: model.StatusActive}
 	bank := model.Account{Name: "并发现金", OwnerID: &owner, Type: model.AccountAsset, AssetClass: "cash", Status: model.StatusActive, OpeningBalance: dec("10000")}
@@ -226,7 +228,9 @@ func TestFundMySQLConcurrentFinancialAndQuoteWrites(t *testing.T) {
 
 func TestFundMySQLScheduledClaimsAcrossWorkersAndRestart(t *testing.T) {
 	r, migrate := fundMySQLSchema(t)
-	migrate("000014_personal_fund_accounts.up.sql")
+	for _, file := range []string{"000014_personal_fund_accounts.up.sql", "000015_personal_voucher_platforms.up.sql", "000016_catalog_ordering.up.sql", "000017_ccb_gold_accounts.up.sql", "000018_bank_wealth_accounts.up.sql"} {
+		migrate(file)
+	}
 	item := model.FundInstrument{THSCode: "023564.OF", Ticker: "023564", AssetType: "fund-otc"}
 	mustOK(t, r.SaveInstrument(&item))
 	other := model.FundInstrument{THSCode: "012345.OF", Ticker: "012345", AssetType: "fund-otc"}

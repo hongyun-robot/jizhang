@@ -26,8 +26,10 @@ type Config struct {
 	// 否则浏览器在 /jizhang/api/v1/auth/refresh 上不会携带 Path=/api/v1/auth 的 cookie。
 	CookiePath string
 	// BackupStatusFile 备份状态文件路径（docker/backup.sh 写入，health 暴露最近备份时间）。
-	BackupStatusFile string
-	FuyaoAPIKey      string `json:"-"`
+	BackupStatusFile   string
+	FuyaoAPIKey        string `json:"-"`
+	WealthCollectorURL string
+	WealthCollectorKey string `json:"-"`
 }
 
 func getEnv(key, def string) string {
@@ -75,8 +77,10 @@ func Load() *Config {
 		CookieSecure:    getEnvBool("COOKIE_SECURE", false),
 		CookiePath:      getEnv("COOKIE_PATH", "/api/v1/auth"),
 
-		BackupStatusFile: getEnv("BACKUP_STATUS_FILE", ""),
-		FuyaoAPIKey:      getEnv("FUYAO_API_KEY", ""),
+		BackupStatusFile:   getEnv("BACKUP_STATUS_FILE", ""),
+		FuyaoAPIKey:        getEnv("FUYAO_API_KEY", ""),
+		WealthCollectorURL: getEnv("WEALTH_COLLECTOR_URL", ""),
+		WealthCollectorKey: getEnv("WEALTH_COLLECTOR_KEY", ""),
 	}
 }
 

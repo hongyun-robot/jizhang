@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func goldMySQLSchema(t *testing.T) (*goldEnv, func(string)) {
+func goldMySQLSchema(t *testing.T, latest bool) (*goldEnv, func(string)) {
 	t.Helper()
 	dsn := os.Getenv("GOLD_MYSQL_DSN")
 	if dsn == "" {
@@ -26,6 +26,9 @@ func goldMySQLSchema(t *testing.T) (*goldEnv, func(string)) {
 	db := r.DB()
 	for _, f := range []string{"000014_personal_fund_accounts.up.sql", "000015_personal_voucher_platforms.up.sql", "000016_catalog_ordering.up.sql", "000017_ccb_gold_accounts.up.sql"} {
 		migrate(f)
+	}
+	if latest {
+		migrate("000018_bank_wealth_accounts.up.sql")
 	}
 	accounts := repository.NewAccountRepo(db)
 	periods := NewPeriodService(repository.NewSettingRepo(db))
@@ -52,7 +55,7 @@ func goldMySQLSchema(t *testing.T) (*goldEnv, func(string)) {
 	return g, migrate
 }
 func TestGoldMySQLSharedWorkersAndClosingRace(t *testing.T) {
-	g, _ := goldMySQLSchema(t)
+	g, _ := goldMySQLSchema(t, true)
 	other := NewGoldService(g.db, g.txn, g.marketGold)
 	other.Now = g.gold.Now
 	var workers sync.WaitGroup
@@ -109,7 +112,7 @@ func TestGoldMySQLSharedWorkersAndClosingRace(t *testing.T) {
 	}
 }
 func TestGoldMySQLConcurrencyPrecisionAndRollbackGuard(t *testing.T) {
-	g, _ := goldMySQLSchema(t)
+	g, _ := goldMySQLSchema(t, true)
 	in := GoldInput{RequestKey: uuid.NewString(), Kind: "buy", Grams: "10.12345678", CashAmount: "8010", CashAccountID: g.banks[0], TradeDate: "2026-10-15"}
 	var wg sync.WaitGroup
 	errs := make(chan error, 4)
@@ -164,7 +167,7 @@ func TestGoldMySQLConcurrencyPrecisionAndRollbackGuard(t *testing.T) {
 	}
 }
 func TestGoldMySQLEmptyMigrationDown(t *testing.T) {
-	g, migrate := goldMySQLSchema(t)
+	g, migrate := goldMySQLSchema(t, false)
 	// Only these newly created, never-used test accounts may be removed.
 	mustOK(t, g.db.Where("asset_class = ?", "gold").Delete(&model.Account{}).Error)
 	_, e := g.gold.Refresh(context.Background(), g.users[0])
@@ -182,7 +185,7 @@ func TestGoldMySQLEmptyMigrationDown(t *testing.T) {
 	}
 }
 func TestGoldMySQLAccountLifecycleAndOrdering(t *testing.T) {
-	g, _ := goldMySQLSchema(t)
+	g, _ := goldMySQLSchema(t, true)
 	svc := NewAccountService(g.accounts)
 	input := CreateAccountInput{Name: "追加黄金", Type: model.AccountAsset, AssetClass: "gold", ActorID: 1, RequestKey: uuid.NewString()}
 	a, e := svc.Create(input)

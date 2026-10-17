@@ -16,7 +16,7 @@ func expenseEffectSQL(alias string) string {
 	if p != "" {
 		p += "."
 	}
-	return "CASE WHEN " + p + "purpose IN ('voucher_purchase','voucher_refund') THEN 0 " +
+	return "CASE WHEN " + p + "purpose IN ('voucher_purchase','voucher_refund','wealth_cash_yield') THEN 0 " +
 		"WHEN " + p + "kind = 'expense' THEN " + p + "amount " +
 		"WHEN " + p + "kind = 'refund' THEN -" + p + "amount ELSE 0 END"
 }
