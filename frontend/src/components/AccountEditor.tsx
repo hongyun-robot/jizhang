@@ -3,6 +3,11 @@ import { App, Alert, Button, Form, Input, InputNumber, Modal, Segmented, Switch 
 import SelectionScope from './SelectionScope';
 import ResponsiveSelect from './ResponsiveSelect';
 import PrincipalRemainderField from './PrincipalRemainderField';
+import DatePicker from './DatePicker';
+import { useWealthProducts } from '../api/wealth';
+import { useAuth } from '../stores/auth';
+import { canRecord } from '../domain/permissions';
+import { parseCents } from '../lib/money';
 import { useAccountMutations, type AccountInput } from '../api/accounts';
 import { useLiabilityDetail, useLiabilityTypes } from '../api/liability';
 import type { Account, AccountType, PrincipalRemainder } from '../api/types';
@@ -13,12 +18,12 @@ import { useRef as submissionRef } from 'react';
 import { plannedBills, ruleError } from '../lib/liability';
 import { popupInParent } from '../lib/popup';
 import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 
 interface FormValues {
   name: string;
   type: AccountType;
-  asset_class?: 'cash' | 'fund' | 'gold';
+  asset_class?: 'cash' | 'fund' | 'gold' | 'wealth' | 'wealth_cash';
   opening_balance?: string;
   repayment_day?: number;
   liability_type?: string;
@@ -26,6 +31,8 @@ interface FormValues {
   repayment_month_offset?: number;
   principal_remainder?: PrincipalRemainder;
   status?: boolean;
+  wealth_product_id?: number;
+  wealth_start_date?: Dayjs;
 }
 
 export interface AccountEditorProps {
@@ -35,11 +42,12 @@ export interface AccountEditorProps {
   allowFunds?: boolean;
   fundOnly?: boolean;
   goldOnly?: boolean;
+ wealthOnly?: boolean;
   onClose: () => void;
   onCreated?: (account: Account) => void;
   onPending?: (pending: boolean) => void;
 }
-export default function AccountEditor({ account, initialName = '', assetOnly = false, allowFunds = false, fundOnly = false, goldOnly = false, onClose, onCreated, onPending }: AccountEditorProps) {
+export default function AccountEditor({ account, initialName = '', assetOnly = false, allowFunds = false, fundOnly = false, goldOnly = false, wealthOnly = false, onClose, onCreated, onPending }: AccountEditorProps) {
   const scope = useScope();
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
@@ -61,6 +69,18 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
   const [editing, setEditing] = useState<Account | null>(null);
   const [form] = Form.useForm<FormValues>();
   const values = Form.useWatch([], form) as FormValues | undefined;
+  const user = useAuth((s) => s.user);
+  const creatingWealthCash = !editing && values?.type === 'asset' && values.asset_class === 'wealth_cash';
+  const products = useWealthProducts(open && creatingWealthCash);
+  const assetOptions = editing?.asset_class === 'wealth_cash'
+    ? [{ value: 'wealth_cash', label: '理财零钱' }]
+    : [
+        { value: 'cash', label: '现金资产' },
+        ...(!editing && !fundOnly && !goldOnly && !wealthOnly && canRecord(user?.role) ? [{ value: 'wealth_cash', label: '理财零钱' }] : []),
+        ...(allowFunds || fundOnly || editing?.asset_class === 'fund' ? [{ value: 'fund', label: '基金账户' }] : []),
+        ...(allowFunds || goldOnly || editing?.asset_class === 'gold' ? [{ value: 'gold', label: '建行积存金' }] : []),
+        ...(allowFunds || wealthOnly || editing?.asset_class === 'wealth' ? [{ value: 'wealth', label: '银行理财' }] : []),
+      ];
   const editingDetail = useLiabilityDetail(
     editing?.type === 'liability' ? editing.id : 0
   );
@@ -148,8 +168,9 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
     form.setFieldsValue({
       name: initialName,
       type: 'asset',
-      asset_class: goldOnly ? 'gold' : fundOnly ? 'fund' : 'cash',
+      asset_class: wealthOnly ? 'wealth' : goldOnly ? 'gold' : fundOnly ? 'fund' : 'cash',
       opening_balance: '0',
+      wealth_start_date: dayjs(),
       liability_type: defaultType,
       statement_day: 31,
       repayment_day: 10,
@@ -201,7 +222,10 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
           opening_balance: v.opening_balance ?? '0',
           status: v.status === false ? 'disabled' : 'active',
         };
-        if ((input.asset_class === 'fund' || input.asset_class === 'gold')) input.opening_balance = '0';
+        if ((input.asset_class === 'fund' || input.asset_class === 'gold' || input.asset_class === 'wealth')) input.opening_balance = '0';
+        if (!editing && input.asset_class === 'wealth_cash') {
+          input.wealth_cash = { product_id: v.wealth_product_id!, start_date: v.wealth_start_date!.format('YYYY-MM-DD') };
+        }
         if (v.type === 'liability') {
           const rules = editingDetail.data?.rules;
           const last = rules?.at(-1);
@@ -275,7 +299,7 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
             </Form.Item>
             <Form.Item name="type" label="类型">
               <Segmented
-                disabled={assetOnly || fundOnly || goldOnly || !!editing?.has_financial_history}
+                disabled={assetOnly || fundOnly || goldOnly || wealthOnly || !!editing?.has_financial_history}
                 onChange={(value) => {
                   if (value === 'liability')
                     form.setFieldsValue({
@@ -293,22 +317,34 @@ export default function AccountEditor({ account, initialName = '', assetOnly = f
                 ]}
               />
             </Form.Item>
-            {values?.type === 'asset' && (allowFunds || fundOnly || goldOnly || editing?.asset_class === 'fund' || editing?.asset_class === 'gold') && <Form.Item name="asset_class" label="资产类别"><Segmented disabled={fundOnly || goldOnly || !!editing?.has_financial_history} options={[{ value: 'cash', label: '现金资产' }, { value: 'fund', label: '基金账户' }, ...(!fundOnly ? [{ value: 'gold', label: '建行积存金' }] : [])]} onChange={(value) => { if (value === 'fund' || value === 'gold') form.setFieldValue('opening_balance', '0'); }} /></Form.Item>}
+            {values?.type === 'asset' && <Form.Item name="asset_class" label="资产类别"><ResponsiveSelect sheetTitle="资产类别" aria-label="资产类别" active={open} mobileSearch={false} disabled={fundOnly || goldOnly || wealthOnly || editing?.asset_class === 'wealth_cash' || !!editing?.has_financial_history} options={assetOptions} onChange={(value) => { if (value === 'fund' || value === 'gold' || value === 'wealth') form.setFieldValue('opening_balance', '0'); }} /></Form.Item>}
             {values?.asset_class === 'fund' && values?.type === 'asset' && <Alert type="info" title="在基金详情添加持仓" description="基金账户从零现金开始，市值按确认份额和最新有效净值计算。" />}
-            {values?.asset_class === 'gold' && <Alert type="info" title="在黄金详情录入克数和成本" description="建行积存金按赎回价估值；普通现金期初为零。" />}
+            {values?.asset_class === 'wealth' && <Alert type="info" title="在独立理财详情登记产品持仓" description="仅选择已接入产品，可在一个账户管理多款；普通现金期初为零。" />}
+ {values?.asset_class === 'gold' && <Alert type="info" title="在黄金详情录入克数和成本" description="建行积存金按赎回价估值；普通现金期初为零。" />}
             <Form.Item
               name="opening_balance"
-              label="期初余额（新负债账户从零开始）"
+              label={creatingWealthCash ? '起始余额（元）' : '期初余额（新负债账户从零开始）'}
+              rules={creatingWealthCash ? [{ required: true, message: '请输入起始余额' }, { validator: (_, value: string) => { const amount = parseCents(value); return amount !== null && amount >= 0n && amount <= 999999999999n ? Promise.resolve() : Promise.reject(new Error('起始余额须为非负金额，最多两位小数')); } }] : []}
             >
               <Input
+                aria-label={creatingWealthCash ? '理财零钱起始余额' : '账户期初余额'}
                 placeholder="0.00"
                 inputMode="decimal"
                 disabled={
                   !!editing?.has_financial_history ||
-                  values?.type === 'liability' || values?.asset_class === 'fund' || values?.asset_class === 'gold'
+                  values?.type === 'liability' || values?.asset_class === 'fund' || values?.asset_class === 'gold' || values?.asset_class === 'wealth'
                 }
               />
             </Form.Item>
+            {creatingWealthCash && <>
+              <Form.Item name="wealth_product_id" label="关联理财产品" rules={[{ required: true, message: '请选择理财产品及份额' }]}>
+                <ResponsiveSelect sheetTitle="关联理财产品" aria-label="关联理财产品" active={open} showSearch optionFilterProp="label" placeholder="选择产品及份额" options={(products.data ?? []).map((p) => ({ value: p.id, label: `${p.name} · ${p.code}` }))} loading={products.isLoading} errorMessage={products.isError ? errMsg(products.error) : undefined} onRetry={() => void products.refetch()} />
+              </Form.Item>
+              <Form.Item name="wealth_start_date" label="起算基准日" rules={[{ required: true, message: '请选择基准日' }]}>
+                <DatePicker aria-label="理财零钱起算基准日" allowClear={false} disabledDate={(d) => d.isAfter(dayjs(), 'day')} style={{ width: '100%' }} />
+              </Form.Item>
+              <Alert type="info" showIcon title="起始余额按基准日结束时的已确认资金起算，下一日起随已披露净值自动记收益。" description="可直接用于日常收支，支出默认快速转出。" />
+            </>}
             <Form.Item noStyle shouldUpdate={(a, b) => a.type !== b.type}>
               {({ getFieldValue }) =>
                 getFieldValue('type') === 'liability' ? (

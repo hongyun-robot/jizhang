@@ -92,6 +92,8 @@ export function useTxnListInfinite(params: TxnListParams, startPage: number) {
 // ---------- 流水写操作（成功后失效流水/余额/统计缓存） ----------
 
 export interface TxnInput {
+  wealth_cash?: { account_id?: number; application_time?: string; transfer_mode?: 'quick' | 'ordinary'; confirmation_date?: string; rights_end_date?: string };
+  wealth_cash_timings?: NonNullable<TxnInput['wealth_cash']>[];
   kind: 'expense' | 'income' | 'transfer' | 'refund';
   amount: string;
   account_id: number;

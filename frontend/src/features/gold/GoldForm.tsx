@@ -1,3 +1,4 @@
+import { isCashAccount } from '../../domain/accounts';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, App, Button, Form, Input, Segmented } from 'antd';
 import dayjs from 'dayjs';
@@ -44,7 +45,7 @@ export default function GoldForm({ kind, open, active = true, account, amend = f
   }, [open, scope, account?.account.id, amend]);
   const selectedId = account?.account.id ?? d.account;
   const selected = account ?? gold.data?.find((row) => row.account.id === selectedId);
-  const cash = (accounts.data ?? []).filter((a) => a.type === 'asset' && (!a.asset_class || a.asset_class === 'cash') && a.status === 'active');
+  const cash = (accounts.data ?? []).filter((a) => isCashAccount(a) && a.status === 'active');
   const allowed = kind === 'opening' || canRecord(user?.role);
   const total = kind === 'opening' && d.costMode === 'unit' ? goldTotal(d.grams, d.amount) : d.amount;
   const perGram = kind === 'opening' && d.costMode === 'unit' ? d.amount : goldRatio(d.amount, d.grams);

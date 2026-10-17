@@ -1,5 +1,9 @@
 import type { Account } from '../api/types';
 
+export function isCashAccount(account: Pick<Account, 'type' | 'asset_class'>): boolean {
+  return account.type === 'asset' && (!account.asset_class || account.asset_class === 'cash' || account.asset_class === 'wealth_cash');
+}
+
 export function accountOptions(
   accounts: Account[] | undefined,
   options: {
@@ -12,7 +16,7 @@ export function accountOptions(
 ) {
   return (accounts ?? [])
     .filter((account) => {
-      if (account.type === 'asset' && account.asset_class && account.asset_class !== 'cash') return false;
+      if (account.type === 'asset' && !isCashAccount(account)) return false;
       if (options.assetOnly && account.type !== 'asset') return false;
       if (
         account.type === 'liability' &&

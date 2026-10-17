@@ -15,7 +15,11 @@ export type TxnPurpose =
   | 'fund_redemption'
   | 'fund_dividend'
   | 'gold_purchase'
-  | 'gold_redemption';
+  | 'gold_redemption'
+ | 'wealth_purchase'
+ | 'wealth_redemption'
+ | 'wealth_dividend'
+ | 'wealth_cash_yield';
 export type CategoryKind = 'expense' | 'income';
 export type PrincipalRemainder = 'first' | 'last';
 
@@ -23,8 +27,9 @@ export interface Account {
   id: number;
   name: string;
   type: AccountType;
-  asset_class?: 'cash' | 'fund' | 'gold';
-  valuation_status?: string;
+  asset_class?: 'cash' | 'fund' | 'gold' | 'wealth' | 'wealth_cash';
+  known_balance?: string;
+ valuation_status?: string;
   nav_date?: string;
   owner_id?: number | null;
   opening_balance: string;
@@ -61,7 +66,12 @@ export interface CategoryTreeNode extends Category {
 export type CategoryForest = CategoryTreeNode[];
 
 export interface Transaction {
-  gold_event_id?: number | null;
+  wealth_cash_yield_id?: number | null;
+  wealth_cash_flows?: WealthCashFlow[];
+  wealth_event_id?: number | null;
+ wealth_position_id?: number | null;
+ wealth_code?: string;
+ gold_event_id?: number | null;
   fund_event_id?: number | null;
   fund_position_id?: number | null;
   fund_code?: string;
@@ -83,7 +93,7 @@ export interface Transaction {
   note?: string;
   platform?: string;
   created_by: number;
-  source: 'manual' | 'recurring' | 'voucher_auto' | 'liability_auto';
+  source: 'manual' | 'recurring' | 'voucher_auto' | 'liability_auto' | 'wealth_auto';
   installment_plan_id?: number | null;
   liability_term_id?: number | null;
   liability_operation_id?: number | null;
@@ -95,6 +105,15 @@ export interface Transaction {
   expense_effect?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface WealthCashFlow {
+  txn_id: number;
+  account_id: number;
+  application_time: string;
+  transfer_mode: 'quick' | 'ordinary';
+  confirmation_date?: string;
+  rights_end_date?: string;
 }
 
 export interface TxnListResp {
@@ -187,10 +206,11 @@ export interface AssetAcct {
   name: string;
   type: AccountType;
   balance: string | null;
-  asset_class?: 'cash' | 'fund' | 'gold';
+  asset_class?: 'cash' | 'fund' | 'gold' | 'wealth' | 'wealth_cash';
   nav_date?: string;
 }
 export interface AssetPoint {
+ known_subtotal?: string;
   date: string;
   total: string | null;
   accounts: AssetAcct[];

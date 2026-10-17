@@ -1,5 +1,3 @@
-import GoldForm from '../features/gold/GoldForm';
-import { useScope } from '../api/keys';
 import SelectionScope from './SelectionScope';
 import DatePicker from './DatePicker';
 import AccountSelect from './AccountSelect';
@@ -9,7 +7,7 @@ import { useRef as submissionRef } from 'react';
 import CategoryPicker from './CategoryPicker';
 import { accountOptions as buildAccountOptions } from '../domain/accounts';
 import { amountError } from '../lib/money';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
   Alert,
@@ -37,6 +35,9 @@ import { useLiabilityDetail } from '../api/liability';
 import { plannedBills } from '../lib/liability';
 import { previewCents as cents, money } from '../lib/money';
 import { popupInParent } from '../lib/popup';
+import WealthCashYieldDialog from '../features/wealth/WealthCashYieldDialog';
+import WealthCashFlowFields from '../features/wealth/WealthCashFlowFields';
+import type { TxnInput } from '../api/transactions';
 
 const KIND_OPTIONS = [
   { value: 'expense', label: '支出' },
@@ -78,16 +79,18 @@ interface Props {
  * - 转账双账户且无分类；日期默认今天
  * - 退款可关联原支出（related_txn_id），累计超原支出时黄条提示、二次确认提交
  */
-export default function TxnFormModal({
+export default function TxnFormModal(props: Props) {
+  if (props.open && props.editing?.wealth_cash_yield_id) return <WealthCashYieldDialog id={props.editing.wealth_cash_yield_id} onClose={props.onClose} />;
+  return <OrdinaryTxnFormModal {...props} />;
+}
+
+function OrdinaryTxnFormModal({
   open,
   onClose,
   editing,
   refill,
 }: Props) {
   const submitGate = submissionRef(submissionGate());
-  const [goldMode, setGoldMode] = useState<'ordinary' | 'buy' | 'sell'>('ordinary');
-  const goldScope = useScope();
-  useEffect(() => { setGoldMode('ordinary'); }, [open, goldScope]);
   const [creatingAccount, setCreatingAccount] = useState(false);
   const editor = useEditorSession(
     open,
@@ -127,6 +130,9 @@ export default function TxnFormModal({
   const [date, setDate] = useState<Dayjs>(() => dayjs());
   const [note, setNote] = useState('');
   const [platform, setPlatform] = useState('');
+  const [cashFlows, setCashFlows] = useState<Record<number, NonNullable<TxnInput['wealth_cash']>>>({});
+  const setCashFlow = useCallback((value: TxnInput['wealth_cash']) => { if (value?.account_id) setCashFlows((old) => ({ ...old, [value.account_id!]: value })); }, []);
+  const cashWallets = (accounts.data ?? []).filter((a) => a.asset_class === 'wealth_cash' && (a.id === accountId || (kind === 'transfer' && a.id === transferId)));
   const [creatingPlatform, setCreatingPlatform] = useState(false);
   // 退款关联上下文：关联 id / 原支出金额 / 已退累计 / 超额二次确认
   const [relatedId, setRelatedId] = useState<number | undefined>();
@@ -273,6 +279,7 @@ export default function TxnFormModal({
         entry_date: date.format('YYYY-MM-DD'),
         note: note || undefined,
         platform: platform.trim(),
+        ...(cashWallets.length ? { wealth_cash_timings: cashWallets.flatMap((a) => cashFlows[a.id] ? [cashFlows[a.id]] : []) } : {}),
       };
       try {
         if (editing) {
@@ -348,7 +355,7 @@ export default function TxnFormModal({
               overflowY: 'auto',
             },
           }}
-          footer={goldMode !== 'ordinary' ? null : [
+          footer={[
             <Button key="cancel" onClick={close}>
               取消
             </Button>,
@@ -363,9 +370,7 @@ export default function TxnFormModal({
             </Button>,
           ]}
         >
-          {!editing && canRecord(user?.role) && <div className="gold-mode-picker"><Segmented block value={goldMode} options={[{ value: 'ordinary', label: '普通记账' }, { value: 'buy', label: '买入黄金' }, { value: 'sell', label: '卖出黄金' }]} onChange={(value) => setGoldMode(value as 'ordinary' | 'buy' | 'sell')} /></div>}
-          {!editing && <div hidden={goldMode === 'ordinary'}><GoldForm kind={goldMode === 'sell' ? 'sell' : 'buy'} open={open} active={goldMode !== 'ordinary'} onSaved={close} /></div>}
-          <div className="txn-form" style={{display: goldMode !== 'ordinary' ? 'none' : undefined}}>
+          <div className="txn-form">
             {/* body 顶部受控错误 Alert：提交未通过 validate() 时出现，修好后自动消失，Modal 不关闭 */}
             {fieldErr && (
               <Alert
@@ -573,6 +578,7 @@ export default function TxnFormModal({
             )}
 
             {/* 退款关联信息 + 超额黄条（累计可超原支出，仅提示需二次确认） */}
+            {cashWallets.map((wallet) => <div key={`${wallet.id}:${editing?.id ?? 'new'}:${open}`}>{cashWallets.length > 1 && <strong>{wallet.name}</strong>}<WealthCashFlowFields accountId={wallet.id} outgoing={wallet.id === accountId && (kind === 'expense' || kind === 'transfer')} refund={kind === 'refund'} existing={editing?.wealth_cash_flows?.find((f) => f.account_id === wallet.id)} entryDate={date.format('YYYY-MM-DD')} onChange={setCashFlow} /></div>)}
             {kind === 'refund' && relatedId && (
               <div className="refund-related">
                 已关联原支出 #{relatedId}
@@ -594,11 +600,12 @@ export default function TxnFormModal({
               )}
 
             <DatePicker
+              aria-label="流水发生日期"
               value={date}
               onChange={(v) => v && setDate(v)}
               style={{ width: '100%' }}
               allowClear={false}
-              getPopupContainer={popupInParent}
+              getPopupContainer={() => document.body}
             />
 
             <Input.TextArea

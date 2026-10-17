@@ -12,6 +12,7 @@ describe('financial views', () => {
       queryKeys.key('accounts', 1),
       queryKeys.key('budgets', 1),
       queryKeys.key('closings', 1, 'preview'),
+      queryKeys.key('wealth', 1, 'position', 10),
     ];
     for (const key of current) client.setQueryData(key, {});
     const previous = queryKeys.key('txns', 0, 'page=1');

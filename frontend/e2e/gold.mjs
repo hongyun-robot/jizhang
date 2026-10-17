@@ -59,15 +59,35 @@ await withFixture(base, async (browser) => {
   const curve = await admin.request('GET', `/stats/assets?start_date=${yesterday}&end_date=${day}`);
   check(curve.points[0].accounts.find((a) => a.account_id === historical.id).balance === null, 'today quote backfilled history');
 
-  // The actual purchase is registered inside the ordinary record modal.
+  // Ordinary recording retains its modes and draft; investments live on their own pages.
   await page.goto(base + '/'); await page.getByRole('button', { name: /快捷记账/ }).click();
   modal = page.getByRole('dialog', { name: '记一笔', exact: true });
-  await modal.getByText('买入黄金', { exact: true }).click();
-  let form = modal.locator('.gold-form:visible');
-  await form.getByRole('combobox').nth(0).click(); await page.locator('.ant-select-dropdown:visible').getByText(prefix, { exact: true }).click();
+  check(await modal.locator('.gold-form').count() === 0, 'ordinary modal embeds gold form');
+  for (const label of ['买入黄金', '卖出黄金', '理财申购', '理财赎回']) {
+    check(await modal.getByText(label, { exact: true }).count() === 0, 'ordinary modal exposes ' + label);
+  }
+  await modal.getByPlaceholder('0.00', { exact: true }).fill('12.34');
+  for (const label of ['支出', '收入', '转账', '退款', '支出']) {
+    await modal.getByText(label, { exact: true }).click();
+    check(await modal.getByPlaceholder('0.00', { exact: true }).inputValue() === '12.34', 'ordinary mode change discarded draft');
+  }
+  check(await modal.getByRole('button', { name: '购券：先付款，使用时计消费', exact: true }).count() === 1, 'voucher entry missing');
+  await shot(page, 'gold-ordinary-record');
+  await modal.getByRole('button', { name: /取\s*消/ }).click();
+  await page.goto(base + '/records');
+  await page.getByRole('button', { name: /记一笔/ }).click();
+  modal = page.getByRole('dialog', { name: '记一笔', exact: true });
+  check(await modal.locator('.gold-form').count() === 0, 'records modal embeds gold form');
+  check(await modal.getByText('买入黄金', { exact: true }).count() === 0, 'records modal exposes gold purchase');
+  check(await modal.getByText('卖出黄金', { exact: true }).count() === 0, 'records modal exposes gold sale');
+  await shot(page, 'gold-ordinary-records');
+  await modal.getByRole('button', { name: /取\s*消/ }).click();
+  await page.goto(base + `/gold/${id}`); await page.getByRole('button', { name: '买入黄金', exact: true }).click();
+  modal = page.getByRole('dialog', { name: '买入黄金', exact: true });
+  let form = modal.locator('.gold-form');
   await form.getByRole('textbox', { name: '黄金克数', exact: true }).fill('10');
   await form.getByRole('textbox', { name: '黄金实际金额', exact: true }).fill('9000');
-  await form.getByRole('combobox').nth(1).click(); await page.locator('.ant-select-dropdown:visible').getByText(prefix + '现金', { exact: true }).click();
+  await form.getByRole('combobox').first().click(); await page.locator('.ant-select-dropdown:visible').getByText(prefix + '现金', { exact: true }).click();
   const keys = []; let attempts = 0;
   await page.route(`**/api/v1/gold/accounts/${id}/events`, async (route) => {
     if (route.request().method() !== 'POST') return route.continue();

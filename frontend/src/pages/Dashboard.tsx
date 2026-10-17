@@ -68,7 +68,7 @@ export default function Dashboard() {
 
   const totalAssets = useMemo(
     () =>
-      sumMoney((accounts.data ?? []).map((account) => account.balance ?? '0')),
+      sumMoney((accounts.data ?? []).map((account) => account.balance ?? account.known_balance ?? '0')),
     [accounts.data]
   );
 
@@ -183,7 +183,7 @@ export default function Dashboard() {
               <div className="k">总资产</div>
               <div className="v">
                 {accounts.data ? (
-                  accounts.data.some((a) => (a.asset_class === 'fund' || a.asset_class === 'gold') && a.valuation_status === 'no_price') ? <span className="muted">报价不完整</span> : <Money value={totalAssets} animate />
+                  accounts.data.some((a) => (a.asset_class === 'fund' || a.asset_class === 'gold' || a.asset_class === 'wealth') && a.valuation_status === 'no_price') ? <span className="muted"><span>报价不完整</span> · 已知小计 <Money value={totalAssets} /></span> : <Money value={totalAssets} animate />
                 ) : (
                   <span className="muted">—</span>
                 )}
@@ -265,14 +265,14 @@ export default function Dashboard() {
                     role="button"
                     tabIndex={0}
                     onClick={() =>
-                      navigate(`/records${lastSearchOf('/records')}`, {
+                      t.wealth_position_id ? navigate(`/wealth-positions/${t.wealth_position_id}?event=${t.wealth_event_id}`) : navigate(`/records${lastSearchOf('/records')}`, {
                         state: { locateId: t.id },
                       })
                     }
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        navigate(`/records${lastSearchOf('/records')}`, {
+                        if(t.wealth_position_id) navigate(`/wealth-positions/${t.wealth_position_id}?event=${t.wealth_event_id}`); else navigate(`/records${lastSearchOf('/records')}`, {
                           state: { locateId: t.id },
                         });
                       }
@@ -281,7 +281,7 @@ export default function Dashboard() {
                     <span className="recent-note">
                         <LiabilityFeeTag transaction={t} />
                       {t.kind === 'transfer'
-                        ? `转账 ${acctName.get(t.account_id) ?? ''}→${acctName.get(t.transfer_account_id ?? 0) ?? ''}`
+                        ? `${t.wealth_event_id ? `${VOUCHER_PURPOSE_LABEL[t.purpose || 'regular'] || '理财资金'} · ${t.wealth_code || ''} · ` : ''}转账 ${acctName.get(t.account_id) ?? ''}→${acctName.get(t.transfer_account_id ?? 0) ?? ''}`
                         : `${t.purpose && VOUCHER_PURPOSE_LABEL[t.purpose] ? `${VOUCHER_PURPOSE_LABEL[t.purpose]} · ` : ''}${t.note || acctName.get(t.account_id) || '—'}`}
                     </span>
                     <Money

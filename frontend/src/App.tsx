@@ -13,6 +13,9 @@ const Records = lazy(() => import('./pages/Records'));
 const Stats = lazy(() => import('./pages/Stats'));
 const Mine = lazy(() => import('./pages/Mine'));
 const Accounts = lazy(() => import('./pages/Accounts'));
+const Wealth = lazy(() => import('./pages/Wealth'));
+const WealthCash = lazy(() => import('./pages/WealthCash'));
+const WealthPositionDetail = lazy(() => import('./pages/WealthPositionDetail'));
 const Gold = lazy(() => import('./pages/Gold'));
 const Funds = lazy(() => import('./pages/Funds'));
 const FundPositionDetail = lazy(() => import('./pages/FundPositionDetail'));
@@ -47,6 +50,10 @@ export default function App() {
             <Route path="/platforms" element={<Platforms />} />
             <Route path="/gold" element={<Gold />} />
             <Route path="/gold/:id" element={<Gold />} />
+            <Route path="/wealth" element={<Wealth />} />
+            <Route path="/wealth-cash/:id" element={<WealthCash />} />
+            <Route path="/wealth/:id" element={<Wealth />} />
+            <Route path="/wealth-positions/:id" element={<WealthPositionDetail />} />
             <Route path="/funds" element={<Funds />} />
             <Route path="/funds/:id" element={<Funds />} />
             <Route path="/fund-positions/:id" element={<FundPositionDetail />} />

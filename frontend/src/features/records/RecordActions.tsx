@@ -24,6 +24,7 @@ export default function RecordActions({
   const navigate = useNavigate();
   const canEdit = (transaction: Transaction) =>
     canModifyTransaction(user, transaction);
+  if (t.wealth_cash_yield_id) return <span className="row-actions"><Button type="link" size="small" onClick={() => navigate(`/wealth-cash/${t.account_id}`)}>理财零钱</Button>{user?.id === t.created_by && !t.historical_readonly && ['admin', 'recorder', 'member'].includes(user.role) && <Button type="link" size="small" onClick={() => openEdit(t)}>修改收益</Button>}</span>;
   return (
     <>
       {t.liability_account_id &&
@@ -54,7 +55,7 @@ export default function RecordActions({
         >
           查看负债记录
         </Button>
-      ) : t.gold_event_id ? <Button type="link" size="small" onClick={() => navigate(`/gold/${t.purpose === 'gold_purchase' ? t.transfer_account_id : t.account_id}?event=${t.gold_event_id}`)}>查看黄金</Button> : t.fund_position_id ? <Button type="link" size="small" onClick={() => navigate(`/fund-positions/${t.fund_position_id}`)}>查看基金</Button> : t.voucher_id ? (
+      ) : t.wealth_position_id ? <Button type="link" size="small" onClick={() => navigate(`/wealth-positions/${t.wealth_position_id}?event=${t.wealth_event_id}`)}>查看理财</Button> : t.gold_event_id ? <Button type="link" size="small" onClick={() => navigate(`/gold/${t.purpose === 'gold_purchase' ? t.transfer_account_id : t.account_id}?event=${t.gold_event_id}`)}>查看黄金</Button> : t.fund_position_id ? <Button type="link" size="small" onClick={() => navigate(`/fund-positions/${t.fund_position_id}`)}>查看基金</Button> : t.voucher_id ? (
         <Button
           type="link"
           size="small"

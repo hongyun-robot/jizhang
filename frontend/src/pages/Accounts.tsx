@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { App, Button, Card, Grid, Popconfirm, Table, Tag } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { isCashAccount } from '../domain/accounts';
 import { useNavigate } from 'react-router-dom';
 import { useAccounts, useAccountMutations, useReorderAccounts } from '../api/accounts';
 import { useLiabilityTypes } from '../api/liability';
@@ -40,7 +41,7 @@ export default function Accounts() {
 
   /** 负债欠款按红字“欠款”呈现；资产为负同样红字。 */
   const renderBalance = (a: Account) => {
-    if ((a.asset_class === 'fund' || a.asset_class === 'gold') && a.valuation_status === 'no_price') return <span className="muted">暂无法估值</span>;
+    if ((a.asset_class === 'fund' || a.asset_class === 'gold' || a.asset_class === 'wealth') && a.valuation_status === 'no_price') return <span className="muted">暂无法完整估值{a.known_balance && <> · 已知 <Money value={a.known_balance} /></>}</span>;
     const n = cents(a.balance ?? '0');
     if (n < 0n) {
       return (
@@ -61,7 +62,7 @@ export default function Accounts() {
       key: 'name',
       width: '38%',
       render: (name: string, a: Account) =>
-        a.asset_class === 'gold' ? <Button type="link" onClick={() => navigate(`/gold/${a.id}`)}>{name}</Button> : a.asset_class === 'fund' ? <Button type="link" onClick={() => navigate(`/funds/${a.id}`)}>{name}</Button> : a.type === 'liability' ? (
+        a.asset_class === 'wealth_cash' ? <Button type="link" onClick={() => navigate(`/wealth-cash/${a.id}`)}>{name}</Button> : a.asset_class === 'wealth' ? <Button type="link" onClick={() => navigate(`/wealth/${a.id}`)}>{name}</Button> : a.asset_class === 'gold' ? <Button type="link" onClick={() => navigate(`/gold/${a.id}`)}>{name}</Button> : a.asset_class === 'fund' ? <Button type="link" onClick={() => navigate(`/funds/${a.id}`)}>{name}</Button> : a.type === 'liability' ? (
           <>
             <Button
               type="link"
@@ -83,8 +84,8 @@ export default function Accounts() {
       dataIndex: 'type',
       key: 'type',
       width: '9%',
-      render: (t: AccountType) =>
-        t === 'asset' ? <Tag>资产</Tag> : <Tag color="volcano">负债</Tag>,
+      render: (t: AccountType, a: Account) =>
+        t === 'asset' ? <Tag>{a.asset_class === 'wealth_cash' ? '理财零钱' : '资产'}</Tag> : <Tag color="volcano">负债</Tag>,
     },
     {
       title: '余额',
@@ -118,6 +119,7 @@ export default function Accounts() {
           <Button type="link" size="small" disabled={blocked} onClick={() => openEdit(a)}>
             编辑
           </Button>
+          {isCashAccount(a) && <Button type="link" size="small" onClick={() => navigate(`/wealth-cash/${a.id}`)}>理财零钱</Button>}
           <Popconfirm
             title={`删除「${a.name}」？`}
             onConfirm={() => doDelete(a)}
@@ -177,11 +179,12 @@ export default function Accounts() {
                         color={a.type === 'liability' ? 'volcano' : undefined}
                         style={{ marginLeft: 8 }}
                       >
-                        {a.type === 'asset' ? '资产' : '负债'}
+                        {a.asset_class === 'wealth_cash' ? '理财零钱' : a.type === 'asset' ? '资产' : '负债'}
                       </Tag>
                       {a.status === 'disabled' && <Tag>停用</Tag>}
                     </div>
                     <div className="acct-meta">
+                      {isCashAccount(a) && <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); navigate(`/wealth-cash/${a.id}`); }}>{a.asset_class === 'wealth_cash' ? '理财零钱与收益' : '关联理财零钱'}</Button>}
                       {a.repayment_day ? `还款日 每月${a.repayment_day}日` : ''}
                       {a.type === 'liability' && (
                         <Button
@@ -195,7 +198,8 @@ export default function Accounts() {
                           账单与分期
                         </Button>
                       )}
-                      {a.asset_class === 'gold' && <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); navigate(`/gold/${a.id}`); }}>黄金持仓与盈亏</Button>}
+                      {a.asset_class === 'wealth' && <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); navigate(`/wealth/${a.id}`); }}>理财持仓与盈亏</Button>}
+ {a.asset_class === 'gold' && <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); navigate(`/gold/${a.id}`); }}>黄金持仓与盈亏</Button>}
                       {a.asset_class === 'fund' && <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); navigate(`/funds/${a.id}`); }}>持仓与盈亏</Button>}
                     </div>
                   </div>

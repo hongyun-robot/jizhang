@@ -1,3 +1,4 @@
+import { isCashAccount } from '../../domain/accounts';
 import { useEffect, useRef, useState } from 'react';
 import { App, Alert, Button, Checkbox, Form, Input, Modal, Space, Switch } from 'antd';
 import dayjs from 'dayjs';
@@ -109,7 +110,7 @@ export default function FundForm({ accountId, position, kind, amend = false, set
         {hasCash && <>
           {kind !== 'settlement' && <Form.Item name="cash_date" label={kind === 'buy' ? '实际付款日期' : '实际到账日期'} rules={[{ required: true }]}><DateInput /></Form.Item>}
           <Form.Item name="cash_account_id" label={kind === 'buy' ? '付款账户' : '到账账户'} rules={[{ required: true, message: '请选择本人现金资产账户' }]}>
-            <AccountSelect assetOnly sheetTitle="本人现金资产账户" active options={(accounts.data ?? []).filter((a) => a.type === 'asset' && (!a.asset_class || a.asset_class === 'cash') && a.status === 'active').map((a) => ({ value: a.id, label: a.name }))} onCreatingChange={setCreating} loading={accounts.isLoading} errorMessage={accounts.isError ? errMsg(accounts.error) : undefined} onRetry={() => void accounts.refetch()} />
+            <AccountSelect assetOnly sheetTitle="本人现金资产账户" active options={(accounts.data ?? []).filter((a) => isCashAccount(a) && a.status === 'active').map((a) => ({ value: a.id, label: a.name }))} onCreatingChange={setCreating} loading={accounts.isLoading} errorMessage={accounts.isError ? errMsg(accounts.error) : undefined} onRetry={() => void accounts.refetch()} />
           </Form.Item>
         </>}
         {values?.settled === false && (kind === 'redeem' || kind === 'cash_dividend') && <Alert type="info" title="保留为待结算资产" description="实际到账后，在事件记录中登记到账日期和账户，资金只转入一次。" />}

@@ -18,7 +18,7 @@ export function canVisit(pathname: string, role?: Role): boolean {
   return true;
 }
 export function activeKey(pathname: string): string {
-  if (['/vouchers', '/liabilities', '/accounts', '/categories', '/platforms', '/funds', '/fund-positions', '/gold'].some((path) => pathname.startsWith(path)))
+  if (['/vouchers', '/liabilities', '/accounts', '/categories', '/platforms', '/funds', '/fund-positions', '/gold', '/wealth', '/wealth-positions'].some((path) => pathname.startsWith(path)))
     return 'mine';
   if (pathname === '/') return 'dash';
   return (

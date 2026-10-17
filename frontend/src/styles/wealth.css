@@ -1,0 +1,31 @@
+.wealth-account-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; }
+.wealth-account-heading, .wealth-position-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.wealth-position-heading .ant-btn-link, .wealth-account-heading .ant-btn-link { padding-inline: 0; height: auto; white-space: normal; text-align: left; font-size: 17px; }
+.wealth-overview { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 24px; align-items: start; padding: 24px; margin-bottom: 16px; }
+.wealth-primary-amount { font-size: clamp(24px, 3.2vw, 38px); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.wealth-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; padding-block: 16px; }
+.wealth-values > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.wealth-position-list, .wealth-event-list { display: grid; gap: 14px; }
+.wealth-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-block: 16px; }
+.wealth-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; margin-top: 16px; }
+.wealth-search-results { margin-bottom: 16px; }
+.wealth-event-row { padding: 16px; }
+.wealth-event-row.is-located { outline: 2px solid #0d7c70; outline-offset: 2px; }
+.wealth-event-row > .ant-space { margin-top: 12px; }
+.wealth-cash-form { display: grid; gap: 16px; margin-block: 16px; }
+.wealth-cash-form label { display: grid; gap: 6px; min-width: 0; }
+.wealth-cash-form .ant-select, .wealth-cash-form .ant-picker { width: 100%; min-width: 0; }
+.wealth-cash-actions { margin-top: 16px; }
+.wealth-cash-yields { display: grid; }
+.wealth-cash-yield { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; border-bottom: 1px solid var(--border, #e7e6e2); }
+.wealth-cash-yield > div { min-width: 0; overflow-wrap: anywhere; }
+.wealth-cash-yield > div:nth-child(2) { text-align: right; margin-left: auto; }
+.wealth-cash-yield:last-child { border-bottom: 0; }
+@media (max-width: 767px) {
+  .wealth-overview { grid-template-columns: 1fr 1fr; gap: 18px; padding: 18px; }
+  .wealth-overview > div:first-child { grid-column: 1 / -1; }
+  .wealth-values { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .wealth-form-grid { grid-template-columns: 1fr; }
+  .wealth-toolbar { align-items: flex-start; }
+  .wealth-position-row .ant-card-body { padding: 16px; }
+}

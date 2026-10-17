@@ -365,7 +365,7 @@ export default function Stats() {
                 ])}
               />
               <div className="muted small">
-                期末总资产 {assets.data?.ending_total == null ? '报价不完整，暂无法完整估值' : <Money value={assets.data.ending_total} />}
+                期末总资产 {assets.data?.ending_total == null ? <>估值不完整，已知小计 <Money value={assets.data?.points.at(-1)?.known_subtotal || '0'} /></> : <Money value={assets.data.ending_total} />}
               </div>
             </>
           </QueryState>

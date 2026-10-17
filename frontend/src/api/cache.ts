@@ -14,9 +14,11 @@ const views = {
     'voucher-platforms',
     'funds',
     'gold',
+    'wealth',
   ],
-  account: ['accounts', 'liabilities', 'stats', 'notifications', 'gold'],
+  account: ['accounts', 'liabilities', 'stats', 'notifications', 'gold', 'wealth'],
   gold: ['gold', 'accounts', 'stats', 'txns', 'notifications'],
+  wealth: ['wealth', 'accounts', 'stats', 'txns', 'notifications'],
   fund: ['funds', 'accounts', 'stats', 'txns', 'notifications'],
   category: [
     'categories',
@@ -27,7 +29,7 @@ const views = {
     'vouchers',
     'liabilities',
   ],
-  closing: ['closings', 'audit', 'txns', 'stats', 'budgets', 'notifications', 'gold'],
+  closing: ['closings', 'audit', 'txns', 'stats', 'budgets', 'notifications', 'gold', 'wealth'],
 };
 
 export async function invalidateFinancialViews(
