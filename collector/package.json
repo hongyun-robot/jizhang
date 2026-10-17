@@ -1,0 +1,15 @@
+{
+  "name": "jizhang-wealth-collector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test *.test.mjs",
+    "smoke": "node smoke.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  },
+  "engines": { "node": ">=22" }
+}

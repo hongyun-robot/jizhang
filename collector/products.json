@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "products": [
+    {
+      "issuer": "suyin",
+      "adapter": "suyin",
+      "code": "J07241",
+      "name": "苏银理财恒源日申周赎1号A",
+      "registration_code": "Z7003125000238",
+      "currency": "CNY",
+      "valuation_basis": "cny_wealth_unit_nav",
+      "page_url": "https://www.suyinwealth.com/lccs/cpxq/J07241",
+      "source_code": "Y0408Ux",
+      "inception_date": "2025-08-29",
+      "order_policy": "zhoulibao_20250402"
+    },
+    {
+      "issuer": "cmbcwm",
+      "adapter": "cmbcwm",
+      "code": "FBAE68020E",
+      "name": "民生理财贵竹固收增利天天盈9号理财产品E",
+      "registration_code": "Z7007923000092",
+      "currency": "CNY",
+      "valuation_basis": "cny_wealth_unit_nav",
+      "page_url": "https://www.cmbcwm.com.cn/cmbcwm/grlc/cpxq/index.html?code=FBAE68020E",
+      "source_code": "FBAE68020E",
+      "inception_date": "2023-06-20",
+      "order_policy": "confirmed_facts",
+      "default_cash_policy": "yulibao_20250715"
+    }
+  ]
+}
