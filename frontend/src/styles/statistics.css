@@ -12,9 +12,15 @@
 }
 
 .share-total {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
   font-size: 13px;
   margin-bottom: 6px;
   color: var(--muted);
+}
+.share-total > span {
+  white-space: nowrap;
 }
 .share-total .money {
   font-weight: 600;

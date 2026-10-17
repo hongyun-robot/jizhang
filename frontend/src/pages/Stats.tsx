@@ -27,6 +27,7 @@ import EChart from '../components/EChart';
 import QueryState, { QueryBoundary } from '../components/QueryState';
 import Money, { fmtMoney } from '../components/Money';
 import PeriodPicker, { presetRange } from '../components/PeriodPicker';
+import { sumMoney } from '../lib/money';
 
 function pct(p: number | null): { text: string; cls: string } {
   if (p === null) return { text: '—', cls: 'pct-flat' };
@@ -52,6 +53,7 @@ export default function Stats() {
   const [range, setRange] = useState<DateRange>(() => presetRange('thisMonth'));
   const [gran, setGran] = useState<'day' | 'week' | 'month'>('day');
   const [shareKind, setShareKind] = useState<'expense' | 'income'>('expense');
+  const [shareSelection, setShareSelection] = useState<Record<string, boolean>>({});
   const [year, setYear] = useState<number>(() => dayjs().year());
 
   const category = useStatsCategory(range);
@@ -75,6 +77,15 @@ export default function Stats() {
 
   const share =
     shareKind === 'expense' ? category.data?.expense : category.data?.income;
+  // 非正净额默认不绘制，只有可绘制分类被取消选择才显示筛选合计。
+  const hasHiddenCategories = share?.items.some(
+    (item) => Number(item.amount) > 0 && shareSelection[item.name] === false
+  );
+  const selectedTotal = sumMoney(
+    (share?.items ?? [])
+      .filter((item) => shareSelection[item.name] !== false)
+      .map((item) => item.amount)
+  );
   const chartStyle = {
     dark,
     isMobile,
@@ -87,7 +98,7 @@ export default function Stats() {
   };
   const pieOption = useMemo(
     () => pieOptions(share, chartStyle),
-    [share, dark, isMobile]
+    [share, dark, isMobile, shareKind, range.start, range.end]
   );
   const trendOption = useMemo(
     () => trendOptions(trend.data, chartStyle),
@@ -149,13 +160,19 @@ export default function Stats() {
             skeleton={<Spin />}
           >
             <>
-              <div className="share-total">
-                合计 <Money value={share?.total} tone={shareKind} />
+              <div className="share-total" aria-live="polite" aria-atomic="true">
+                <span>合计 <Money value={share?.total} tone={shareKind} /></span>
+                {hasHiddenCategories && (
+                  <span>
+                    当前显示合计 <Money value={selectedTotal} tone={shareKind} />
+                  </span>
+                )}
               </div>
               <EChart
                 option={pieOption}
                 height={260}
-                ariaLabel={`${shareKind === 'expense' ? '支出' : '收入'}分类占比，合计 ${fmtMoney(share?.total)}`}
+                ariaLabel={`${shareKind === 'expense' ? '支出' : '收入'}分类占比，合计 ${fmtMoney(share?.total)}${hasHiddenCategories ? `，当前显示合计 ${fmtMoney(selectedTotal)}` : ''}`}
+                onLegendSelectionChange={setShareSelection}
               />
               <ChartDataTable
                 label="查看数据表"

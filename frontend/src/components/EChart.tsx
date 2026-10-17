@@ -18,6 +18,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import type { EChartsOption } from 'echarts';
 
 import { useResolvedTheme } from '../stores/theme';
+import { isRecord } from '../lib/json';
 echarts.use([
   BarChart,
   LineChart,
@@ -39,11 +40,14 @@ export default function EChart({
   option,
   height = 280,
   ariaLabel,
+  onLegendSelectionChange,
 }: {
   option: EChartsOption;
   height?: number;
   /** 无障碍标签：调用方给业务语义（如「本月支出分类占比」）；缺省从 option 摘要生成 */
   ariaLabel?: string;
+  /** 图例选择状态；应用新 option 重置图表时也同步通知。 */
+  onLegendSelectionChange?: (selected: Record<string, boolean>) => void;
 }) {
   const domRef = useRef<HTMLDivElement>(null);
   const instRef = useRef<echarts.ECharts | null>(null);
@@ -69,8 +73,25 @@ export default function EChart({
   );
 
   useEffect(() => {
-    instRef.current?.setOption(themed, true);
-  }, [themed]);
+    const chart = instRef.current;
+    if (!chart) return;
+    chart.setOption(themed, true);
+    if (!onLegendSelectionChange) return;
+
+    const legend = Array.isArray(themed.legend) ? themed.legend[0] : themed.legend;
+    onLegendSelectionChange(legend?.selected ?? {});
+    const onSelect = (event: unknown) => {
+      if (!isRecord(event) || !isRecord(event.selected)) return;
+      const selected = Object.fromEntries(
+        Object.entries(event.selected).map(([name, value]) => [name, value !== false])
+      );
+      onLegendSelectionChange(selected);
+    };
+    chart.on('legendselectchanged', onSelect);
+    return () => {
+      chart.off('legendselectchanged', onSelect);
+    };
+  }, [themed, onLegendSelectionChange]);
 
   const autoLabel = useMemo(() => describeOption(option), [option]);
 
