@@ -16,7 +16,13 @@
 .sort-handle:hover, .sort-handle:focus-visible { color: var(--text); background: var(--bg); }
 .sort-handle:active { cursor: grabbing; }
 .sort-handle:disabled { opacity: .35; cursor: default; }
-[data-dragging] { position: relative; z-index: 1100; box-shadow: var(--shadow-2); }
+[data-dragging] { position: relative; z-index: 1100; box-shadow: var(--shadow-2); background: var(--panel); }
+.txn-list.is-sorting { overflow: visible; }
+@media (max-width: 767px) {
+  .txn-row[data-order-id] { gap: 6px; padding-left: 6px; flex-wrap: wrap; }
+  .txn-row[data-order-id] .txn-main { flex-basis: calc(100% - 50px); }
+  .txn-row[data-order-id] .txn-actions { width: 100%; padding-left: 50px; }
+}
 .order-status { margin-bottom: 12px; font-size: 12px; }
 .order-status.ant-alert { flex-wrap: wrap; gap: 8px; }
 .cat-root-trigger { width: 100%; text-align: left; border: 0; padding: 4px 0; color: inherit; background: transparent; cursor: pointer; }

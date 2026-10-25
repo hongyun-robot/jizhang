@@ -16,12 +16,12 @@ import { queryKeys, useScope } from './keys';
 
 /** 序列化流水查询参数（供 react-query key 稳定）。 */
 export function txnQueryUrl(p: TxnListParams): string {
-  return `/transactions${qs(txnQueryParams(p))}`;
+  return `/transactions${qs({ ...txnQueryParams(p), order: 'custom' })}`;
 }
 
 /** 导出当前筛选流水为 CSV（任务 11.2）：与列表同参但不分页，BOM 由后端产出。 */
 export async function exportTxns(p: TxnListParams): Promise<void> {
-  const url = `/transactions/export${qs(txnQueryParams(p, true))}`;
+  const url = `/transactions/export${qs({ ...txnQueryParams(p, true), order: 'custom' })}`;
   const res = await api.get(url, { responseType: 'blob', timeout: 30000 });
   const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });
   const cd = String(res.headers['content-disposition'] ?? '');

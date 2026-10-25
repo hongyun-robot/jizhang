@@ -8,6 +8,7 @@ import LiabilityFeeTag from '../../components/LiabilityFeeTag';
 import { VOUCHER_PURPOSE_LABEL } from '../../labels';
 import { cents, formatMoney } from '../../lib/money';
 import { amountOf, tone, kindTag } from './display';
+import { SortableHandle, SortableItem } from '../../components/sorting/SortableCollection';
 
 interface Presentation {
   acctName: ReadonlyMap<number, string>;
@@ -22,6 +23,12 @@ export function recordColumns({
   locateRefunds,
 }: Presentation) {
   return [
+    {
+      title: '',
+      key: 'sort',
+      width: 48,
+      render: (_: unknown, t: Transaction) => <SortableHandle name={`${dayjs(t.entry_date).format('YYYY-MM-DD')} ${t.note || acctName.get(t.account_id) || '流水'}`} />,
+    },
     {
       title: '日期',
       dataIndex: 'entry_date',
@@ -125,7 +132,8 @@ export function RecordRows({
   return (
     <>
       {items.map((t) => (
-        <div className="txn-row" key={t.id} data-txn-id={t.id}>
+        <SortableItem id={t.id} className="txn-row" key={t.id} data-txn-id={t.id}>
+          <SortableHandle name={`${dayjs(t.entry_date).format('YYYY-MM-DD')} ${t.note || acctName.get(t.account_id) || '流水'}`} />
           <div className="txn-main">
             <div className="txn-title">
               <span className="txn-cat">
@@ -179,7 +187,7 @@ export function RecordRows({
             )}
           </div>
           <div className="txn-actions">{actions(t)}</div>
-        </div>
+        </SortableItem>
       ))}
     </>
   );

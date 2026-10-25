@@ -137,3 +137,11 @@
 .txn-row:nth-child(n + 7) {
   animation-delay: 390ms;
 }
+
+/* Drag feedback moves sortable rows back into the list on drop. Replaying
+   their entrance animation makes an already visible row disappear. Keep
+   sorting transitions and the explicit navigation highlight instead. */
+.recent-row[data-order-id],
+.txn-row[data-order-id]:not(.flash) {
+  animation: none;
+}

@@ -6,6 +6,28 @@ import { orderItems, type OrderInput, type OrderResult } from '../lib/ordering';
 import type { Account, CategoryForest, CategoryKind, VoucherPlatform } from './types';
 
 type Directory = 'accounts' | 'categories' | 'voucher-platforms';
+
+export function useTxnReorder() {
+  const epoch = useScope();
+  const client = useQueryClient();
+  const key = ['transaction-reorder', epoch] as const;
+  const mutation = useMutation({
+    mutationKey: key,
+    retry: false,
+    mutationFn: async (input: OrderInput) => {
+      if (epoch !== useAuth.getState().epoch) throw new Error('会话已结束');
+      await client.cancelQueries({ queryKey: queryKeys.root('transactions', epoch) });
+      const options = { method: 'put', data: input, _epoch: epoch };
+      return requestJson<OrderResult>('/transactions/reorder', options);
+    },
+    onSuccess: async () => {
+      if (epoch !== useAuth.getState().epoch) return;
+      await client.invalidateQueries({ queryKey: queryKeys.root('transactions', epoch) });
+    },
+  });
+  return { ...mutation, directoryBusy: useIsMutating({ mutationKey: key }) > 0 };
+}
+
 export function useCatalogReorder(resource: Directory, category?: { kind: CategoryKind; parent_id: number | null }) {
   const epoch = useScope();
   const client = useQueryClient();

@@ -3,11 +3,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Grid, Skeleton } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 
 import { useAccounts } from '../api/accounts';
 import { useBudgets } from '../api/budgets';
 import { useStatsCompare } from '../api/statistics';
 import { useTxnList } from '../api/transactions';
+import { useTxnReorder } from '../api/ordering';
+import { useCatalogOrder } from '../hooks/useCatalogOrder';
+import { OrderStatus, SortableCollection, SortableHandle, SortableItem } from '../components/sorting/SortableCollection';
 import { useVouchers } from '../api/vouchers';
 import type { Transaction } from '../api/types';
 import { ROLE_LABEL, VOUCHER_PURPOSE_LABEL } from '../labels';
@@ -62,6 +66,8 @@ export default function Dashboard() {
   const compare = useStatsCompare(null);
   const accounts = useAccounts();
   const recent = useTxnList({ page: 1, page_size: 10 });
+  const reorder = useTxnReorder();
+  const order = useCatalogOrder(recent.data?.items ?? [], 'transactions:recent', reorder.mutateAsync, recent.refetch);
   const budgets = useBudgets(); // 当前账期预算（后端推 period_key）
   const vouchers = useVouchers({ page_size: 1 });
 
@@ -229,7 +235,7 @@ export default function Dashboard() {
           </QueryBoundary>
         </Card>
 
-        {/* 最近 10 笔（归属日期倒序） */}
+        {/* 最近流水采用本人保存的展示顺序；未排序时按归属日期倒序。 */}
         <Card
           size="small"
           className="panel"
@@ -256,50 +262,53 @@ export default function Dashboard() {
                 <Skeleton active paragraph={{ rows: 5 }} title={false} />
               }
             >
-              <>
-                {(recent.data?.items ?? []).map((t: Transaction) => (
-                  <div
-                    className="recent-row clickable"
+              <SortableCollection ids={order.ids} disabled={order.busy || reorder.directoryBusy || recent.isFetching || recent.isPlaceholderData} onOrder={order.commit}>
+                {order.rows.length > 1 && <OrderStatus {...order} retry={order.retry} />}
+                {order.rows.map((t: Transaction) => (
+                  <SortableItem
+                    id={t.id}
+                    className="recent-row"
                     key={t.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() =>
-                      t.wealth_position_id ? navigate(`/wealth-positions/${t.wealth_position_id}?event=${t.wealth_event_id}`) : navigate(`/records${lastSearchOf('/records')}`, {
-                        state: { locateId: t.id },
-                      })
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        if(t.wealth_position_id) navigate(`/wealth-positions/${t.wealth_position_id}?event=${t.wealth_event_id}`); else navigate(`/records${lastSearchOf('/records')}`, {
-                          state: { locateId: t.id },
-                        });
-                      }
-                    }}
                   >
-                    <span className="recent-note">
-                        <LiabilityFeeTag transaction={t} />
-                      {t.kind === 'transfer'
-                        ? `${t.wealth_event_id ? `${VOUCHER_PURPOSE_LABEL[t.purpose || 'regular'] || '理财资金'} · ${t.wealth_code || ''} · ` : ''}转账 ${acctName.get(t.account_id) ?? ''}→${acctName.get(t.transfer_account_id ?? 0) ?? ''}`
-                        : `${t.purpose && VOUCHER_PURPOSE_LABEL[t.purpose] ? `${VOUCHER_PURPOSE_LABEL[t.purpose]} · ` : ''}${t.note || acctName.get(t.account_id) || '—'}`}
-                    </span>
-                    <Money
-                      value={
-                        t.kind === 'income' || t.kind === 'refund'
-                          ? t.amount
-                          : `-${t.amount}`
+                    <SortableHandle name={`${dayjs(t.entry_date).format('YYYY-MM-DD')} ${t.note || acctName.get(t.account_id) || '流水'}`} />
+                    <button
+                      type="button"
+                      className="recent-content"
+                      onClick={() =>
+                        t.wealth_position_id ? navigate(`/wealth-positions/${t.wealth_position_id}?event=${t.wealth_event_id}`) : navigate(`/records${lastSearchOf('/records')}`, {
+                          state: { locateId: t.id },
+                        })
                       }
-                      tone={
-                        t.kind === 'income' || t.kind === 'refund'
-                          ? 'income'
-                          : t.kind === 'expense'
-                            ? 'expense'
-                            : 'plain'
-                      }
-                    />
-                  </div>
+                    >
+                      <span className="recent-description">
+                        <span className="recent-note">
+                          <LiabilityFeeTag transaction={t} />
+                          {t.kind === 'transfer'
+                            ? `${t.wealth_event_id ? `${VOUCHER_PURPOSE_LABEL[t.purpose || 'regular'] || '理财资金'} · ${t.wealth_code || ''} · ` : ''}转账 ${acctName.get(t.account_id) ?? ''}→${acctName.get(t.transfer_account_id ?? 0) ?? ''}`
+                            : `${t.purpose && VOUCHER_PURPOSE_LABEL[t.purpose] ? `${VOUCHER_PURPOSE_LABEL[t.purpose]} · ` : ''}${t.note || acctName.get(t.account_id) || '—'}`}
+                        </span>
+                        <time className="recent-date" dateTime={dayjs(t.entry_date).format('YYYY-MM-DD')}>
+                          {dayjs(t.entry_date).format('YYYY-MM-DD')}
+                        </time>
+                      </span>
+                      <Money
+                        value={
+                          t.kind === 'income' || t.kind === 'refund'
+                            ? t.amount
+                            : `-${t.amount}`
+                        }
+                        tone={
+                          t.kind === 'income' || t.kind === 'refund'
+                            ? 'income'
+                            : t.kind === 'expense'
+                              ? 'expense'
+                              : 'plain'
+                        }
+                      />
+                    </button>
+                  </SortableItem>
                 ))}
-              </>
+              </SortableCollection>
             </QueryState>
           </div>
         </Card>

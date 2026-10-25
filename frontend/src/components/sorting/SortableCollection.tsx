@@ -1,5 +1,6 @@
 import { createContext, createElement, useContext, useEffect, useRef, useState, type HTMLAttributes, type ReactNode, type RefObject } from 'react';
 import { Alert, Button } from 'antd';
+import { flushSync } from 'react-dom';
 import { HolderOutlined } from '@ant-design/icons';
 import { Accessibility, KeyboardSensor, PointerActivationConstraints, PointerSensor, Scroller, type DragEndEvent } from '@dnd-kit/dom';
 import { DragDropProvider, useDragDropManager } from '@dnd-kit/react';
@@ -59,7 +60,11 @@ export function SortableCollection({ ids, disabled = false, onOrder, onDraggingC
             // The moved row occupies its new slot; excluding it from collision targets
             // can leave target=null even for a valid drop inside the same collection.
             const inside = area && point.x >= area.left && point.x <= area.right && point.y >= area.top && point.y <= area.bottom;
-            if (event.operation.target || inside || event.operation.activatorEvent instanceof KeyboardEvent) onOrder(moveItem(ids, source.initialIndex, source.index));
+            if (event.operation.target || inside || event.operation.activatorEvent instanceof KeyboardEvent) {
+              // Commit the preview before a fast failed save can restore it. The
+              // sorting plugin already moved DOM nodes outside React's tree.
+              flushSync(() => onOrder(moveItem(ids, source.initialIndex, source.index)));
+            }
           }
           dragged.current = undefined;
           setTimeout(() => onDraggingChange?.(false), 0);

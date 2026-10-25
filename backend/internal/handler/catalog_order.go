@@ -13,7 +13,7 @@ func respondOrder(c *gin.Context, out *service.CatalogOrderResult, err error) {
 	case err == nil:
 		response.OK(c, out)
 	case errors.Is(err, service.ErrTxnForbidden):
-		response.Forbidden(c, "只能排序自己的目录")
+		response.Forbidden(c, "只能排序本人可见的条目")
 	case errors.Is(err, service.ErrOrderInvalid):
 		response.Invalid(c, err.Error())
 	case errors.Is(err, service.ErrOrderNotFound):
@@ -23,6 +23,19 @@ func respondOrder(c *gin.Context, out *service.CatalogOrderResult, err error) {
 	default:
 		response.Internal(c, "排序保存失败")
 	}
+}
+
+func (h *txnHandler) Reorder(c *gin.Context) {
+	var request struct {
+		service.CatalogOrderInput
+		RequestKey string `json:"request_key" binding:"required,max=128"`
+	}
+	if c.ShouldBindJSON(&request) != nil {
+		response.Invalid(c, service.ErrOrderInvalid.Error())
+		return
+	}
+	out, err := h.svc.Reorder(middleware.CurrentUser(c), request.CatalogOrderInput, request.RequestKey)
+	respondOrder(c, out, err)
 }
 func (h *categoryHandler) Reorder(c *gin.Context) {
 	var in service.CategoryOrderInput

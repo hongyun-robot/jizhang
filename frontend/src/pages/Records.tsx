@@ -32,7 +32,10 @@ import {
 } from '@ant-design/icons';
 
 import { errMsg } from '../api/client';
-import { exportTxns, useDeleteTxn } from '../api/transactions';
+import { exportTxns, txnQueryUrl, useDeleteTxn } from '../api/transactions';
+import { useTxnReorder } from '../api/ordering';
+import { useCatalogOrder } from '../hooks/useCatalogOrder';
+import { OrderStatus, SortableCollection, SortableTableRow } from '../components/sorting/SortableCollection';
 import { useAccounts } from '../api/accounts';
 import { useCategoryForest } from '../api/categories';
 import type { Transaction } from '../api/types';
@@ -70,6 +73,11 @@ export default function Records() {
     loadNext,
     clearFilters,
   } = useRecordsState();
+  const reorder = useTxnReorder();
+  const order = useCatalogOrder(items, `transactions:${txnQueryUrl(exportParams)}:${list.data?.pageParams[0]}`, reorder.mutateAsync, list.refetch);
+  const [dragging, setDragging] = useState(false);
+  const sorting = dragging || order.busy || reorder.directoryBusy;
+  const refreshing = list.isRefetching && !sorting;
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [refill, setRefill] = useState<TxnRefill | null>(null);
@@ -108,7 +116,7 @@ export default function Records() {
     onTouchMove,
     onTouchEnd,
     onTouchCancel,
-  } = useListGestures(isMobile, list, loadNext);
+  } = useListGestures(isMobile && !sorting, list, loadNext);
 
   const openCreate = () => {
     setEditing(null);
@@ -173,7 +181,7 @@ export default function Records() {
       transaction={transaction}
       user={user}
       accountTypes={accountTypes}
-      pending={delTxn.isPending}
+      pending={delTxn.isPending || sorting}
       onEdit={openEdit}
       onRefund={openRefund}
       onDelete={doDelete}
@@ -267,91 +275,95 @@ export default function Records() {
         </Drawer>
       </SelectionScope>
 
-      {isMobile ? (
-        <div
-          className="txn-list"
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onTouchCancel={onTouchCancel}
-        >
-          {/* 下拉刷新指示器：只动 transform，状态由 pull/isRefetching 驱动 */}
+      <SortableCollection ids={order.ids} disabled={order.busy || reorder.directoryBusy || list.isFetching || list.isPlaceholderData || delTxn.isPending || formOpen || filterOpen} onOrder={order.commit} onDraggingChange={setDragging}>
+        {order.rows.length > 1 && <OrderStatus {...order} retry={order.retry} />}
+        {isMobile ? (
           <div
-            className="ptr-indicator"
-            style={{
-              transform: `translateY(${list.isRefetching ? 0 : Math.min(pull, PTR_H) - PTR_H}px)`,
-            }}
+            className={`txn-list${dragging ? ' is-sorting' : ''}`}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onTouchCancel={onTouchCancel}
           >
-            {list.isRefetching
-              ? '刷新中…'
-              : pull >= PTR_TRIGGER
-                ? '松开刷新'
-                : '下拉刷新'}
-          </div>
-          {/* 错误态单列：请求失败不得渲染成「暂无数据」空态（specs/ui-shell 数据加载错误态） */}
-          {list.isError && !list.data ? (
-            <QueryState
-              error={list.error}
-              onRetry={() => void list.refetch()}
-            />
-          ) : !list.data && !list.isError ? (
-            <div className="txn-skeleton">
-              <Skeleton active paragraph={{ rows: 5 }} title={false} />
+            {/* 下拉刷新指示器：只动 transform，状态由 pull/isRefetching 驱动 */}
+            <div
+              className="ptr-indicator"
+              style={{
+                transform: `translateY(${refreshing ? 0 : Math.min(pull, PTR_H) - PTR_H}px)`,
+              }}
+            >
+              {refreshing
+                ? '刷新中…'
+                : pull >= PTR_TRIGGER
+                  ? '松开刷新'
+                  : '下拉刷新'}
             </div>
-          ) : (
-            <RecordRows
-              items={items}
-              acctName={acctName}
-              catInfo={catInfo}
-              actions={actions}
-              locateRefunds={locateRefunds}
-            />
-          )}
-          {!list.isLoading && !list.isError && items.length === 0 && (
-            <div className="list-empty">
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="暂无数据"
+            {/* 错误态单列：请求失败不得渲染成「暂无数据」空态（specs/ui-shell 数据加载错误态） */}
+            {list.isError && !list.data ? (
+              <QueryState
+                error={list.error}
+                onRetry={() => void list.refetch()}
               />
-            </div>
-          )}
-          {/* 上拉加载：进行中指示 + 底部哨兵（IntersectionObserver 触发 fetchNextPage） */}
-          {list.isFetchingNextPage && (
-            <div className="load-more" role="status">
-              加载中…
-            </div>
-          )}
-          <div
-            className="load-sentinel"
-            ref={sentinelRef}
-            style={{ display: list.hasNextPage ? undefined : 'none' }}
-          />
-        </div>
-      ) : (
-        <div className="panel">
-          {list.isError && !list.data ? (
-            <QueryState
-              error={list.error}
-              onRetry={() => void list.refetch()}
+            ) : !list.data && !list.isError ? (
+              <div className="txn-skeleton">
+                <Skeleton active paragraph={{ rows: 5 }} title={false} />
+              </div>
+            ) : (
+              <RecordRows
+                items={order.rows}
+                acctName={acctName}
+                catInfo={catInfo}
+                actions={actions}
+                locateRefunds={locateRefunds}
+              />
+            )}
+            {!list.isLoading && !list.isError && items.length === 0 && (
+              <div className="list-empty">
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="暂无数据"
+                />
+              </div>
+            )}
+            {/* 上拉加载：进行中指示 + 底部哨兵（IntersectionObserver 触发 fetchNextPage） */}
+            {list.isFetchingNextPage && (
+              <div className="load-more" role="status">
+                加载中…
+              </div>
+            )}
+            <div
+              className="load-sentinel"
+              ref={sentinelRef}
+              style={{ display: list.hasNextPage ? undefined : 'none' }}
             />
-          ) : (
-            <Table
-              rowKey="id"
-              size="small"
-              loading={list.isLoading}
-              dataSource={items}
-              columns={columns}
-              pagination={false}
-              scroll={{ x: 990 }}
-              onRow={(record) =>
-                ({
-                  'data-txn-id': record.id,
-                }) as HTMLAttributes<HTMLTableRowElement>
-              }
-            />
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="panel">
+            {list.isError && !list.data ? (
+              <QueryState
+                error={list.error}
+                onRetry={() => void list.refetch()}
+              />
+            ) : (
+              <Table
+                rowKey="id"
+                size="small"
+                loading={list.isLoading}
+                dataSource={order.rows}
+                components={{ body: { row: SortableTableRow } }}
+                columns={columns}
+                pagination={false}
+                scroll={{ x: 1040 }}
+                onRow={(record) =>
+                  ({
+                    'data-txn-id': record.id,
+                  }) as HTMLAttributes<HTMLTableRowElement>
+                }
+              />
+            )}
+          </div>
+        )}
+      </SortableCollection>
 
       <div className="pager">
         <Pagination
@@ -362,6 +374,7 @@ export default function Records() {
           showSizeChanger={false}
           showTotal={(t) => `共 ${t} 笔`}
           size="small"
+          disabled={sorting}
         />
       </div>
 

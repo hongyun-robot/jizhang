@@ -184,6 +184,7 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 			txns.GET("", txnh.List)
 			txns.GET("/export", txnh.Export)
 			txns.POST("", txnh.Create)
+			txns.PUT("/reorder", txnh.Reorder)
 			txns.PUT("/:id", txnh.Update)
 			txns.DELETE("/:id", txnh.Delete)
 		}

@@ -42,6 +42,7 @@ type TxnFilter struct {
 	PersonalOwnerID       int64
 	IncludeLiabilityLinks bool
 	LegacyTransfers       bool
+	CustomOrder           bool
 }
 
 // applyFilter 组装筛选条件（List / ListAll 共用，导出与列表同一套筛选语义）。
@@ -111,7 +112,7 @@ func (r *TransactionRepo) List(f TxnFilter) ([]model.Transaction, int64, error) 
 	}
 
 	var list []model.Transaction
-	err := q.Order("entry_date DESC, id DESC").
+	err := transactionOrderQuery(q, f).
 		Offset((page - 1) * size).
 		Limit(size).
 		Find(&list).Error
@@ -122,8 +123,16 @@ func (r *TransactionRepo) List(f TxnFilter) ([]model.Transaction, int64, error) 
 func (r *TransactionRepo) ListAll(f TxnFilter) ([]model.Transaction, error) {
 	q := applyFilter(r.db.Model(&model.Transaction{}), f)
 	var list []model.Transaction
-	err := q.Order("entry_date DESC, id DESC").Find(&list).Error
+	err := transactionOrderQuery(q, f).Find(&list).Error
 	return list, err
+}
+
+func transactionOrderQuery(q *gorm.DB, f TxnFilter) *gorm.DB {
+	if f.CustomOrder && f.PersonalOwnerID > 0 {
+		q = q.Select("transactions.*").Joins("LEFT JOIN transaction_display_orders display_order ON display_order.transaction_id=transactions.id AND display_order.owner_id=?", f.PersonalOwnerID).
+			Order("CASE WHEN display_order.transaction_id IS NULL THEN 0 ELSE 1 END, display_order.position")
+	}
+	return q.Order("transactions.entry_date DESC, transactions.id DESC")
 }
 
 // GetByID 按主键查询。

@@ -40,6 +40,7 @@ export function useListGestures(
   const onTouchStart = (event: TouchEvent) => {
     if (!enabled || window.scrollY > 0 || source.isRefetching || source.isError)
       return;
+    if (event.target instanceof Element && event.target.closest('[data-sort-handle]')) return;
     start.current = event.touches[0]?.clientY ?? null;
   };
   const onTouchMove = (event: TouchEvent) => {

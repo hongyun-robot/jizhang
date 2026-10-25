@@ -64,6 +64,28 @@
   transition: color 0.18s ease;
 }
 
+.recent-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.recent-description { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.recent-date { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.recent-content .money { flex-shrink: 0; white-space: nowrap; }
+.recent-content:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 4px; }
+.recent-row:hover { background: var(--hover-soft); }
+
 .txn-row {
   transition: background-color 0.16s ease;
 }

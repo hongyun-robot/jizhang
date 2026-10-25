@@ -55,6 +55,9 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	}
 	pool.SetMaxOpenConns(1)
 	defer pool.Close()
+	if err := db.AutoMigrate(&model.TransactionDisplayOrder{}); err != nil {
+		t.Fatal(err)
+	}
 	if err := db.AutoMigrate(&model.CatalogOrderRequest{}, &model.User{}, &model.Setting{}, &model.Account{}, &model.Category{}, &model.Transaction{}, &model.Budget{}, &model.RecurringRule{}, &model.PeriodClosing{}, &model.AuditLog{}, &model.Notification{}, &model.Voucher{}, &model.VoucherEvent{}, &model.VoucherPlatform{}); err != nil {
 		t.Fatal(err)
 	}

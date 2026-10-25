@@ -192,6 +192,7 @@ type txnListQuery struct {
 	RelatedTxnID int64  `form:"related_txn_id"`
 	Page         int    `form:"page"`
 	PageSize     int    `form:"page_size"`
+	Order        string `form:"order" binding:"omitempty,oneof=custom"`
 }
 
 // buildFilter 查询参数 → 过滤条件（List 与 Export 共用，保证导出与列表同一套筛选语义）。
@@ -205,6 +206,7 @@ func buildFilter(q txnListQuery) repository.TxnFilter {
 		RelatedTxnID: q.RelatedTxnID,
 		Page:         q.Page,
 		PageSize:     q.PageSize,
+		CustomOrder:  q.Order == "custom",
 	}
 	if q.AmountMin != "" {
 		f.AmountMin = &q.AmountMin
