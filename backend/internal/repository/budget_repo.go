@@ -1,9 +1,10 @@
 package repository
 
 import (
+	"strings"
+
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
-	"strings"
 
 	"jizhang/internal/model"
 )
@@ -17,10 +18,14 @@ type BudgetRepo struct {
 func NewBudgetRepo(db *gorm.DB) *BudgetRepo         { return &BudgetRepo{db: db} }
 func (r *BudgetRepo) ForOwner(id int64) *BudgetRepo { return &BudgetRepo{db: r.db, ownerID: id} }
 func (r *BudgetRepo) scoped(q *gorm.DB) *gorm.DB {
-	if r.ownerID > 0 {
-		return q.Where("category_id IS NULL OR category_id IN (SELECT id FROM categories WHERE owner_id = ?)", r.ownerID)
-	}
-	return q
+	return q.Where("owner_id = ?", r.ownerID)
+}
+
+// Owners 后台评估只遍历实际配置过预算的账号。
+func (r *BudgetRepo) Owners(periodKey string) ([]int64, error) {
+	var owners []int64
+	err := r.db.Model(&model.Budget{}).Where("period_key = ?", periodKey).Distinct("owner_id").Pluck("owner_id", &owners).Error
+	return owners, err
 }
 
 // List 某账期全部预算（总预算 category_id 为 NULL）。
@@ -32,11 +37,16 @@ func (r *BudgetRepo) List(periodKey string) ([]model.Budget, error) {
 
 // Replace 整期重建配置（配置页整单提交）：事务内删旧插新。
 func (r *BudgetRepo) Replace(periodKey string, bs []model.Budget) error {
+	if r.ownerID <= 0 {
+		return gorm.ErrInvalidData
+	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := r.scoped(tx.Where("period_key = ?", periodKey)).Delete(&model.Budget{}).Error; err != nil {
 			return err
 		}
 		for i := range bs {
+			bs[i].OwnerID = r.ownerID
+			bs[i].PeriodKey = periodKey
 			if err := tx.Create(&bs[i]).Error; err != nil {
 				return err
 			}

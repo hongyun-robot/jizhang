@@ -37,7 +37,7 @@ export default function BudgetProgress({
     p: BudgetProgressDto;
   }> = [];
   if (view.total.budget || showUnset) {
-    rows.push({ scope: 'total', name: '本人进度 · 账本总预算', p: view.total });
+    rows.push({ scope: 'total', name: '总预算', p: view.total });
   }
   for (const c of view.categories) {
     if (c.budget || showUnset) {

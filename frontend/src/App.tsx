@@ -60,7 +60,7 @@ export default function App() {
             <Route path="/vouchers" element={<Vouchers />} />
             <Route path="/liabilities" element={<Liabilities />} />
             <Route path="/liabilities/:id" element={<LiabilityDetail />} />
-            {/* 预算：查看对四档角色开放，配置仅管理员（后端 + 页面内双重门禁，specs/budgets） */}
+            {/* 全部登录角色查看和管理本人预算（specs/budgets） */}
             <Route path="/budgets" element={<Budgets />} />
             {/* 提醒列表：四档角色可读可标已读（specs/notifications，任务 10.3） */}
             <Route path="/notifications" element={<Notifications />} />

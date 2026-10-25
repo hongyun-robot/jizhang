@@ -152,6 +152,11 @@ export default function Mine() {
               label="平台 / 商家管理"
               onClick={() => navigate('/platforms')}
             />
+            <Tile
+              icon={<FundOutlined />}
+              label="预算管理"
+              onClick={() => navigate('/budgets')}
+            />
         </div>
       </Card>
       {user?.role === 'admin' && (
@@ -167,11 +172,6 @@ export default function Mine() {
               icon={<CalendarOutlined />}
               label="账期设置"
               onClick={() => navigate('/settings')}
-            />
-            <Tile
-              icon={<FundOutlined />}
-              label="预算管理"
-              onClick={() => navigate('/budgets')}
             />
             <Tile
               icon={<HistoryOutlined />}

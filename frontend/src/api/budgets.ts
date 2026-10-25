@@ -16,7 +16,7 @@ export function useBudgets(periodKey?: string) {
   });
 }
 
-/** 保存预算整单配置（仅管理员）：保存后立即评估超支并生成提醒。 */
+/** 保存本人预算整单配置（全部登录角色）：保存后立即评估本人的超支提醒。 */
 export function useUpdateBudgets() {
   const scope = useScope();
   const qc = useQueryClient();

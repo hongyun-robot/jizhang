@@ -20,7 +20,6 @@ import {
   useStatsTrend,
 } from '../api/statistics';
 import type { DateRange } from '../api/types';
-import { useAuth } from '../stores/auth';
 import { useResolvedTheme } from '../stores/theme';
 import BudgetProgress from '../components/BudgetProgress';
 import EChart from '../components/EChart';
@@ -63,7 +62,6 @@ export default function Stats() {
   const assets = useStatsAssets(range);
   // 预算按账期口径（非区间口径）：展示当前账期进度
   const budgets = useBudgets();
-  const user = useAuth((s) => s.user);
 
   // 主题相关用色（任务 12.1）：画布不读 CSS 变量，需按生效主题取值
   const dark = useResolvedTheme() === 'dark';
@@ -328,7 +326,7 @@ export default function Stats() {
               view={budgets.data}
               loading={budgets.isLoading}
               showPeriod
-              configLink={user?.role === 'admin'}
+              configLink
             />
           </QueryBoundary>
         </Card>

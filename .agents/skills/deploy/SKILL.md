@@ -41,7 +41,7 @@ description: "Deploy local changes to the production jizhang server: hash-diff l
 
 生产私有 `.env` 已选择 `COMPOSE_FILE=docker-compose.yml:docker-compose.wealth.yml` 并保存共享采集密钥。后续部署保留这一选择；`.env` 仍只留在服务器。编排器已同步 `collector/` 与 overlay，采集运行时代码变化会构建 `wealth-collector`，overlay 变化也会重建 API；先等采集器 healthy，再切换 API。验证会增加采集器健康与 API 内部连通性检查。采集器源码无差异但上次构建失败时，需明确补跑其构建及健康切换，单独 `-Force` 只保证 web/api 重建。
 
-生产采集服务名为 `jizhang-wealth-collector`。`jizhang-wealth-qualification-<run-id>` 是独立真实时间验收，发布不重启、不替换、不清理它；持续采样记录见 `openspec/changes/add-bank-wealth-accounts/qualification.md`。采集器进程健康和一次取数成功各自记录，均不替代三天正式验收。
+生产采集服务名为 `jizhang-wealth-collector`。`jizhang-wealth-qualification-<run-id>` 是独立真实时间验收，发布不重启、不替换、不清理它；持续采样记录见 `openspec/changes/archive/2026-10-20-add-bank-wealth-accounts/qualification.md`。采集器进程健康和一次取数成功各自记录，均不替代三天正式验收。
 
 ### 编排器做什么
 

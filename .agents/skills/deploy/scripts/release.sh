@@ -85,7 +85,40 @@ if (( initial_version < LATEST )); then
     {
       for table in "${tables[@]}"; do
         printf '%s:%s\n' "$table" "${original_columns[$table]}"
-        query="SET time_zone='+00:00'; SELECT JSON_ARRAY(${original_columns[$table]}) FROM \`$table\`${original_filter[$table]} ORDER BY ${original_order[$table]}"
+        source_table="$table"
+        if [[ "$table" == budgets ]] && (( initial_version < 22 && LATEST >= 22 )); then
+          has_budget_snapshot=$(docker exec -e CHECK_DB="$check_db" jizhang-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --batch --skip-column-names -uroot "${CHECK_DB:-$MYSQL_DATABASE}" -e "SELECT COUNT(*) FROM information_schema.tables WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=\"personal_budget_before\""')
+          if [[ "$has_budget_snapshot" == 1 ]]; then
+            # Version 22 intentionally replaces shared totals with independent
+            # per-user copies. Check that exact mapping, then fingerprint every
+            # original budget cell through the migration's retained snapshot.
+            budget_check_sql="SELECT
+              (SELECT COUNT(*) FROM budgets) =
+                (SELECT COUNT(*) FROM personal_budget_before WHERE category_id IS NOT NULL) +
+                (SELECT COUNT(*) FROM users) *
+                (SELECT COUNT(DISTINCT period_key) FROM personal_budget_before WHERE category_id IS NULL)
+              AND NOT EXISTS(
+                SELECT 1 FROM personal_budget_before old
+                JOIN categories c ON c.id=old.category_id
+                LEFT JOIN budgets b ON b.id=old.id
+                WHERE old.category_id IS NOT NULL AND
+                  (b.id IS NULL OR b.owner_id<>c.owner_id OR b.period_key<>old.period_key
+                   OR NOT(b.category_id<=>old.category_id) OR b.amount<>old.amount
+                   OR NOT(b.created_at<=>old.created_at) OR NOT(b.updated_at<=>old.updated_at)))
+              AND NOT EXISTS(
+                SELECT 1 FROM personal_budget_before old CROSS JOIN users u
+                LEFT JOIN budgets b ON b.owner_id=u.id AND b.period_key=old.period_key AND b.category_id IS NULL
+                WHERE old.category_id IS NULL AND NOT EXISTS(
+                  SELECT 1 FROM personal_budget_before newer
+                  WHERE newer.period_key=old.period_key AND newer.category_id IS NULL AND newer.id>old.id)
+                AND (b.id IS NULL OR b.amount<>old.amount
+                     OR NOT(b.created_at<=>old.created_at) OR NOT(b.updated_at<=>old.updated_at)))"
+            budget_check=$(docker exec -e CHECK_DB="$check_db" -e RELEASE_QUERY="$budget_check_sql" jizhang-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --batch --skip-column-names -uroot "${CHECK_DB:-$MYSQL_DATABASE}" -e "$RELEASE_QUERY"')
+            [[ "$budget_check" == 1 ]] || { echo 'RELEASE: personal budget ownership or initial values changed unexpectedly' >&2; return 1; }
+            source_table=personal_budget_before
+          fi
+        fi
+        query="SET time_zone='+00:00'; SELECT JSON_ARRAY(${original_columns[$table]}) FROM \`$source_table\`${original_filter[$table]} ORDER BY ${original_order[$table]}"
         if ! docker exec -e CHECK_DB="$check_db" -e RELEASE_QUERY="$query" jizhang-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --default-character-set=utf8mb4 --batch --raw --skip-column-names -uroot "${CHECK_DB:-$MYSQL_DATABASE}" -e "$RELEASE_QUERY"'; then
           return 1
         fi

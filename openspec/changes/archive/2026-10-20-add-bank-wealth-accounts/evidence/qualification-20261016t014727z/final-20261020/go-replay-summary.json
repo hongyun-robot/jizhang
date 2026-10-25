@@ -1,0 +1,105 @@
+{
+  "reviewed_at": "2026-10-20T01:56:42.422035+00:00",
+  "test": "backend/internal/suyin.TestCapturedPublicEnvelope",
+  "results": [
+    {
+      "file": "public-001.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 265,
+      "latest": "2026-10-15"
+    },
+    {
+      "file": "public-002.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 265,
+      "latest": "2026-10-15"
+    },
+    {
+      "file": "public-003.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 265,
+      "latest": "2026-10-15"
+    },
+    {
+      "file": "public-004.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 265,
+      "latest": "2026-10-15"
+    },
+    {
+      "file": "public-005.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 265,
+      "latest": "2026-10-15"
+    },
+    {
+      "file": "public-006.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 265,
+      "latest": "2026-10-15"
+    },
+    {
+      "file": "public-007.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 265,
+      "latest": "2026-10-15"
+    },
+    {
+      "file": "public-008.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 265,
+      "latest": "2026-10-15"
+    },
+    {
+      "file": "public-009.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 265,
+      "latest": "2026-10-15"
+    },
+    {
+      "file": "public-010.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 265,
+      "latest": "2026-10-15"
+    },
+    {
+      "file": "public-011.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 266,
+      "latest": "2026-10-16"
+    },
+    {
+      "file": "public-012.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 266,
+      "latest": "2026-10-16"
+    },
+    {
+      "file": "public-013.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 266,
+      "latest": "2026-10-16"
+    },
+    {
+      "file": "public-014.json",
+      "passed": true,
+      "exit_code": 0,
+      "count": 266,
+      "latest": "2026-10-16"
+    }
+  ],
+  "passed": true
+}

@@ -64,7 +64,6 @@ export default function Dashboard() {
   const recent = useTxnList({ page: 1, page_size: 10 });
   const budgets = useBudgets(); // 当前账期预算（后端推 period_key）
   const vouchers = useVouchers({ page_size: 1 });
-  const isAdmin = user?.role === 'admin';
 
   const totalAssets = useMemo(
     () =>
@@ -225,7 +224,7 @@ export default function Dashboard() {
               view={budgets.data}
               loading={budgets.isLoading}
               showPeriod
-              configLink={isAdmin}
+              configLink
             />
           </QueryBoundary>
         </Card>

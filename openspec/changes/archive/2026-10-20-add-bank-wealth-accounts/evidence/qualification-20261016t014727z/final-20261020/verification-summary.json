@@ -1,0 +1,274 @@
+{
+  "reviewed_at": "2026-10-20T01:57:22.148515+00:00",
+  "passed_evidence_audit": true,
+  "run_id": "20261016t014727z",
+  "sampling_status": "passed_sampling",
+  "completed_at": "2026-10-19T14:00:08.921Z",
+  "normal_slots": 12,
+  "successful_slots": 12,
+  "failed_slots": 0,
+  "missed_slots": 0,
+  "interrupted_slots": 0,
+  "failed_attempts": 0,
+  "prechecks": 2,
+  "public_envelopes": 14,
+  "maximum_start_delay_seconds": 0.024,
+  "workday": "2026-10-19",
+  "proofs": {
+    "fresh_anonymous_history": true,
+    "cold_start": true,
+    "process_restart": true,
+    "new_disclosure_or_revision": {
+      "check": "2026-10-19/22",
+      "observed_at": "2026-10-19T14:00:08.816Z",
+      "dates": [
+        "2026-10-16"
+      ]
+    }
+  },
+  "new_disclosure_first_check": "2026-10-19/8",
+  "new_rows": [
+    {
+      "date": "2026-10-16",
+      "nav": "1.02147",
+      "total_nav": "1.02147"
+    }
+  ],
+  "runtime": {
+    "name": "/jizhang-wealth-qualification-20261016t014727z",
+    "status": "running",
+    "image": "sha256:922da80d0af479b2e5b4b4b24eb40580718100cddfa531ed113324e6f329abf4",
+    "restart_count": 1,
+    "started_at": "2026-10-16T01:47:42.781152787Z"
+  },
+  "slots": [
+    {
+      "id": "2026-10-17/8",
+      "start_delay_seconds": 0.024,
+      "duration_seconds": 10.343,
+      "weekday": 5,
+      "public_envelope": "public-003.json",
+      "count": 265,
+      "latest": {
+        "date": "2026-10-15",
+        "nav": "1.02142",
+        "total_nav": "1.02142"
+      }
+    },
+    {
+      "id": "2026-10-17/12",
+      "start_delay_seconds": 0.004,
+      "duration_seconds": 10.433,
+      "weekday": 5,
+      "public_envelope": "public-004.json",
+      "count": 265,
+      "latest": {
+        "date": "2026-10-15",
+        "nav": "1.02142",
+        "total_nav": "1.02142"
+      }
+    },
+    {
+      "id": "2026-10-17/18",
+      "start_delay_seconds": 0.003,
+      "duration_seconds": 9.926,
+      "weekday": 5,
+      "public_envelope": "public-005.json",
+      "count": 265,
+      "latest": {
+        "date": "2026-10-15",
+        "nav": "1.02142",
+        "total_nav": "1.02142"
+      }
+    },
+    {
+      "id": "2026-10-17/22",
+      "start_delay_seconds": 0.005,
+      "duration_seconds": 9.921,
+      "weekday": 5,
+      "public_envelope": "public-006.json",
+      "count": 265,
+      "latest": {
+        "date": "2026-10-15",
+        "nav": "1.02142",
+        "total_nav": "1.02142"
+      }
+    },
+    {
+      "id": "2026-10-18/8",
+      "start_delay_seconds": 0.02,
+      "duration_seconds": 9.302,
+      "weekday": 6,
+      "public_envelope": "public-007.json",
+      "count": 265,
+      "latest": {
+        "date": "2026-10-15",
+        "nav": "1.02142",
+        "total_nav": "1.02142"
+      }
+    },
+    {
+      "id": "2026-10-18/12",
+      "start_delay_seconds": 0.005,
+      "duration_seconds": 9.228,
+      "weekday": 6,
+      "public_envelope": "public-008.json",
+      "count": 265,
+      "latest": {
+        "date": "2026-10-15",
+        "nav": "1.02142",
+        "total_nav": "1.02142"
+      }
+    },
+    {
+      "id": "2026-10-18/18",
+      "start_delay_seconds": 0.001,
+      "duration_seconds": 9.018,
+      "weekday": 6,
+      "public_envelope": "public-009.json",
+      "count": 265,
+      "latest": {
+        "date": "2026-10-15",
+        "nav": "1.02142",
+        "total_nav": "1.02142"
+      }
+    },
+    {
+      "id": "2026-10-18/22",
+      "start_delay_seconds": 0.009,
+      "duration_seconds": 8.828,
+      "weekday": 6,
+      "public_envelope": "public-010.json",
+      "count": 265,
+      "latest": {
+        "date": "2026-10-15",
+        "nav": "1.02142",
+        "total_nav": "1.02142"
+      }
+    },
+    {
+      "id": "2026-10-19/8",
+      "start_delay_seconds": 0.023,
+      "duration_seconds": 9.098,
+      "weekday": 0,
+      "public_envelope": "public-011.json",
+      "count": 266,
+      "latest": {
+        "date": "2026-10-16",
+        "nav": "1.02147",
+        "total_nav": "1.02147"
+      }
+    },
+    {
+      "id": "2026-10-19/12",
+      "start_delay_seconds": 0.005,
+      "duration_seconds": 8.61,
+      "weekday": 0,
+      "public_envelope": "public-012.json",
+      "count": 266,
+      "latest": {
+        "date": "2026-10-16",
+        "nav": "1.02147",
+        "total_nav": "1.02147"
+      }
+    },
+    {
+      "id": "2026-10-19/18",
+      "start_delay_seconds": 0.003,
+      "duration_seconds": 9.918,
+      "weekday": 0,
+      "public_envelope": "public-013.json",
+      "count": 266,
+      "latest": {
+        "date": "2026-10-16",
+        "nav": "1.02147",
+        "total_nav": "1.02147"
+      }
+    },
+    {
+      "id": "2026-10-19/22",
+      "start_delay_seconds": 0.003,
+      "duration_seconds": 8.917,
+      "weekday": 0,
+      "public_envelope": "public-014.json",
+      "count": 266,
+      "latest": {
+        "date": "2026-10-16",
+        "nav": "1.02147",
+        "total_nav": "1.02147"
+      }
+    }
+  ],
+  "captures": [
+    {
+      "file": "public-001.json",
+      "count": 265,
+      "sha256": "9c6d7e1f7c8088a306c54d59f781da4cef0dbdc2262f0b6188cb7dde88118063"
+    },
+    {
+      "file": "public-002.json",
+      "count": 265,
+      "sha256": "9c6d7e1f7c8088a306c54d59f781da4cef0dbdc2262f0b6188cb7dde88118063"
+    },
+    {
+      "file": "public-003.json",
+      "count": 265,
+      "sha256": "9c6d7e1f7c8088a306c54d59f781da4cef0dbdc2262f0b6188cb7dde88118063"
+    },
+    {
+      "file": "public-004.json",
+      "count": 265,
+      "sha256": "9c6d7e1f7c8088a306c54d59f781da4cef0dbdc2262f0b6188cb7dde88118063"
+    },
+    {
+      "file": "public-005.json",
+      "count": 265,
+      "sha256": "9c6d7e1f7c8088a306c54d59f781da4cef0dbdc2262f0b6188cb7dde88118063"
+    },
+    {
+      "file": "public-006.json",
+      "count": 265,
+      "sha256": "9c6d7e1f7c8088a306c54d59f781da4cef0dbdc2262f0b6188cb7dde88118063"
+    },
+    {
+      "file": "public-007.json",
+      "count": 265,
+      "sha256": "9c6d7e1f7c8088a306c54d59f781da4cef0dbdc2262f0b6188cb7dde88118063"
+    },
+    {
+      "file": "public-008.json",
+      "count": 265,
+      "sha256": "9c6d7e1f7c8088a306c54d59f781da4cef0dbdc2262f0b6188cb7dde88118063"
+    },
+    {
+      "file": "public-009.json",
+      "count": 265,
+      "sha256": "9c6d7e1f7c8088a306c54d59f781da4cef0dbdc2262f0b6188cb7dde88118063"
+    },
+    {
+      "file": "public-010.json",
+      "count": 265,
+      "sha256": "9c6d7e1f7c8088a306c54d59f781da4cef0dbdc2262f0b6188cb7dde88118063"
+    },
+    {
+      "file": "public-011.json",
+      "count": 266,
+      "sha256": "5f73415e19033eb6a645b9b97328d78cc738b86e89f8f190f6cc6d57a4c48949"
+    },
+    {
+      "file": "public-012.json",
+      "count": 266,
+      "sha256": "5f73415e19033eb6a645b9b97328d78cc738b86e89f8f190f6cc6d57a4c48949"
+    },
+    {
+      "file": "public-013.json",
+      "count": 266,
+      "sha256": "5f73415e19033eb6a645b9b97328d78cc738b86e89f8f190f6cc6d57a4c48949"
+    },
+    {
+      "file": "public-014.json",
+      "count": 266,
+      "sha256": "5f73415e19033eb6a645b9b97328d78cc738b86e89f8f190f6cc6d57a4c48949"
+    }
+  ]
+}

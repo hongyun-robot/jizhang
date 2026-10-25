@@ -8,7 +8,6 @@ import { errMsg } from '../api/client';
 import { useBudgets, useUpdateBudgets } from '../api/budgets';
 import type { BudgetSetInput } from '../api/types';
 import BudgetProgress from '../components/BudgetProgress';
-import { useAuth } from '../stores/auth';
 import { readApi } from '../api/request';
 import type { BudgetView } from '../api/types';
 import {
@@ -20,14 +19,12 @@ import {
 
 /**
  * 预算（specs/budgets，任务 8.3）：
- * - 查看对四档角色开放；配置仅管理员（输入框与保存按钮仅管理员可见）。
+ * - 四档登录角色均可查看和配置本人预算。
  * - 账期用月份选择器手动选择，键值以后端返回的 period_key 为准，不在客户端重算归期。
  * - 整单提交：留空/0 即不设预算；保存后立即生效，低于既有消耗会当场生成超支提醒。
  */
 export default function Budgets() {
   const { message, modal } = App.useApp();
-  const user = useAuth((s) => s.user);
-  const isAdmin = user?.role === 'admin';
 
   const [month, setMonth] = useState<Dayjs | null>(null);
   const [pickerVersion, setPickerVersion] = useState(0);
@@ -86,7 +83,6 @@ export default function Budgets() {
   };
 
   const inputFor = (scope: 'total' | number) => {
-    if (!isAdmin) return undefined;
     const key = String(scope);
     return (
       <InputNumber
@@ -146,9 +142,7 @@ export default function Budgets() {
           </div>
           <h2>预算</h2>
         </div>
-        <Tag color={isAdmin ? 'teal' : 'default'}>
-          {isAdmin ? '可配置' : '仅查看'}
-        </Tag>
+        <Tag color="teal">我的预算</Tag>
       </div>
 
       <QueryBoundary query={view}>
@@ -171,23 +165,21 @@ export default function Budgets() {
           {view.data && (
             <>
               <BudgetProgress view={view.data} showUnset inputFor={inputFor} />
-              {isAdmin && (
-                <div className="setting-row" style={{ marginTop: 14 }}>
-                  <Button
-                    type="primary"
-                    loading={save.isPending}
-                    onClick={() => void doSave()}
-                  >
-                    保存
-                  </Button>
-                  <span className="muted small">
-                    留空或 0 表示不设预算；保存后立即生效
-                  </span>
-                  {draft.dirty && (
-                    <span className="small muted">有未保存修改</span>
-                  )}
-                </div>
-              )}
+              <div className="setting-row" style={{ marginTop: 14 }}>
+                <Button
+                  type="primary"
+                  loading={save.isPending}
+                  onClick={() => void doSave()}
+                >
+                  保存
+                </Button>
+                <span className="muted small">
+                  留空或 0 表示不设预算；保存后立即生效
+                </span>
+                {draft.dirty && (
+                  <span className="small muted">有未保存修改</span>
+                )}
+              </div>
             </>
           )}
         </Card>

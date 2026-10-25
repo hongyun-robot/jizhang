@@ -67,8 +67,14 @@ func TestPersonalFinancialScope(t *testing.T) {
 	}
 	budget := NewBudgetService(BudgetDeps{Budgets: repository.NewBudgetRepo(e.db), Stats: stats, Cats: repository.NewCategoryRepo(e.db), Notifs: repository.NewNotificationRepo(e.db), Periods: e.txn.deps.Periods})
 	limit := "5"
-	mustOK(t, budget.Set("2026-10", BudgetSetInput{Total: &limit}))
+	mustOK(t, budget.ForUser(adminUser()).Set("2026-10", BudgetSetInput{Total: &limit}))
 	view, err := budget.ForUser(other).Get("2026-10")
+	mustOK(t, err)
+	if view.Total.Budget != nil {
+		t.Fatal("foreign total budget exposed", view)
+	}
+	mustOK(t, budget.ForUser(other).Set("2026-10", BudgetSetInput{Total: &limit}))
+	view, err = budget.ForUser(other).Get("2026-10")
 	mustOK(t, err)
 	if view.Total.Consumed != "31.00" || view.Total.Budget == nil || *view.Total.Budget != "5.00" {
 		t.Fatal("budget scope", view)

@@ -1,0 +1,5 @@
+=== RUN   TestCapturedPublicEnvelope
+    client_test.go:36: validated 265 public NAV rows; latest date 2026-10-15
+--- PASS: TestCapturedPublicEnvelope (0.00s)
+PASS
+ok  	jizhang/internal/suyin	0.870s

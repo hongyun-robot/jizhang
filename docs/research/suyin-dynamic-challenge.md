@@ -42,7 +42,7 @@ fundCode=J07241&dateType=all&rows=9999&page=1
 
 实现使用 `--disable-blink-features=AutomationControlled`，并通过浏览器自身 `Browser.getVersion` 获取实际 UA，只将 `HeadlessChrome/` 替换为 `Chrome/`，保留真实平台和版本。不伪造一个固定 Windows UA 给 Linux；保持 headless、非 root、Chromium sandbox、超时及匿名上下文隔离。
 
-上述对照证明当前修复组合有效，不能推断已经列全网站所有环境检查项，也不能当作未来稳定性保证。证据位于 `openspec/changes/add-bank-wealth-accounts/evidence/2026-10-16-challenge/`。
+上述对照证明当前修复组合有效，不能推断已经列全网站所有环境检查项，也不能当作未来稳定性保证。证据位于 `openspec/changes/archive/2026-10-20-add-bank-wealth-accounts/evidence/2026-10-16-challenge/`。
 
 ## 直接 HTTP 对照结果
 

@@ -2,7 +2,7 @@
 
 核对日期：2026-10-16（北京时间）。本次只验证匿名 HTTP 查询和项目接入可行性，未实施业务集成，未验证生产服务器访问或跨日稳定性。
 
-后续实施（2026-10-16）：已按用户要求增加 `backend/internal/cmbcwm` 原生 HTTP 适配器、共用 `wealthdata` 行情分派及 `000020` E 份额公共目录迁移，复用现有四槽/租约/持仓重估。Go 匿名完整历史验证取得 754 条，起始 2023-08-30、最新 2026-10-15 净值 1.068033；隔离测试覆盖修订、失败保留、不同来源配置和 MySQL 迁移回滚。本节下文保留原调查快照与当时接入建议，最新实施验收见 [实施记录](../../openspec/changes/add-bank-wealth-accounts/cmbcwm-implementation.md)。尚未生产部署或完成民生多日采样。
+后续实施（2026-10-16）：已按用户要求增加 `backend/internal/cmbcwm` 原生 HTTP 适配器、共用 `wealthdata` 行情分派及 `000020` E 份额公共目录迁移，复用现有四槽/租约/持仓重估。Go 匿名完整历史验证取得 754 条，起始 2023-08-30、最新 2026-10-15 净值 1.068033；隔离测试覆盖修订、失败保留、不同来源配置和 MySQL 迁移回滚。本节下文保留原调查快照与当时接入建议，最新实施验收见 [实施记录](../../openspec/changes/archive/2026-10-20-add-bank-wealth-accounts/cmbcwm-implementation.md)。尚未生产部署或完成民生多日采样。
 
 结论：**可以通过官网的 HTTP POST 接口获取该产品 E 份额的最新净值和分页历史，无需登录、Cookie、API Key 或浏览器执行 JavaScript。** 这是本机本次实测结果；接口由官网页面内部使用，本次没有取得面向第三方的正式 API 契约、配额、发布时间或 SLA，不能将一次成功视为长期可用承诺。[官方产品页](https://www.cmbcwm.com.cn/cmbcwm/grlc/cpxq/index.html?code=FBAE68020E)、[官方请求封装脚本](https://www.cmbcwm.com.cn/uiFramework/commonResource/zip/cmbc_wm/skin/js/main.js)
 

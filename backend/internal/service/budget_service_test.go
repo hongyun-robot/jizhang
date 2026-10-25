@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -11,6 +12,66 @@ import (
 	"jizhang/internal/model"
 	"jizhang/internal/repository"
 )
+
+func TestPersonalBudgetConfiguration(t *testing.T) {
+	e := newBudgetEnv(t)
+	actors := []*model.User{
+		{ID: 1, Role: model.RoleAdmin}, {ID: 2, Role: model.RoleRecorder},
+		{ID: 3, Role: model.RoleMember}, {ID: 4, Role: model.RoleViewer},
+	}
+	categories := make([]int64, len(actors))
+	for i, actor := range actors {
+		category := model.Category{OwnerID: &actor.ID, Kind: model.KindExpense, Name: "同名分类"}
+		mustOK(t, e.catRepo.Create(&category))
+		categories[i] = category.ID
+		personal := e.budget.ForUser(actor)
+		view, err := personal.Get("2026-10")
+		mustOK(t, err)
+		if view.Total.Budget != nil || len(view.Categories) != 1 || view.Categories[0].Budget != nil {
+			t.Fatalf("new account inherited someone else's budget: %+v", view)
+		}
+		total, amount := fmt.Sprint(100+i), fmt.Sprint(10+i)
+		mustOK(t, personal.Set("2026-10", BudgetSetInput{Total: &total, Items: []BudgetSetItem{{CategoryID: category.ID, Amount: &amount}}}))
+		mustOK(t, personal.Set("2026-11", BudgetSetInput{Total: &amount}))
+	}
+	for i, actor := range actors {
+		personal := e.budget.ForUser(actor)
+		view, err := personal.Get("2026-10")
+		mustOK(t, err)
+		if view.Total.Budget == nil || *view.Total.Budget != fmt.Sprintf("%d.00", 100+i) || len(view.Categories) != 1 || view.Categories[0].CategoryID != categories[i] || view.Categories[0].Budget == nil || *view.Categories[0].Budget != fmt.Sprintf("%d.00", 10+i) {
+			t.Fatalf("account %d budget leaked or overwritten: %+v", actor.ID, view)
+		}
+		foreign := categories[(i+1)%len(actors)]
+		amount := "999"
+		if err := personal.Set("2026-10", BudgetSetInput{Total: &amount, Items: []BudgetSetItem{{CategoryID: foreign, Amount: &amount}}}); !errors.Is(err, ErrBudgetCategoryInvalid) {
+			t.Fatalf("foreign category accepted for %s: %v", actor.Role, err)
+		}
+	}
+	mustOK(t, e.budget.ForUser(actors[0]).Set("2026-10", BudgetSetInput{}))
+	for i, actor := range actors {
+		view, err := e.budget.ForUser(actor).Get("2026-10")
+		mustOK(t, err)
+		if (view.Total.Budget == nil) != (i == 0) || (view.Categories[0].Budget == nil) != (i == 0) {
+			t.Fatal("clearing one account changed another", actor.ID, view)
+		}
+		view, err = e.budget.ForUser(actor).Get("2026-11")
+		mustOK(t, err)
+		if view.Total.Budget == nil || *view.Total.Budget != fmt.Sprintf("%d.00", 10+i) {
+			t.Fatal("another period changed", view)
+		}
+	}
+	for _, actor := range []*model.User{nil, {ID: 0}} {
+		if _, err := e.budget.ForUser(actor).Get("2026-10"); !errors.Is(err, ErrTxnForbidden) {
+			t.Fatal("unauthenticated read", err)
+		}
+		if err := e.budget.ForUser(actor).Set("2026-10", BudgetSetInput{}); !errors.Is(err, ErrTxnForbidden) {
+			t.Fatal("unauthenticated write", err)
+		}
+		if err := e.budget.ForUser(actor).Evaluate("2026-10"); !errors.Is(err, ErrTxnForbidden) {
+			t.Fatal("unauthenticated evaluation", err)
+		}
+	}
+}
 
 // budgetEnv 预算测试环境（sqlite 内存库跑真实仓储，流水写钩子联动超支评估）。
 type budgetEnv struct {
@@ -58,7 +119,7 @@ func newBudgetEnv(t *testing.T) *budgetEnv {
 	}
 	return &budgetEnv{
 		periods: periods,
-		budget:  bs,
+		budget:  bs.ForUser(adminUser()),
 		txn:     txn,
 		accRepo: accRepo,
 		catRepo: catRepo,

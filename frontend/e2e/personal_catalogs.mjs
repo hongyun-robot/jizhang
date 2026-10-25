@@ -31,7 +31,8 @@ await withFixture(base, async (browser, cleanup) => {
     assert(ownAccounts.every((row) => row.owner_id === account.owner_id));
     if (username === 'voucher-viewer') {
       await request('POST', '/transactions', { kind: 'expense', amount: '1', account_id: account.id, category_id: child.id, entry_date: '2026-10-12' }, 403);
-      await request('PUT', '/budgets/2026-10', { total: '100' }, 403);
+      await request('PUT', '/budgets/2026-10', { total: '100' });
+      cleanup(() => request('PUT', '/budgets/2026-10', {}));
     }
     clients.push({ username, request, account, category, child });
   }

@@ -1,0 +1,1524 @@
+{
+  "requirements": 37,
+  "scenarios": 135,
+  "spec_files": 8,
+  "basis_records": [
+    "implementation-status.md",
+    "pending-orders-implementation.md",
+    "opening-total-cost.md",
+    "cmbcwm-implementation.md",
+    "wealth-cash-implementation.md",
+    "wealth-cash-create.md"
+  ],
+  "entries": [
+    {
+      "spec": "specs/accounts/spec.md",
+      "line": 3,
+      "delta": "MODIFIED Requirements",
+      "requirement": "现金与基金资产子类",
+      "implementation": [
+        "backend/internal/service/account_service.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/account_wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_mysql_test.go",
+        "backend/internal/service/account_wealth_cash_test.go",
+        "backend/internal/service/account_wealth_cash_mysql_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 10,
+          "name": "升级旧账户"
+        },
+        {
+          "line": 14,
+          "name": "新建黄金资产账户"
+        },
+        {
+          "line": 18,
+          "name": "主动新建理财账户"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/accounts/spec.md",
+      "line": 22,
+      "delta": "MODIFIED Requirements",
+      "requirement": "流水关联账户",
+      "implementation": [
+        "backend/internal/service/account_service.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/account_wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_mysql_test.go",
+        "backend/internal/service/account_wealth_cash_test.go",
+        "backend/internal/service/account_wealth_cash_mysql_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 29,
+          "name": "记一笔支出"
+        },
+        {
+          "line": 33,
+          "name": "记一笔退款"
+        },
+        {
+          "line": 37,
+          "name": "券只付一次钱"
+        },
+        {
+          "line": 41,
+          "name": "信用账户购买券"
+        },
+        {
+          "line": 45,
+          "name": "基金净值改变"
+        },
+        {
+          "line": 49,
+          "name": "黄金买入与估值分开"
+        },
+        {
+          "line": 53,
+          "name": "理财补值不写资金流水"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/accounts/spec.md",
+      "line": 57,
+      "delta": "MODIFIED Requirements",
+      "requirement": "余额与总资产计算",
+      "implementation": [
+        "backend/internal/service/account_service.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/account_wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_mysql_test.go",
+        "backend/internal/service/account_wealth_cash_test.go",
+        "backend/internal/service/account_wealth_cash_mysql_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 64,
+          "name": "汇总资产"
+        },
+        {
+          "line": 68,
+          "name": "未用券价值单列"
+        },
+        {
+          "line": 72,
+          "name": "分期不会多扣总资产"
+        },
+        {
+          "line": 76,
+          "name": "基金市值只计一次"
+        },
+        {
+          "line": 80,
+          "name": "黄金资产只计赎回市值"
+        },
+        {
+          "line": 84,
+          "name": "黄金报价缺失"
+        },
+        {
+          "line": 88,
+          "name": "理财市值和本金不叠加"
+        },
+        {
+          "line": 92,
+          "name": "理财缺价与已清仓区分"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/accounts/spec.md",
+      "line": 96,
+      "delta": "MODIFIED Requirements",
+      "requirement": "账户删除约束",
+      "implementation": [
+        "backend/internal/service/account_service.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/account_wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_mysql_test.go",
+        "backend/internal/service/account_wealth_cash_test.go",
+        "backend/internal/service/account_wealth_cash_mysql_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 103,
+          "name": "删除有流水的账户"
+        },
+        {
+          "line": 107,
+          "name": "账单记录保留"
+        },
+        {
+          "line": 111,
+          "name": "越权管理资产"
+        },
+        {
+          "line": 115,
+          "name": "停用不是卖出"
+        },
+        {
+          "line": 119,
+          "name": "黄金清仓后仍保留历史"
+        },
+        {
+          "line": 123,
+          "name": "停用黄金账户仍可处置"
+        },
+        {
+          "line": 127,
+          "name": "理财清仓不删除历史"
+        },
+        {
+          "line": 131,
+          "name": "停用理财继续到账"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/accounts/spec.md",
+      "line": 135,
+      "delta": "MODIFIED Requirements",
+      "requirement": "本人账户目录统一拖动排序",
+      "implementation": [
+        "backend/internal/service/account_service.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/account_wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_mysql_test.go",
+        "backend/internal/service/account_wealth_cash_test.go",
+        "backend/internal/service/account_wealth_cash_mysql_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 143,
+          "name": "不同类型共同排序"
+        },
+        {
+          "line": 147,
+          "name": "停用账户参与完整目录"
+        },
+        {
+          "line": 151,
+          "name": "账户编辑不重置排序"
+        },
+        {
+          "line": 155,
+          "name": "排序不改变账务"
+        },
+        {
+          "line": 159,
+          "name": "黄金参与统一排序"
+        },
+        {
+          "line": 163,
+          "name": "理财与其他账户共同排序"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/accounts/spec.md",
+      "line": 169,
+      "delta": "ADDED Requirements",
+      "requirement": "银行理财与普通支付隔离",
+      "implementation": [
+        "backend/internal/service/account_service.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/account_wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_mysql_test.go",
+        "backend/internal/service/account_wealth_cash_test.go",
+        "backend/internal/service/account_wealth_cash_mysql_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 172,
+          "name": "普通表单不能选理财"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/accounts/spec.md",
+      "line": 176,
+      "delta": "ADDED Requirements",
+      "requirement": "理财零钱原地关联与普通支付",
+      "implementation": [
+        "backend/internal/service/account_service.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/account_wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_mysql_test.go",
+        "backend/internal/service/account_wealth_cash_test.go",
+        "backend/internal/service/account_wealth_cash_mysql_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 181,
+          "name": "直接创建理财零钱"
+        },
+        {
+          "line": 185,
+          "name": "创建失败或回执丢失"
+        },
+        {
+          "line": 189,
+          "name": "余利宝启用后支出"
+        },
+        {
+          "line": 193,
+          "name": "停止自动收益"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/billing-periods/spec.md",
+      "line": 3,
+      "delta": "ADDED Requirements",
+      "requirement": "银行理财财务硬锁与估值资料修订边界",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_mysql_test.go",
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_cash_mysql_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 6,
+          "name": "确认日封账而资金日开放"
+        },
+        {
+          "line": 10,
+          "name": "封账日期补净值"
+        },
+        {
+          "line": 14,
+          "name": "到账在新开放期"
+        },
+        {
+          "line": 18,
+          "name": "封账与申购并发"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/gold-accounts/spec.md",
+      "line": 3,
+      "delta": "MODIFIED Requirements",
+      "requirement": "真实已完成买入及同日现金联动",
+      "implementation": [
+        "frontend/src/components/TxnFormModal.tsx",
+        "frontend/src/pages/Gold.tsx"
+      ],
+      "related_tests": [
+        "frontend/e2e/gold.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 6,
+          "name": "空账户从黄金详情首次买入"
+        },
+        {
+          "line": 10,
+          "name": "空账户从记账弹窗直接买入"
+        },
+        {
+          "line": 14,
+          "name": "买入追加采用加权成本"
+        },
+        {
+          "line": 18,
+          "name": "跨日资金不被默默当成同日"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/gold-accounts/spec.md",
+      "line": 22,
+      "delta": "MODIFIED Requirements",
+      "requirement": "黄金管理和统一买卖表单",
+      "implementation": [
+        "frontend/src/components/TxnFormModal.tsx",
+        "frontend/src/pages/Gold.tsx"
+      ],
+      "related_tests": [
+        "frontend/e2e/gold.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 25,
+          "name": "从独立黄金详情买入"
+        },
+        {
+          "line": 29,
+          "name": "从记一笔切换到黄金买入"
+        },
+        {
+          "line": 33,
+          "name": "记一笔移除黄金模式"
+        },
+        {
+          "line": 37,
+          "name": "手机查看和提交"
+        },
+        {
+          "line": 41,
+          "name": "保存响应晚于换号"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/home-dashboard/spec.md",
+      "line": 3,
+      "delta": "MODIFIED Requirements",
+      "requirement": "快捷记账入口",
+      "implementation": [
+        "frontend/src/components/TxnFormModal.tsx",
+        "backend/internal/service/account_service.go",
+        "backend/internal/service/stats_service.go"
+      ],
+      "related_tests": [
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/gold.mjs",
+        "backend/internal/service/wealth_statistics_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 8,
+          "name": "快速记账"
+        },
+        {
+          "line": 12,
+          "name": "快捷购券"
+        },
+        {
+          "line": 16,
+          "name": "快捷记账没有投资切换"
+        },
+        {
+          "line": 20,
+          "name": "从首页直接购入黄金"
+        },
+        {
+          "line": 24,
+          "name": "从首页直接卖出黄金"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/home-dashboard/spec.md",
+      "line": 30,
+      "delta": "ADDED Requirements",
+      "requirement": "首页银行理财资产与估值完整性",
+      "implementation": [
+        "frontend/src/components/TxnFormModal.tsx",
+        "backend/internal/service/account_service.go",
+        "backend/internal/service/stats_service.go"
+      ],
+      "related_tests": [
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/gold.mjs",
+        "backend/internal/service/wealth_statistics_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 33,
+          "name": "补值使未知资产可估值"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/identity/access-control/spec.md",
+      "line": 3,
+      "delta": "ADDED Requirements",
+      "requirement": "本人银行理财配置和人工净值与资金权限分离",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_quotes.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_orders_mysql_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 6,
+          "name": "只读成员补净值但不能申购"
+        },
+        {
+          "line": 10,
+          "name": "管理员访问他人资料"
+        },
+        {
+          "line": 14,
+          "name": "后台自动值替代个人补值"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/statistics/spec.md",
+      "line": 3,
+      "delta": "MODIFIED Requirements",
+      "requirement": "资产走势",
+      "implementation": [
+        "backend/internal/service/stats_service.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_cash_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 10,
+          "name": "资产曲线"
+        },
+        {
+          "line": 14,
+          "name": "券资金跨月走势"
+        },
+        {
+          "line": 18,
+          "name": "基金历史份额准确"
+        },
+        {
+          "line": 22,
+          "name": "建账不改更早历史"
+        },
+        {
+          "line": 26,
+          "name": "停用基金仍计资产"
+        },
+        {
+          "line": 30,
+          "name": "黄金按历史克数估值"
+        },
+        {
+          "line": 34,
+          "name": "历史没有报价观察"
+        },
+        {
+          "line": 38,
+          "name": "假期成功查询旧源价"
+        },
+        {
+          "line": 42,
+          "name": "当日资产保持一致"
+        },
+        {
+          "line": 46,
+          "name": "个人补值不影响其他人的曲线"
+        },
+        {
+          "line": 50,
+          "name": "自动值替代人工后的日期边界"
+        },
+        {
+          "line": 54,
+          "name": "后补历史净值与未来报价区别"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/statistics/spec.md",
+      "line": 58,
+      "delta": "MODIFIED Requirements",
+      "requirement": "统计查询缓存",
+      "implementation": [
+        "backend/internal/service/stats_service.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_cash_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 65,
+          "name": "命中缓存"
+        },
+        {
+          "line": 69,
+          "name": "新净值使资产缓存失效"
+        },
+        {
+          "line": 73,
+          "name": "小时行情使黄金资产缓存失效"
+        },
+        {
+          "line": 77,
+          "name": "两个第一版报价仍触发来源更新"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/statistics/spec.md",
+      "line": 81,
+      "delta": "MODIFIED Requirements",
+      "requirement": "投资口径不进入日常收支",
+      "implementation": [
+        "backend/internal/service/stats_service.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_cash_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 88,
+          "name": "买入费用不污染生活预算"
+        },
+        {
+          "line": 92,
+          "name": "分红与赎回不是生活收入"
+        },
+        {
+          "line": 96,
+          "name": "个人汇总隔离"
+        },
+        {
+          "line": 100,
+          "name": "黄金买卖不污染收支"
+        },
+        {
+          "line": 104,
+          "name": "理财分红到账不计工资收入"
+        },
+        {
+          "line": 108,
+          "name": "理财费用只计一次"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/statistics/spec.md",
+      "line": 114,
+      "delta": "ADDED Requirements",
+      "requirement": "理财零钱收益与同一资产余额",
+      "implementation": [
+        "backend/internal/service/stats_service.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_cash.go"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_cash_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 117,
+          "name": "自动收益与普通支出同时存在"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/transactions/spec.md",
+      "line": 3,
+      "delta": "ADDED Requirements",
+      "requirement": "银行理财事件管理的资金转账",
+      "implementation": [
+        "backend/internal/service/transaction_service.go",
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_cash.go"
+      ],
+      "related_tests": [
+        "frontend/e2e/wealth.mjs",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_cash_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 6,
+          "name": "跨日申购只扣一次"
+        },
+        {
+          "line": 10,
+          "name": "应收到账只生成实际资金一次"
+        },
+        {
+          "line": 14,
+          "name": "禁止从普通入口破坏持仓"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/transactions/spec.md",
+      "line": 18,
+      "delta": "ADDED Requirements",
+      "requirement": "银行理财资金记录展示导航与导出",
+      "implementation": [
+        "backend/internal/service/transaction_service.go",
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_cash.go"
+      ],
+      "related_tests": [
+        "frontend/e2e/wealth.mjs",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_cash_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 21,
+          "name": "导出理财赎回到账"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/transactions/spec.md",
+      "line": 25,
+      "delta": "ADDED Requirements",
+      "requirement": "可编辑的理财零钱收益流水",
+      "implementation": [
+        "backend/internal/service/transaction_service.go",
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_cash.go"
+      ],
+      "related_tests": [
+        "frontend/e2e/wealth.mjs",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_cash_test.go"
+      ],
+      "scenarios": [
+        {
+          "line": 28,
+          "name": "从流水修改实际收益"
+        },
+        {
+          "line": 32,
+          "name": "已封账收益与失败回滚"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 7,
+      "delta": "ADDED Requirements",
+      "requirement": "已付款待确认申购及周利宝转出订单",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 10,
+          "name": "先付款后确认"
+        },
+        {
+          "line": 14,
+          "name": "取消后部分退款"
+        },
+        {
+          "line": 18,
+          "name": "乙类后进先出且不占用丙类"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 22,
+      "delta": "ADDED Requirements",
+      "requirement": "已接入产品目录与本人多产品持仓",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 25,
+          "name": "只选已接入产品"
+        },
+        {
+          "line": 29,
+          "name": "本人多账户与多人同产品"
+        },
+        {
+          "line": 33,
+          "name": "产品退出新增目录"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 37,
+      "delta": "ADDED Requirements",
+      "requirement": "期初持仓和缺净值建账",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 40,
+          "name": "小额总成本与单位净值分开"
+        },
+        {
+          "line": 44,
+          "name": "可填写的建账参考净值"
+        },
+        {
+          "line": 48,
+          "name": "初次缺价也可登记"
+        },
+        {
+          "line": 52,
+          "name": "有后续交易后修改期初"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 56,
+      "delta": "ADDED Requirements",
+      "requirement": "已确认申购与跨日待结算",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 59,
+          "name": "已确认交易补登记跨日历史"
+        },
+        {
+          "line": 63,
+          "name": "追加申购"
+        },
+        {
+          "line": 67,
+          "name": "只知道扣款尚无确认份额"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 71,
+      "delta": "ADDED Requirements",
+      "requirement": "赎回确认与实际到账",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 74,
+          "name": "部分赎回尚未到账"
+        },
+        {
+          "line": 78,
+          "name": "清仓仍有应收"
+        },
+        {
+          "line": 82,
+          "name": "重复到账或超卖"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 86,
+      "delta": "ADDED Requirements",
+      "requirement": "现金分红与实际红利再投资",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 89,
+          "name": "除息与现金分红不重复计损"
+        },
+        {
+          "line": 93,
+          "name": "再投资不扣银行卡"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 97,
+      "delta": "ADDED Requirements",
+      "requirement": "自动单位净值身份与来源核对",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 102,
+          "name": "民生独立同步并重估"
+        },
+        {
+          "line": 106,
+          "name": "民生历史修订与失败"
+        },
+        {
+          "line": 110,
+          "name": "获取成功但没有新净值"
+        },
+        {
+          "line": 114,
+          "name": "错份额或无效响应"
+        },
+        {
+          "line": 118,
+          "name": "来源历史修订"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 122,
+      "delta": "ADDED Requirements",
+      "requirement": "每日四次同步与可恢复刷新",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 125,
+          "name": "无人在线自动更新"
+        },
+        {
+          "line": 129,
+          "name": "重启合并多个漏跑槽"
+        },
+        {
+          "line": 133,
+          "name": "手动刷新与后台竞争"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 137,
+      "delta": "ADDED Requirements",
+      "requirement": "无人值守采集准入门槛",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 140,
+          "name": "明确授权 J07241 提前开放"
+        },
+        {
+          "line": 144,
+          "name": "桌面可用而服务器不可用"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 148,
+      "delta": "ADDED Requirements",
+      "requirement": "本人净值补录及自动同日优先",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 151,
+          "name": "本人跨账户补缺"
+        },
+        {
+          "line": 155,
+          "name": "同日自动值到齐"
+        },
+        {
+          "line": 159,
+          "name": "补录与自动到齐并发"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 163,
+      "delta": "ADDED Requirements",
+      "requirement": "人工净值修订撤回和完整历史重建",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 166,
+          "name": "人工与自动都是第一版"
+        },
+        {
+          "line": 170,
+          "name": "插入或撤回中间日期"
+        },
+        {
+          "line": 174,
+          "name": "修订响应丢失及并发编辑"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 178,
+      "delta": "ADDED Requirements",
+      "requirement": "市值盈亏与缺价完整性",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 181,
+          "name": "多产品中一只缺价"
+        },
+        {
+          "line": 185,
+          "name": "赎回只重分类收益"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 189,
+      "delta": "ADDED Requirements",
+      "requirement": "净值区间盈亏与历史时点",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 192,
+          "name": "建账前无个人盈亏"
+        },
+        {
+          "line": 196,
+          "name": "历史持仓变化"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 200,
+      "delta": "ADDED Requirements",
+      "requirement": "财务事件可靠写入和末笔撤销",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 203,
+          "name": "申购成功但回执丢失"
+        },
+        {
+          "line": 207,
+          "name": "赎回已有到账依赖"
+        },
+        {
+          "line": 211,
+          "name": "派生估值失败"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 215,
+      "delta": "ADDED Requirements",
+      "requirement": "独立理财页面和来源可见性",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 218,
+          "name": "手机维护本人净值"
+        },
+        {
+          "line": 222,
+          "name": "换号迟到响应"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 226,
+      "delta": "ADDED Requirements",
+      "requirement": "配置化产品目录和银行来源",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 229,
+          "name": "同银行新增份额"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    },
+    {
+      "spec": "specs/wealth-accounts/spec.md",
+      "line": 233,
+      "delta": "ADDED Requirements",
+      "requirement": "理财零钱自动收益和手动采用值",
+      "implementation": [
+        "backend/internal/service/wealth_service.go",
+        "backend/internal/service/wealth_orders.go",
+        "backend/internal/service/wealth_quotes.go",
+        "backend/internal/service/wealth_valuation.go",
+        "backend/internal/service/wealth_sync.go",
+        "backend/internal/service/wealth_schedule.go",
+        "backend/internal/service/wealth_admission.go",
+        "backend/internal/wealthdata/catalog.go",
+        "collector/qualification.mjs"
+      ],
+      "related_tests": [
+        "backend/internal/service/wealth_service_test.go",
+        "backend/internal/service/wealth_orders_test.go",
+        "backend/internal/service/wealth_opening_cost_test.go",
+        "backend/internal/service/wealth_quotes_test.go",
+        "backend/internal/service/wealth_schedule_test.go",
+        "backend/internal/service/wealth_statistics_test.go",
+        "backend/internal/service/wealth_admission_test.go",
+        "backend/internal/service/wealth_cmbcwm_test.go",
+        "backend/internal/service/wealth_cash_test.go",
+        "frontend/e2e/wealth.mjs",
+        "frontend/e2e/wealth-orders.mjs",
+        "frontend/e2e/wealth-opening-cost.mjs",
+        "frontend/e2e/wealth-cash.mjs"
+      ],
+      "scenarios": [
+        {
+          "line": 238,
+          "name": "快转当天停止收益"
+        },
+        {
+          "line": 242,
+          "name": "手动收益后净值修订"
+        },
+        {
+          "line": 246,
+          "name": "转入与支付失败退款"
+        }
+      ],
+      "review_basis": "existing implementation, recorded isolated functional regressions; source admission additionally verified with final real-time evidence and 14 fresh Go replays"
+    }
+  ],
+  "scope_note": "No fresh rerun of full financial/MySQL/frontend/browser suites in this final read-only turn; prior dated records retained. This is a requirement/scenario review and evidence rollup, not 135 newly executed tests."
+}

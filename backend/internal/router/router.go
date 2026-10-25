@@ -246,12 +246,12 @@ func New(corsOrigins []string, d Deps) *gin.Engine {
 			audits.GET("", clh.AuditList)
 		}
 
-		// 预算：读全部角色，写仅管理员（specs/budgets 8.1）
+		// 预算：全部登录角色管理本人预算，服务层按认证账号隔离。
 		bh := handler.NewBudget(d.BudgetSvc)
 		budgets := v1.Group("/budgets", middleware.Auth(d.AuthSvc))
 		{
 			budgets.GET("", bh.Get)
-			budgets.PUT("/:period_key", middleware.RequireRoles(model.RoleAdmin), bh.Set)
+			budgets.PUT("/:period_key", bh.Set)
 		}
 
 		// 周期记账：列表读全部登录角色（作用域按创建者归属，管理员全量）；

@@ -21,6 +21,8 @@ func NewBudget(svc *service.BudgetService) *budgetHandler {
 
 func mapBudgetErr(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, service.ErrTxnForbidden):
+		response.Forbidden(c, "无权操作该预算")
 	case errors.Is(err, service.ErrBudgetInvalidPeriod),
 		errors.Is(err, service.ErrBudgetCategoryInvalid),
 		errors.Is(err, service.ErrBudgetAmountInvalid):
@@ -49,8 +51,8 @@ type budgetSetReq struct {
 	Items []service.BudgetSetItem `json:"items"`
 }
 
-// Set PUT /api/v1/budgets/:period_key 保存预算配置（仅管理员，路由门禁）。
-// 整单提交：total + items 即该账期预算全集（缺项 = 清除）。
+// Set PUT /api/v1/budgets/:period_key 保存本人预算配置（全部登录角色）。
+// 整单提交：total + items 即本人该账期预算全集（缺项 = 清除）。
 func (h *budgetHandler) Set(c *gin.Context) {
 	key := c.Param("period_key")
 	var req budgetSetReq

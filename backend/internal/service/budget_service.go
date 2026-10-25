@@ -113,7 +113,7 @@ func (s *BudgetService) CurrentKey() string {
 // Get 某账期预算视图（全部角色可读）：
 // 总预算进度 + 每个一级支出分类一行（配置回填与进度展示同一个数据源）。
 func (s *BudgetService) Get(periodKey string) (*BudgetView, error) {
-	if s.ownerID < 0 {
+	if s.ownerID <= 0 {
 		return nil, ErrTxnForbidden
 	}
 	if _, _, ok := s.deps.Periods.Range(periodKey); !ok {
@@ -194,10 +194,10 @@ func parseAmount(s *string) (decimal.Decimal, bool, error) {
 	return v, true, nil
 }
 
-// Set 保存预算配置（仅管理员，路由门禁）：整期重建，随后立即评估超支——
+// Set 保存本人预算配置（全部登录角色）：仅重建本人的整期配置，随后立即评估超支——
 // 把预算改到低于既有消耗时当场提醒（spec「首次超支」不限于记账触发）。
 func (s *BudgetService) Set(periodKey string, in BudgetSetInput) error {
-	if s.ownerID < 0 {
+	if s.ownerID <= 0 {
 		return ErrTxnForbidden
 	}
 	if _, _, ok := s.deps.Periods.Range(periodKey); !ok {
@@ -254,9 +254,9 @@ type BudgetNotifyPayload struct {
 // 同账期同预算用 payload.dedup_key 去重（任务 8.2）。
 func (s *BudgetService) Evaluate(periodKey string) error {
 	if s.ownerID == 0 {
-		var owners []int64
-		if e := s.deps.Cats.DB().Table("accounts").Distinct("owner_id").Where("owner_id IS NOT NULL").Pluck("owner_id", &owners).Error; e != nil {
-			return e
+		owners, err := s.deps.Budgets.Owners(periodKey)
+		if err != nil {
+			return err
 		}
 		for _, owner := range owners {
 			if e := s.ForUser(&model.User{ID: owner}).Evaluate(periodKey); e != nil {
@@ -264,6 +264,9 @@ func (s *BudgetService) Evaluate(periodKey string) error {
 			}
 		}
 		return nil
+	}
+	if s.ownerID < 0 {
+		return ErrTxnForbidden
 	}
 	bs, err := s.deps.Budgets.List(periodKey)
 	if err != nil {

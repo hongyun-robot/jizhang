@@ -1,0 +1,17 @@
+{
+  "run_id": "20261016t014727z",
+  "qualification_passed": true,
+  "normal_slots_passed": 12,
+  "normal_slots_total": 12,
+  "go_public_replays_passed": 14,
+  "go_public_replays_total": 14,
+  "openspec_strict_validation": "passed",
+  "tasks_complete": 60,
+  "tasks_total": 60,
+  "automation_id": "automation",
+  "automation_status": "PAUSED",
+  "production_admission_changed": false,
+  "production_database_written": false,
+  "containers_restarted": false,
+  "state_sha256": "a424dbadcc06191655822b851361681343a108a5756b9184de7d65ce0fd62f1a"
+}
