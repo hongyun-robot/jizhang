@@ -64,6 +64,10 @@ export function isUnauthorized(error: unknown): boolean {
   const normalized = normalizeError(error);
   return normalized instanceof ApiError && normalized.kind === 'unauthorized';
 }
+export function isTerminalAuth(error: unknown): boolean {
+  const normalized = normalizeError(error);
+  return normalized instanceof ApiError && (normalized.code === 10008 || normalized.code === 10009);
+}
 export function errMsg(error: unknown): string {
   return typeof error === 'string' ? error : normalizeError(error).message;
 }

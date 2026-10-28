@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { assertFixture, withFixture, login, shot, until } from './support/fixture.mjs';
+import { assertFixture, withFixture, login, shot, until, fixtureApi, fixtureToken } from './support/fixture.mjs';
 
 const base = process.env.GOLD_E2E_BASE ?? 'http://127.0.0.1:5604';
 await assertFixture(base, ['gold-browser']);
@@ -11,14 +11,10 @@ const yesterday = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }
 let assertions = 0;
 function check(value, text) { assert(value, text); assertions++; }
 async function client(username) {
-  const response = await fetch(base + '/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username, password: 'voucher-test-only' }) });
-  assert.equal(response.status, 200); const token = (await response.json()).data.access_token;
-  const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
-  const request = async (method, path, input, expected = 200) => {
-    const r = await fetch(base + '/api/v1' + path, { method, headers, ...(input === undefined ? {} : { body: JSON.stringify(input) }) });
-    const body = await r.json(); assert.equal(r.status, expected, `${path}: ${JSON.stringify(body)}`); assertions++; return body.data;
-  };
-  await request('GET', '/accounts'); return { request, headers };
+  const api = await fixtureApi(base, username);
+  const request = async (...args) => { assertions++; return api(...args); };
+  await request('GET', '/accounts');
+  return { request, username };
 }
 const admin = await client('voucher-admin');
 const viewer = await client('voucher-viewer');
@@ -121,7 +117,7 @@ await withFixture(base, async (browser) => {
   check(linked?.expense_effect === '0', 'gold counted as consumption');
   await admin.request('DELETE', `/transactions/${linked.id}`, undefined, 409);
   await admin.request('POST', '/transactions', { kind: 'transfer', amount: '1', account_id: cash.id, transfer_account_id: id, entry_date: day }, 409);
-  const csv = await fetch(base + `/api/v1/transactions/export?account_id=${id}`, { headers: admin.headers });
+  const csv = await fetch(base + `/api/v1/transactions/export?account_id=${id}`, { headers: { authorization: 'Bearer ' + fixtureToken(base, admin.username) } });
   check((await csv.text()).includes('建行积存金卖出'), 'CSV lost gold purpose');
   const latest = value.events.filter((e) => !e.voided_at).at(-1);
   await admin.request('POST', `/gold/accounts/${id}/events/${latest.id}/undo`, { request_key: randomUUID() });
@@ -160,7 +156,7 @@ await withFixture(base, async (browser) => {
   await until(async () => responseReady, Boolean, 'held successful gold response');
   await modal.locator('.ant-modal-close').click();
   await page.getByRole('menuitem', { name: /我的/ }).click();
-  await page.getByRole('button', { name: /退出登录/ }).click();
+  await page.getByRole('button', { name: /退出所有设备/ }).click();
   await page.waitForURL(/\/login$/);
   await page.getByPlaceholder('用户名').fill('voucher-viewer'); await page.getByPlaceholder('密码').fill('voucher-test-only');
   await page.getByRole('button', { name: /登\s*录/ }).click(); await page.waitForURL((url) => !url.pathname.endsWith('/login'));

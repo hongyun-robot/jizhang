@@ -2,12 +2,14 @@ import { firefox } from 'playwright-core';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fixturePageRequest, registerFixturePage } from './support/fixture.mjs';
 
 const base = process.env.VOUCHER_E2E_BASE ?? 'http://127.0.0.1:5601';
 assert(['127.0.0.1', 'localhost'].includes(new URL(base).hostname));
 const browser = await firefox.launch({ headless: true, executablePath: process.env.FIREFOX_EXE ?? path.join(process.env.LOCALAPPDATA, 'ms-playwright/firefox-1543/firefox/firefox.exe') });
 const context = await browser.newContext({ viewport: { width: 897, height: 884 } });
 const page = await context.newPage();
+registerFixturePage(page,base,'voucher-member');
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
 const prefix = `流水平台-${Date.now()}`;
@@ -16,6 +18,11 @@ let headers;
 const shots = path.resolve('e2e/shots');
 fs.mkdirSync(shots, { recursive: true });
 const api = async (method, endpoint, data) => {
+  if (!new URL(page.url()).pathname.endsWith('/login') && page.url() !== 'about:blank') {
+    const reply = await fixturePageRequest(page,method,endpoint,data);
+    assert.equal(reply.status,200,JSON.stringify(reply.body));
+    return reply.body.data;
+  }
   const response = await context.request.fetch(base + '/api/v1' + endpoint, { method, headers, data });
   assert.equal(response.status(), 200, await response.text());
   return (await response.json()).data;
@@ -28,7 +35,7 @@ const settle = async () => page.locator('.ant-modal:visible').evaluate(async (el
 });
 try {
   assert.equal((await (await context.request.get(base + '/api/v1/__test__/info')).json()).fixture, 'voucher-browser');
-  const signedIn = await context.request.post(base + '/api/v1/auth/login', { data: { username: 'voucher-member', password: 'voucher-test-only' } });
+  const signedIn = await context.request.post(base + '/api/v1/auth/login', { data: { protocol_version: 2, username: 'voucher-member', password: 'voucher-test-only' } });
   headers = { Authorization: 'Bearer ' + (await signedIn.json()).data.access_token };
   await api('POST', '/voucher-platforms', { name: '美团' });
   const balanceBefore = (await api('GET', '/accounts'))[0].balance;

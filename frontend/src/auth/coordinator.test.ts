@@ -47,9 +47,17 @@ function harness() {
     reset: () => {
       state = { token: null, user: null, epoch: 0 };
     },
+    expire: () => { state={...state,accessExpiresAt:Date.now()/1000-1}; },
   };
 }
 describe('session concurrency', () => {
+  it('refreshes when a newer local token has also expired before a late 401 arrives', async () => {
+    const h=harness();h.expire();
+    const refreshing=h.coordinator.refreshAfter401('even-older');
+    expect(h.refresh).toHaveBeenCalledTimes(1);
+    h.result.resolve({access_token:'fresh'});
+    expect(await refreshing).toBe('fresh');
+  });
   it('refreshes an existing rejected token once and reuses the new token for late 401s', async () => {
     const h = harness();
     const requests = [

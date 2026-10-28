@@ -9,14 +9,19 @@ import (
 
 // 统一业务错误码（{code,message,data} 包装，code=0 表示成功）。
 const (
-	CodeOK            = 0
-	CodeInvalidParams = 10001
-	CodeUnauthorized  = 10002
-	CodeForbidden     = 10003
-	CodeNotFound      = 10004
-	CodeTooManyReq    = 10005
-	CodeConflict      = 10006
-	CodeInternal      = 20000
+	CodeOK              = 0
+	CodeInvalidParams   = 10001
+	CodeUnauthorized    = 10002
+	CodeForbidden       = 10003
+	CodeNotFound        = 10004
+	CodeTooManyReq      = 10005
+	CodeConflict        = 10006
+	CodeAccessExpired   = 10007
+	CodeSessionEnded    = 10008
+	CodeSessionReplaced = 10009
+	CodeRefreshConflict = 10010
+	CodeInternal        = 20000
+	CodeAuthUnavailable = 20001
 )
 
 // Body 统一响应体。

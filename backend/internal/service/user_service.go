@@ -30,7 +30,7 @@ type UserManageStore interface {
 
 // SessionRevoker 吊销用户全部在线会话（AuthService 实现）。
 type SessionRevoker interface {
-	RevokeAll(ctx context.Context, uid int64)
+	RevokeAll(ctx context.Context, uid int64) error
 }
 
 var validRoles = map[model.Role]bool{
@@ -123,7 +123,9 @@ func (s *UserService) SetRole(targetID int64, role model.Role) (*model.User, err
 	if err := s.store.Update(u); err != nil {
 		return nil, err
 	}
-	s.sessions.RevokeAll(context.Background(), u.ID) // 角色变更立即重新登录生效
+	if err := s.sessions.RevokeAll(context.Background(), u.ID); err != nil {
+		return nil, err
+	}
 	return u, nil
 }
 
@@ -146,7 +148,9 @@ func (s *UserService) SetStatus(targetID int64, status model.UserStatus) (*model
 	if err := s.store.Update(u); err != nil {
 		return nil, err
 	}
-	s.sessions.RevokeAll(context.Background(), u.ID)
+	if err := s.sessions.RevokeAll(context.Background(), u.ID); err != nil {
+		return nil, err
+	}
 	return u, nil
 }
 
@@ -170,6 +174,5 @@ func (s *UserService) ResetPassword(targetID int64, newPassword string) error {
 	if err := s.store.Update(u); err != nil {
 		return err
 	}
-	s.sessions.RevokeAll(context.Background(), u.ID)
-	return nil
+	return s.sessions.RevokeAll(context.Background(), u.ID)
 }

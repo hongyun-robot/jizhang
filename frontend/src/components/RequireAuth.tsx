@@ -15,6 +15,8 @@ export default function RequireAuth({
   const user = useAuth((s) => s.user);
   const booted = useAuth((s) => s.booted);
   const epoch = useAuth((s) => s.epoch);
+  const validationPending = useAuth((s) => s.validationPending);
+  const validationError = useAuth((s) => s.validationError);
   const location = useLocation();
   const [error, setError] = useState<Error | null>(null);
   const [retry, setRetry] = useState(0);
@@ -23,14 +25,17 @@ export default function RequireAuth({
     let active = true;
     void session.restore().catch((caught) => {
       if (!active || axios.isCancel(caught)) return;
-      if (isUnauthorized(caught)) session.end();
+      if (isUnauthorized(caught)) session.end(normalizeError(caught).message);
       else setError(normalizeError(caught));
     });
     return () => {
       active = false;
     };
   }, [booted, epoch, retry]);
-  if (user) return <>{children}</>;
+  if (user) return <>
+    {validationError && <QueryState error={validationError} onRetry={() => { void session.validate().catch(() => {}); }} />}
+    <div style={{ display: 'contents' }} inert={validationPending || !!validationError}>{children}</div>
+  </>;
   if (error && !booted)
     return (
       <QueryState

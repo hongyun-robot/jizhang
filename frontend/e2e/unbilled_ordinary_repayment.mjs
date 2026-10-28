@@ -165,15 +165,13 @@ try {
   await api('POST', '/liabilities/repayments', { ...input, quote_signature: quote.quote_signature });
   const after = await api('GET', `/accounts/${mixed.id}/liability`);
   check(after.plans[0].terms.every((t) => t.status !== 'settled') && after.credits.filter((c) => c.mode === 'ordinary_advance').length === 1, 'manual multi-bill advance leaves every installment untouched');
-  const authResponse = await fetch(base + '/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'voucher-admin', password: 'voucher-test-only' }) });
-  const token = (await authResponse.json()).data.access_token;
   const pending = { ...input, amount: '100', mode: 'auto', targets: [], request_key: crypto.randomUUID() };
   const pendingQuote = await api('POST', '/liabilities/repayments/preview', pending);
   const other = { ...pending, amount: '10', request_key: crypto.randomUUID() };
   const otherQuote = await api('POST', '/liabilities/repayments/preview', other);
   await api('POST', '/liabilities/repayments', { ...other, quote_signature: otherQuote.quote_signature });
-  const stale = await fetch(base + '/api/v1/liabilities/repayments', { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ ...pending, quote_signature: pendingQuote.quote_signature }) });
-  check(stale.status === 409, 'a changed allocation invalidates the old quote even when the requested amount still fits');
+  await api('POST','/liabilities/repayments',{ ...pending, quote_signature: pendingQuote.quote_signature },409);
+  check(true, 'a changed allocation invalidates the old quote even when the requested amount still fits');
   for (const role of ['member', 'recorder']) {
     const ownApi = await fixtureApi(base, 'voucher-' + role);
     const ownCard = await ownApi('POST', '/accounts', { name: '本人提前还款' + role, type: 'liability', opening_balance: '0', liability_type: 'huabei', statement_day: 31, repayment_day: 10, repayment_month_offset: 1 });
@@ -185,10 +183,9 @@ try {
     await ownApi('POST', '/liabilities/repayments', { ...ownInput, quote_signature: ownQuote.quote_signature });
     check((await ownApi('GET', `/accounts/${ownCard.id}/liability`)).summary.unbilled === '30', role + ' can record only own ordinary advance');
   }
-  const viewerAuth = await fetch(base + '/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'voucher-viewer', password: 'voucher-test-only' }) });
-  const viewerToken = (await viewerAuth.json()).data.access_token;
-  const forbidden = await fetch(base + '/api/v1/liabilities/repayments/preview', { method: 'POST', headers: { authorization: 'Bearer ' + viewerToken, 'content-type': 'application/json' }, body: JSON.stringify(pending) });
-  check(forbidden.status === 403, 'viewer cannot use ordinary advance API');
+  const viewerApi=await fixtureApi(base,'voucher-viewer');
+  await viewerApi('POST','/liabilities/repayments/preview',pending,403);
+  check(true, 'viewer cannot use ordinary advance API');
   console.log(`PASS ${checks} ordinary advance checks`);
 } finally {
   await browser.close();

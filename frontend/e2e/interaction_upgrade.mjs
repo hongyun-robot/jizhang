@@ -1,3 +1,4 @@
+import { currentAuthToken, latestBearer, trackPageAuth } from './support/auth-tokens.mjs';
 /* eslint-disable no-console */
 /**
  * upgrade-mobile-web-interaction 前端 e2e（随任务组追加断言）。
@@ -103,6 +104,7 @@ async function clickPager(page, n) {
 }
 
 async function login(page, username, password) {
+  trackPageAuth(page, BASE);
   await page.goto(BASE + '/login');
   await page.locator('input[placeholder="用户名"]').fill(username);
   await page.locator('input[placeholder="密码"]').fill(password);
@@ -119,10 +121,12 @@ const siderItem = (page, label) => page.locator('.app-sider .ant-menu-item', { h
 const API = process.env.API ?? 'http://127.0.0.1:8080/api/v1';
 let TOKEN = '';
 async function apiLogin(u = 'admin', p = 'admin123') {
+  const _uiToken = currentAuthToken(BASE, u);
+  if (_uiToken) { TOKEN = _uiToken; return _uiToken; }
   const r = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username: u, password: p }),
+    body: JSON.stringify({ protocol_version: 2, username: u, password: p }),
   });
   const j = await r.json();
   if (j.code !== 0) throw new Error(j.message);
@@ -131,7 +135,7 @@ async function apiLogin(u = 'admin', p = 'admin123') {
 async function api(path, opts = {}) {
   const r = await fetch(API + path, {
     ...opts,
-    headers: { ...(opts.headers ?? {}), authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' },
+    headers: { ...(opts.headers ?? {}), authorization: `Bearer ${latestBearer(BASE, TOKEN)}`, 'content-type': 'application/json' },
   });
   return { status: r.status, json: await r.json().catch(() => null) };
 }

@@ -84,7 +84,7 @@ try {
   // Each user owns an independent ledger. Keep smoke writes out of real users' data.
   const adminLogin = await fetch(BASE + '/api/v1/auth/login', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username: ADMIN_USER, password: ADMIN_PASS }),
+    body: JSON.stringify({ protocol_version: 2, username: ADMIN_USER, password: ADMIN_PASS }),
   }).then((response) => response.json());
   adminToken = adminLogin?.data?.access_token;
   if (adminLogin?.code !== 0 || !adminToken) throw new Error('冒烟准备：管理员认证失败');
@@ -210,7 +210,7 @@ try {
     ok(page.url().includes('/login'), '登出跳登录页', page.url());
   } else {
     // 有的实现是链接而非按钮
-    const link = page.getByText(/退出登录|登\s*出/).first();
+    const link = page.getByText(/退出所有设备|登\s*出/).first();
     ok((await link.count()) > 0, '登出入口存在', '未找到按钮，文本入口也未命中');
   }
   await shot(page, 'prod-04-logout');
@@ -261,7 +261,7 @@ try {
   const lr = await fetch(BASE + '/api/v1/auth/login', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username: USER, password: PASS }),
+    body: JSON.stringify({ protocol_version: 2, username: USER, password: PASS }),
   });
   const lj = await lr.json();
   const tok = lj?.data?.access_token;

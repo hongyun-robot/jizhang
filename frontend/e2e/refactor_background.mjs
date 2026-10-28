@@ -33,7 +33,7 @@ await withFixture(base, async (browser) => {
     assert.equal(counts.recurring, 1, 'recurring retains startup-only frequency');
     assert.equal(counts.vouchers > 1, username === 'voucher-admin', 'viewer skips voucher financial processing');
     await page.getByRole('menuitem', { name: /我的/ }).click();
-    await page.getByRole('button', { name: /退出登录/ }).click();
+    await page.getByRole('button', { name: /退出所有设备/ }).click();
     await page.waitForURL((url) => url.pathname.endsWith('/login'));
     const last = { ...counts };
     await page.waitForTimeout(400);

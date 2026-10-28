@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { App, Button, Form, Input } from 'antd';
+import { Alert, App, Button, Form, Input } from 'antd';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 
 import { errMsg } from '../api/client';
 import { useAuth } from '../stores/auth';
-import { session } from '../auth/session';
+import { browserAuth, session } from '../auth/session';
 import { returnTarget } from '../navigation/routes';
 import { BASENAME } from '../base';
 import Brand from '../components/Brand';
@@ -24,6 +24,21 @@ export default function Login() {
   // 静态 message 改走 AntApp 容器（与全站一致，暗色主题下样式正确）
   const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const user = useAuth((s) => s.user);
+  const reason = useAuth((s) => s.endReason);
+  const marker = browserAuth.marker();
+  const pendingLogout = marker?.status === 'logout_failed' || marker?.status === 'logout_pending';
+  useEffect(() => {
+    if (user) navigate(returnTarget((location.state as { from?: unknown } | null)?.from, user.role, BASENAME), { replace: true });
+  }, [user, navigate, location.state]);
+  const retryLogout = async () => {
+    setRetrying(true);
+    try { await session.retryLogout(); useAuth.getState().clear('已退出所有设备'); setLogoutError(null); }
+    catch (error) { setLogoutError(errMsg(error)); }
+    finally { setRetrying(false); }
+  };
 
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true);
@@ -77,6 +92,12 @@ export default function Login() {
           <div className="eyebrow">Sign in</div>
           <h1>登录</h1>
           <p className="login-note">账号由管理员统一创建，未开放注册。</p>
+          {pendingLogout ? <Alert
+            type="warning" showIcon
+            title="当前浏览器已退出，尚未确认其他设备退出"
+            description={logoutError ?? '可重试退出，或使用密码重新登录。'}
+            action={<Button loading={retrying} onClick={() => { void retryLogout(); }}>重试退出</Button>}
+          /> : reason ? <Alert type="info" showIcon title={reason} /> : null}
 
           <Form
             layout="vertical"

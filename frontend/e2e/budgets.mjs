@@ -56,7 +56,7 @@ await withFixture(base, async (browser, cleanup) => {
       assert(!(await card.innerText()).includes('11000.00'));
     }
     await page.goto(base + '/mine');
-    await page.getByRole('button', { name: '退出登录' }).click();
+    await page.getByRole('button', { name: '退出所有设备' }).click();
     await page.waitForURL(/\/login$/);
     await login(page, base, viewer.username);
     await page.setViewportSize({ width: 390, height: 844 });
@@ -73,7 +73,7 @@ await withFixture(base, async (browser, cleanup) => {
     await shot(page, 'budgets-personal-mobile');
     console.log('PASS desktop and mobile save; home/statistics progress; same-browser login switch; viewer self-service');
 
-    const auth = await fetch(base + '/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: admin.username, password: 'voucher-test-only' }) });
+    const auth = await fetch(base + '/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ protocol_version: 2, username: admin.username, password: 'voucher-test-only' }) });
     const token = (await auth.json()).data.access_token;
     const rejected = await fetch(base + `/api/v1/budgets/${admin.period}`, { method: 'PUT', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ total: '1', items: [{ category_id: viewer.category, amount: '1' }] }) });
     assert.equal(rejected.status, 400, 'admin cannot configure foreign categories');

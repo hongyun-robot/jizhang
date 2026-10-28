@@ -1,3 +1,4 @@
+import { currentAuthToken, latestBearer, trackPageAuth } from './support/auth-tokens.mjs';
 /* eslint-disable no-console */
 /**
  * add-ledger-system 任务 11.2：流水页导出按钮走查（specs/transactions「CSV 导出」）。
@@ -42,10 +43,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: true });
 
 async function apiLogin(u, p) {
+  const _uiToken = currentAuthToken(BASE, u);
+  if (_uiToken) { return _uiToken; }
   const r = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username: u, password: p }),
+    body: JSON.stringify({ protocol_version: 2, username: u, password: p }),
   });
   const j = await r.json();
   if (j.code !== 0) throw new Error(j.message);
@@ -53,6 +56,7 @@ async function apiLogin(u, p) {
 }
 
 async function login(page, username, password) {
+  trackPageAuth(page, BASE);
   await page.goto(BASE + '/login');
   await page.locator('input[placeholder="用户名"]').fill(username);
   await page.locator('input[placeholder="密码"]').fill(password);
@@ -118,7 +122,7 @@ async function main() {
   const monthExpenseSum = async (token) => {
     const r = await fetch(
       `${API}/transactions?period_key=${periodKey}&kind=expense&page_size=100`,
-      { headers: { authorization: `Bearer ${token}` } },
+      { headers: { authorization: `Bearer ${latestBearer(BASE, token)}` } },
     );
     const j = await r.json();
     return j.data.items.reduce((s, t) => s + Number(t.amount), 0);
@@ -171,7 +175,7 @@ async function main() {
   // 与后端 API 同参对比（列表与导出同一套筛选语义）
   const token = await apiLogin('admin', 'admin123');
   const r = await fetch(`${API}/transactions?kind=expense&keyword=${encodeURIComponent('午饭')}`, {
-    headers: { authorization: `Bearer ${token}` },
+    headers: { authorization: `Bearer ${latestBearer(BASE, token)}` },
   });
   const j = await r.json();
   ok(c2.dataLines === j.data.total, '导出行数 = 后端同参 total', `${c2.dataLines} vs ${j.data.total}`);

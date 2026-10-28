@@ -1,21 +1,13 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { withFixture, login, shot, until } from './support/fixture.mjs';
+import { withFixture, login, shot, until, fixtureApi } from './support/fixture.mjs';
 
 const base = process.env.REFACTOR_E2E_BASE ?? 'http://127.0.0.1:5601';
 const prefix = `个人目录-${Date.now()}`;
 await withFixture(base, async (browser, cleanup) => {
   const clients = [];
   for (const username of ['voucher-admin', 'voucher-recorder', 'voucher-member', 'voucher-viewer']) {
-    const auth = await fetch(base + '/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username, password: 'voucher-test-only' }) });
-    assert.equal(auth.status, 200);
-    const token = (await auth.json()).data.access_token;
-    const request = async (method, endpoint, input, status = 200) => {
-      const response = await fetch(base + '/api/v1' + endpoint, { method, headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, ...(input === undefined ? {} : { body: JSON.stringify(input) }) });
-      const body = await response.json();
-      assert.equal(response.status, status, `${method} ${endpoint}: ${JSON.stringify(body)}`);
-      return body.data;
-    };
+    const request = await fixtureApi(base, username);
     const input = { name: prefix + '-同名账户', type: 'asset', opening_balance: '12', request_key: randomUUID(), owner_id: 999 };
     const account = await request('POST', '/accounts', input);
     assert.notEqual(account.owner_id, 999);

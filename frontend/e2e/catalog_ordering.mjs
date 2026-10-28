@@ -87,13 +87,8 @@ await withFixture(base, async (browser, cleanup) => {
   }
   // HTTP status/role/ownership checks also exercise the registered static reorder routes.
   for (const role of ['admin', 'recorder', 'member', 'viewer']) {
-    const auth = await fetch(base + '/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: `voucher-${role}`, password: 'voucher-test-only' }) });
-    const token = (await auth.json()).data.access_token;
-    const request = async (resource, data, expected) => {
-      const response = await fetch(base + `/api/v1/${resource}/reorder`, { method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(data) });
-      assert.equal(response.status, expected, await response.text());
-    };
-    const own = await fixtureApi(base, `voucher-${role}`);
+    const own = await fixtureApi(base, 'voucher-' + role);
+    const request = async (resource, data, expected) => own('PUT', '/' + resource + '/reorder', data, expected);
     for (const resource of ['accounts', 'voucher-platforms', 'categories']) {
       const all = await own('GET', `/${resource}`);
       const rows = resource === 'categories' ? flattenRoots(all) : all;
@@ -241,7 +236,7 @@ await withFixture(base, async (browser, cleanup) => {
   await keyboardMove(page, handles);
   await until(() => held, Boolean, 'late save committed');
   await page.locator('.bottom-tabs').getByRole('button', { name: /我的$/ }).click();
-  await page.getByRole('button', { name: /退出登录$/ }).click();
+  await page.getByRole('button', { name: /退出所有设备$/ }).click();
   await page.getByPlaceholder('用户名').fill('voucher-viewer');
   await page.getByPlaceholder('密码').fill('voucher-test-only');
   await page.getByRole('button', { name: /登\s*录/ }).click();

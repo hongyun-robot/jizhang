@@ -30,6 +30,32 @@ afterEach(() => {
 });
 
 describe('authenticated request retry', () => {
+  it('ends a replaced session without refreshing or logging out other devices', async () => {
+    useAuth.getState().setSession('old', user);
+    const refresh = vi.spyOn(session, 'refreshAfter401');
+    const logout = vi.spyOn(session, 'logout');
+    api.defaults.adapter = async (config) => {
+      const rejected = response(config, 401);
+      rejected.data.code = 10009;
+      throw new AxiosError('replaced', '', config, undefined, rejected);
+    };
+    await expect(createJsonRequester(api)('/accounts')).rejects.toMatchObject({ code: 10009 });
+    expect(refresh).not.toHaveBeenCalled();
+    expect(logout).not.toHaveBeenCalled();
+    expect(useAuth.getState().user).toBeNull();
+  });
+  it('keeps the session on a retryable authentication service failure', async () => {
+    useAuth.getState().setSession('old', user);
+    const refresh = vi.spyOn(session, 'refreshAfter401');
+    api.defaults.adapter = async (config) => {
+      const rejected = response(config, 503);
+      rejected.data.code = 20001;
+      throw new AxiosError('unavailable', '', config, undefined, rejected);
+    };
+    await expect(createJsonRequester(api)('/transactions')).rejects.toMatchObject({ status: 503 });
+    expect(refresh).not.toHaveBeenCalled();
+    expect(useAuth.getState().user).toEqual(user);
+  });
   it('retries once with the same write body and operation key', async () => {
     useAuth.getState().setSession('old', user);
     const refresh = vi

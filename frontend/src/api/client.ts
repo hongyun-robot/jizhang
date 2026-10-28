@@ -2,7 +2,7 @@ import axios, { CanceledError, type InternalAxiosRequestConfig } from 'axios';
 import { API_BASE } from '../base';
 import { useAuth } from '../stores/auth';
 import { session } from '../auth/session';
-import { isUnauthorized, normalizeError } from './errors';
+import { isTerminalAuth, isUnauthorized, normalizeError } from './errors';
 
 export { errMsg } from './errors';
 export type { ApiBody } from './errors';
@@ -13,9 +13,12 @@ type SessionConfig = InternalAxiosRequestConfig & {
   _retried?: boolean;
 };
 export const api = axios.create({ baseURL: API_BASE, timeout: 10000 });
-api.interceptors.request.use((input) => {
+api.interceptors.request.use(async (input) => {
   const config = input as SessionConfig;
+  const epoch = config._epoch ?? useAuth.getState().epoch;
+  await session.beforeRequest();
   const state = useAuth.getState();
+  if (epoch !== state.epoch) throw new CanceledError('会话已结束');
   if (config._epoch !== undefined && config._epoch !== state.epoch)
     throw new CanceledError('会话已结束');
   config._epoch = state.epoch;
@@ -40,8 +43,12 @@ api.interceptors.response.use(
     )
       throw new CanceledError('会话已结束');
     if (config && isUnauthorized(error) && !config.url?.startsWith('/auth/')) {
+      if (isTerminalAuth(error)) {
+        session.end(normalizeError(error).message);
+        throw normalizeError(error);
+      }
       if (config._retried) {
-        session.end();
+        session.end(normalizeError(error).message);
         throw normalizeError(error);
       }
       config._retried = true;
@@ -54,7 +61,7 @@ api.interceptors.response.use(
           isUnauthorized(caught) &&
           config._epoch === useAuth.getState().epoch
         )
-          session.end();
+          session.end(normalizeError(caught).message);
         throw normalizeError(caught);
       }
     }

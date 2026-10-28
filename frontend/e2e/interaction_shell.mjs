@@ -1,3 +1,4 @@
+import { currentAuthToken, latestBearer, trackPageAuth } from './support/auth-tokens.mjs';
 /* eslint-disable no-console */
 /**
  * improve-mobile-web-interaction 阶段 1 走查（断点导航 / 触控热区 / 触屏可见性 /
@@ -32,6 +33,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, `${name}.p
 const shotView = (page, name) => page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
 
 async function login(page, username, password) {
+  trackPageAuth(page, BASE);
   await page.goto(BASE + '/login');
   await page.locator('input[placeholder="用户名"]').fill(username);
   await page.locator('input[placeholder="密码"]').fill(password);
@@ -44,11 +46,13 @@ async function login(page, username, password) {
 /** API 直接种数据：种子库可能为空，列表类断言依赖至少 1 行流水 + 1 条周期模板。 */
 let TOKEN = '';
 async function apiLogin() {
+  const _uiToken = currentAuthToken(BASE, 'admin');
+  if (_uiToken) { TOKEN = _uiToken; return _uiToken; }
   if (TOKEN) return TOKEN;
   const r = await fetch(BASE + '/api/v1/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'admin', password: 'admin123' }),
+    body: JSON.stringify({ protocol_version: 2, username: 'admin', password: 'admin123' }),
   });
   const j = await r.json();
   TOKEN = j.data?.access_token ?? '';
@@ -58,7 +62,7 @@ async function apiLogin() {
 const api = (path, init = {}) =>
   fetch(BASE + '/api/v1' + path, {
     ...init,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}`, ...(init.headers ?? {}) },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${latestBearer(BASE, TOKEN)}`, ...(init.headers ?? {}) },
   }).then(async (r) => ({ status: r.status, json: await r.json().catch(() => null) }));
 
 function localToday() {

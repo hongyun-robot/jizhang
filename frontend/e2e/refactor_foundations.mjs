@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { withFixture, fixtureApi, login, shot, until } from './support/fixture.mjs';
+import { withFixture, fixtureApi, login, shot, until, fixturePageRequest as pageRequest } from './support/fixture.mjs';
 
 const base = process.env.REFACTOR_E2E_BASE ?? 'http://127.0.0.1:5601';
 const baseline = process.argv.includes('--baseline');
@@ -56,10 +56,8 @@ await withFixture(base, async (browser, cleanup) => {
     await page.locator('.page h2').first().waitFor();
     assert.equal(await page.getByRole('button', { name: /记一笔$/ }).count(), 0);
     assert.equal(await page.getByRole('button', { name: '导出', exact: true }).count(), 1);
-    const signed = await page.request.post(base + '/api/v1/auth/login', { data: { username: 'voucher-viewer', password: 'voucher-test-only' } });
-    const token = (await signed.json()).data.access_token;
-    const denied = await page.request.post(base + '/api/v1/transactions', { headers: { Authorization: 'Bearer ' + token }, data: { kind: 'expense', amount: '1', account_id: account.id, category_id: category.id, entry_date: '2026-10-12' } });
-    assert.equal(denied.status(), 403, 'server must enforce the same financial permission');
+    const denied = await pageRequest(page, 'POST', '/transactions', { kind: 'expense', amount: '1', account_id: account.id, category_id: category.id, entry_date: '2026-10-12' });
+    assert.equal(denied.status, 403, 'server must enforce the same financial permission');
   });
   await check('notifications-error', async (page) => {
     await page.route('**/api/v1/notifications', (route) => route.fulfill({ status: 500, json: { code: 20000, message: '测试提醒读取失败' } }));

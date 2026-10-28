@@ -1,3 +1,4 @@
+import { currentAuthToken, latestBearer, trackPageAuth } from './support/auth-tokens.mjs';
 /* eslint-disable no-console */
 /**
  * add-refund 任务 7.x：退款全流程浏览器走查（UI + 功能整套逻辑）。
@@ -59,10 +60,12 @@ const AUG = `${CUR_YEAR}-08`; // 封账测试用的历史账期
 const NOTE = '退款测试';
 
 async function apiLogin(u, p) {
+  const _uiToken = currentAuthToken(BASE, u);
+  if (_uiToken) { return _uiToken; }
   const r = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username: u, password: p }),
+    body: JSON.stringify({ protocol_version: 2, username: u, password: p }),
   });
   const j = await r.json();
   if (j.code !== 0) throw new Error(j.message);
@@ -72,7 +75,7 @@ async function apiLogin(u, p) {
 async function api(method, p, token, body) {
   const r = await fetch(API + p, {
     method,
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${latestBearer(BASE, token)}` },
     body: body ? JSON.stringify(body) : undefined,
   });
   const j = await r.json().catch(() => ({}));
@@ -80,6 +83,7 @@ async function api(method, p, token, body) {
 }
 
 async function login(page, username, password) {
+  trackPageAuth(page, BASE);
   await page.goto(BASE + '/login');
   await page.locator('input[placeholder="用户名"]').fill(username);
   await page.locator('input[placeholder="密码"]').fill(password);

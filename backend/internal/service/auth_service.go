@@ -3,25 +3,25 @@ package service
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"errors"
-	"fmt"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
-
+	"io"
 	"jizhang/internal/model"
+	"strconv"
+	"time"
 )
 
-// 认证相关业务错误（handler 据此映射 HTTP 状态）。
 var (
 	ErrInvalidCredentials = errors.New("用户名或密码错误")
 	ErrUserDisabled       = errors.New("账号已停用")
 	ErrRefreshInvalid     = errors.New("登录已过期，请重新登录")
+	ErrSessionReplaced    = errors.New("账号已在另一台同类设备登录，请重新登录")
+	ErrAccessExpired      = errors.New("访问令牌已过期")
+	ErrRefreshConflict    = errors.New("会话正在刷新，请稍后重试")
+	ErrAuthUnavailable    = errors.New("认证服务暂不可用，请重试")
+	ErrAuthChanged        = errors.New("登录状态已变化，请重试")
 	ErrRateLimited        = errors.New("尝试次数过多，请稍后再试")
 )
 
@@ -31,265 +31,268 @@ const (
 	loginFailTTL           = 10 * time.Minute
 )
 
-// UserStore users 表读取依赖（repository.UserRepo 满足；测试可 mock）。
 type UserStore interface {
 	GetByUsername(username string) (*model.User, error)
 	GetByID(id int64) (*model.User, error)
 }
-
-// AuthClaims JWT access token 载荷。Epoch 为会话代次：RevokeAll 递增后代次不匹配的旧 token 全部失效。
 type AuthClaims struct {
-	UID   int64      `json:"uid"`
-	Role  model.Role `json:"role"`
-	Epoch int64      `json:"ep,omitempty"`
+	Version int        `json:"ver"`
+	UID     int64      `json:"uid"`
+	Role    model.Role `json:"role"`
+	SID     string     `json:"sid"`
+	Device  DeviceType `json:"device"`
+	Epoch   int64      `json:"ep"`
 	jwt.RegisteredClaims
 }
 
-// AuthService 登录、双 token 与限流。
+func (c *AuthClaims) ref() sessionRef { return sessionRef{c.UID, c.Device, c.SID} }
+
+type AuthResult struct {
+	AccessToken  string
+	RefreshToken string
+	SessionID    string
+	DeviceType   DeviceType
+	User         *model.User
+	ExpiresAt    int64
+}
 type AuthService struct {
 	store        UserStore
 	rdb          *redis.Client
+	sessions     authSessionStore
 	secret       []byte
 	accessTTL    time.Duration
 	refreshTTL   time.Duration
 	cookieSecure bool
 	cookiePath   string
+	now          func() time.Time
+	random       io.Reader
+	ratePrefix   string
 }
 
-func NewAuthService(store UserStore, rdb *redis.Client, secret string,
-	accessTTL, refreshTTL time.Duration, cookieSecure bool, cookiePath string) *AuthService {
-	if cookiePath == "" {
-		cookiePath = "/api/v1/auth"
+func NewAuthService(store UserStore, rdb *redis.Client, secret string, accessTTL, refreshTTL time.Duration, secure bool, path string) *AuthService {
+	if path == "" {
+		path = "/api/v1/auth"
 	}
-	return &AuthService{
-		store:        store,
-		rdb:          rdb,
-		secret:       []byte(secret),
-		accessTTL:    accessTTL,
-		refreshTTL:   refreshTTL,
-		cookieSecure: cookieSecure,
-		cookiePath:   cookiePath,
-	}
+	return &AuthService{store: store, rdb: rdb, sessions: authSessionStore{rdb, "auth:v2:"}, secret: []byte(secret), accessTTL: accessTTL, refreshTTL: refreshTTL, cookieSecure: secure, cookiePath: path, now: time.Now, random: rand.Reader}
 }
-
-// CookieSecure refresh cookie 是否带 Secure 标志。
-func (s *AuthService) CookieSecure() bool { return s.cookieSecure }
-
-// CookiePath refresh cookie 的 Path（子路径部署时带 /jizhang 前缀）。
-func (s *AuthService) CookiePath() string { return s.cookiePath }
-
-// RefreshTTL 返回 refresh token 有效期（cookie MaxAge 用）。
+func (s *AuthService) CookieSecure() bool        { return s.cookieSecure }
+func (s *AuthService) CookiePath() string        { return s.cookiePath }
 func (s *AuthService) RefreshTTL() time.Duration { return s.refreshTTL }
+func (s *AuthService) AccessTTL() time.Duration  { return s.accessTTL }
 
-// AccessTTL 返回 access token 有效期（前端倒计时用）。
-func (s *AuthService) AccessTTL() time.Duration { return s.accessTTL }
-
-// ---- 登录限流（Redis 计数，5 次封 10 分钟；IP 阈值更宽防止全家误伤） ----
-
-func (s *AuthService) limited(ctx context.Context, key string, threshold int) bool {
+func (s *AuthService) limited(ctx context.Context, key string, threshold int) (bool, error) {
 	n, err := s.rdb.Get(ctx, key).Int()
-	return err == nil && n >= threshold
+	if errors.Is(err, redis.Nil) {
+		return false, nil
+	}
+	if err != nil {
+		return false, authUnavailable(err)
+	}
+	return n >= threshold, nil
 }
-
 func (s *AuthService) recordFailure(ctx context.Context, keys ...string) {
-	for _, k := range keys {
-		n, err := s.rdb.Incr(ctx, k).Result()
+	for _, key := range keys {
+		n, err := s.rdb.Incr(ctx, key).Result()
 		if err == nil && n == 1 {
-			s.rdb.Expire(ctx, k, loginFailTTL)
+			s.rdb.Expire(ctx, key, loginFailTTL)
 		}
 	}
 }
 
-func (s *AuthService) clearFailures(ctx context.Context, keys ...string) {
-	if len(keys) > 0 {
-		s.rdb.Del(ctx, keys...)
+// Login prepares both credentials before atomically replacing the device slot.
+func (s *AuthService) Login(ctx context.Context, username, password, ip string, device DeviceType) (*AuthResult, error) {
+	if !device.valid() {
+		return nil, ErrInvalidCredentials
 	}
-}
-
-// Login 校验凭据并签发双 token。返回 access token 与用户。
-func (s *AuthService) Login(ctx context.Context, username, password, ip string) (string, *model.User, error) {
-	userKey := "login_fail:" + username
-	ipKey := "login_fail_ip:" + ip
-	if s.limited(ctx, userKey, loginFailUserThreshold) || s.limited(ctx, ipKey, loginFailIPThreshold) {
-		return "", nil, ErrRateLimited
+	userKey, ipKey := s.ratePrefix+"login_fail:"+username, s.ratePrefix+"login_fail_ip:"+ip
+	for key, threshold := range map[string]int{userKey: loginFailUserThreshold, ipKey: loginFailIPThreshold} {
+		limited, err := s.limited(ctx, key, threshold)
+		if err != nil {
+			return nil, err
+		}
+		if limited {
+			return nil, ErrRateLimited
+		}
 	}
-
-	user, err := s.store.GetByUsername(username)
+	locator, err := s.store.GetByUsername(username)
 	if err != nil {
-		return "", nil, err
+		return nil, authUnavailable(err)
 	}
-	if user == nil || bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
+	if locator == nil {
 		s.recordFailure(ctx, userKey, ipKey)
-		return "", nil, ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
-	if !user.IsActive() {
-		return "", nil, ErrUserDisabled
-	}
-	s.clearFailures(ctx, userKey)
-
-	access, err := s.issueAccess(user)
+	ep, err := s.sessions.epoch(ctx, locator.ID)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
-	return access, user, nil
+	u, err := s.store.GetByID(locator.ID)
+	if err != nil {
+		return nil, authUnavailable(err)
+	}
+	if u == nil || bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
+		s.recordFailure(ctx, userKey, ipKey)
+		return nil, ErrInvalidCredentials
+	}
+	if !u.IsActive() {
+		return nil, ErrUserDisabled
+	}
+	sid, err := randomHex(s.random, 16)
+	if err != nil {
+		return nil, authUnavailable(err)
+	}
+	ref := sessionRef{u.ID, device, sid}
+	now := s.now()
+	result, record, err := s.prepare(u, ref, ep, now)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.sessions.mutate(ctx, "login", ref, strconv.FormatInt(ep, 10), "", record, now, false); err != nil {
+		return nil, err
+	}
+	s.rdb.Del(ctx, userKey)
+	return result, nil
+}
+func (s *AuthService) prepare(u *model.User, ref sessionRef, ep int64, now time.Time) (*AuthResult, *authSession, error) {
+	refresh, err := newRefreshToken(s.random, ref)
+	if err != nil {
+		return nil, nil, authUnavailable(err)
+	}
+	claims := &AuthClaims{Version: AuthProtocolVersion, UID: u.ID, Role: u.Role, SID: ref.SID, Device: ref.Device, Epoch: ep, RegisteredClaims: jwt.RegisteredClaims{Issuer: "jizhang", ID: refreshDigest(refresh), IssuedAt: jwt.NewNumericDate(now), ExpiresAt: jwt.NewNumericDate(now.Add(s.accessTTL))}}
+	access, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
+	if err != nil {
+		return nil, nil, authUnavailable(err)
+	}
+	return &AuthResult{AccessToken: access, RefreshToken: refresh, SessionID: ref.SID, DeviceType: ref.Device, User: u, ExpiresAt: claims.ExpiresAt.Unix()}, &authSession{SID: ref.SID, Epoch: ep, Digest: refreshDigest(refresh), CreatedAt: now.UnixMilli(), RefreshedAt: now.UnixMilli(), ExpiresAt: now.Add(s.refreshTTL).UnixMilli()}, nil
 }
 
-// ---- access token ----
-
-func (s *AuthService) issueAccess(u *model.User) (string, error) {
-	// 记录签发时的会话代次（键不存在=0），吊销后代次不匹配即拒绝
-	ep, err := s.rdb.Get(context.Background(), epochKey(u.ID)).Int64()
-	if err != nil {
-		ep = 0
+// Verify structure and signature even for expired access, then check its live slot.
+func (s *AuthService) parseAccess(token string) (*AuthClaims, bool, error) {
+	c := &AuthClaims{}
+	parsed, err := jwt.ParseWithClaims(token, c, func(_ *jwt.Token) (interface{}, error) { return s.secret, nil }, jwt.WithValidMethods([]string{"HS256"}), jwt.WithoutClaimsValidation())
+	if err != nil || !parsed.Valid || c.Version != AuthProtocolVersion || c.UID <= 0 || !validHex(c.SID, 16) || !c.Device.valid() || c.Issuer != "jizhang" || c.ExpiresAt == nil || c.IssuedAt == nil || c.Epoch < 0 {
+		return nil, false, ErrRefreshInvalid
 	}
-	claims := &AuthClaims{
-		UID:   u.ID,
-		Role:  u.Role,
-		Epoch: ep,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.accessTTL)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "jizhang",
-		},
+	now := s.now()
+	if c.IssuedAt.After(now) || (c.NotBefore != nil && c.NotBefore.After(now)) {
+		return nil, false, ErrRefreshInvalid
 	}
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.secret)
+	return c, !now.Before(c.ExpiresAt.Time), nil
 }
-
-// Authenticate 解析 access token 并加载启用状态的用户；失败返回 error。
 func (s *AuthService) Authenticate(token string) (*model.User, error) {
-	claims := &AuthClaims{}
-	parsed, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-		}
-		return s.secret, nil
-	})
-	if err != nil || !parsed.Valid {
-		return nil, ErrRefreshInvalid
+	return s.AuthenticateContext(context.Background(), token)
+}
+func (s *AuthService) AuthenticateContext(ctx context.Context, token string) (*model.User, error) {
+	u, _, err := s.AuthenticateSession(ctx, token)
+	return u, err
+}
+
+func (s *AuthService) AuthenticateSession(ctx context.Context, token string) (*model.User, *AuthClaims, error) {
+	c, expired, err := s.parseAccess(token)
+	if err != nil {
+		return nil, nil, err
 	}
-	// 会话代次校验：RevokeAll（重置密码/停用/角色调整/refresh 盗用）会递增代次，
-	// 代次不匹配的旧签发 token 一律失效；Redis 异常时放行（登录/刷新本身依赖 Redis，读路径保持可用）
-	if cur, e := s.rdb.Get(context.Background(), epochKey(claims.UID)).Int64(); e == nil && claims.Epoch != cur {
-		return nil, ErrRefreshInvalid
+	record, err := s.sessions.read(ctx, c.ref(), s.now())
+	if err != nil {
+		return nil, nil, err
 	}
-	u, err := s.store.GetByID(claims.UID)
+	if record.Epoch != c.Epoch {
+		return nil, nil, ErrRefreshInvalid
+	}
+	u, err := s.store.GetByID(c.UID)
+	if err != nil {
+		return nil, nil, authUnavailable(err)
+	}
+	if u == nil || !u.IsActive() {
+		return nil, nil, ErrUserDisabled
+	}
+	if expired {
+		return nil, nil, ErrAccessExpired
+	}
+	return u, c, nil
+}
+func (s *AuthService) Refresh(ctx context.Context, token, expectedSID string) (*AuthResult, error) {
+	ref, err := parseRefresh(token)
 	if err != nil {
 		return nil, err
+	}
+	if expectedSID != "" && expectedSID != ref.SID {
+		return nil, ErrRefreshInvalid
+	}
+	now := s.now()
+	current, err := s.sessions.read(ctx, ref, now)
+	if err != nil {
+		// An unsigned refresh locator cannot prove an older session existed.
+		if errors.Is(err, ErrSessionReplaced) {
+			return nil, ErrRefreshInvalid
+		}
+		return nil, err
+	}
+	u, err := s.store.GetByID(ref.UID)
+	if err != nil {
+		return nil, authUnavailable(err)
 	}
 	if u == nil || !u.IsActive() {
 		return nil, ErrUserDisabled
 	}
-	return u, nil
-}
-
-// ---- refresh token（随机不透明串，uid 前缀支持盗用时按用户吊销） ----
-
-func newRefreshToken(uid int64) string {
-	buf := make([]byte, 32)
-	_, _ = rand.Read(buf)
-	return strconv.FormatInt(uid, 10) + "." + hex.EncodeToString(buf)
-}
-
-func refreshKey(token string) string  { return "refresh:" + token }
-func refreshUserKey(uid int64) string { return fmt.Sprintf("refresh_user:%d", uid) }
-
-// epochKey 用户会话代次（不设 TTL，避免过期重建后旧代次复活）。键缺失视为 0。
-func epochKey(uid int64) string { return fmt.Sprintf("session_epoch:%d", uid) }
-
-// issueRefresh 签发 refresh token 并登记到用户会话集合。
-func (s *AuthService) issueRefresh(ctx context.Context, u *model.User) (string, error) {
-	token := newRefreshToken(u.ID)
-	if err := s.rdb.Set(ctx, refreshKey(token), u.ID, s.refreshTTL).Err(); err != nil {
-		return "", err
-	}
-	s.rdb.SAdd(ctx, refreshUserKey(u.ID), token)
-	s.rdb.Expire(ctx, refreshUserKey(u.ID), s.refreshTTL)
-	return token, nil
-}
-
-// IssueRefreshFor 对已登录用户签发 refresh token（登录流程用）。
-func (s *AuthService) IssueRefreshFor(ctx context.Context, u *model.User) (string, error) {
-	return s.issueRefresh(ctx, u)
-}
-
-// RefreshResult 刷新结果。
-type RefreshResult struct {
-	AccessToken  string
-	RefreshToken string
-}
-
-// Refresh 轮换 refresh token：校验旧值 → 删除旧值 → 签发新对。
-// 旧值不存在视为盗用/重放，吊销该用户全部会话。
-func (s *AuthService) Refresh(ctx context.Context, oldToken string) (*RefreshResult, error) {
-	if oldToken == "" {
-		return nil, ErrRefreshInvalid
-	}
-	uidStr, err := s.rdb.Get(ctx, refreshKey(oldToken)).Result()
+	next, record, err := s.prepare(u, ref, current.Epoch, now)
 	if err != nil {
-		// 旧值缺失：按 uid 前缀尽量吊销该用户其余会话
-		if uid, e := parseUIDPrefix(oldToken); e == nil && uid > 0 {
-			s.RevokeAll(ctx, uid)
+		return nil, err
+	}
+	record.CreatedAt = current.CreatedAt
+	record.Previous = refreshDigest(token)
+	record.PreviousUntil = min(current.ExpiresAt, now.Add(time.Minute).UnixMilli())
+	if err := s.sessions.mutate(ctx, "refresh", ref, strconv.FormatInt(current.Epoch, 10), refreshDigest(token), record, now, false); err != nil {
+		return nil, err
+	}
+	return next, nil
+}
+
+// Logout verifies the still-current actor in the same atomic operation as revocation.
+func (s *AuthService) Logout(ctx context.Context, refresh, bearer, expectedSID string) error {
+	if !validHex(expectedSID, 16) {
+		return ErrRefreshInvalid
+	}
+	var ref sessionRef
+	var claims *AuthClaims
+	if refresh != "" {
+		var err error
+		ref, err = parseRefresh(refresh)
+		if err != nil {
+			return err
 		}
-		return nil, ErrRefreshInvalid
 	}
-	uid, err := strconv.ParseInt(uidStr, 10, 64)
-	if err != nil {
-		return nil, ErrRefreshInvalid
-	}
-	u, err := s.store.GetByID(uid)
-	if err != nil {
-		return nil, err
-	}
-	if u == nil || !u.IsActive() {
-		s.RevokeAll(ctx, uid)
-		return nil, ErrUserDisabled
-	}
-
-	// 轮换：旧 refresh 立即失效
-	s.rdb.Del(ctx, refreshKey(oldToken))
-	s.rdb.SRem(ctx, refreshUserKey(uid), oldToken)
-
-	access, err := s.issueAccess(u)
-	if err != nil {
-		return nil, err
-	}
-	next, err := s.issueRefresh(ctx, u)
-	if err != nil {
-		return nil, err
-	}
-	return &RefreshResult{AccessToken: access, RefreshToken: next}, nil
-}
-
-// Logout 删除指定 refresh token。
-func (s *AuthService) Logout(ctx context.Context, token string) {
-	if token == "" {
-		return
-	}
-	if uid, err := parseUIDPrefix(token); err == nil {
-		s.rdb.SRem(ctx, refreshUserKey(uid), token)
-	}
-	s.rdb.Del(ctx, refreshKey(token))
-}
-
-// RevokeAll 吊销某用户全部会话：删除全部 refresh，并递增会话代次，
-// 使重置密码/停用/角色调整前签发的 access token 立即失效（specs/identity 场景）。
-func (s *AuthService) RevokeAll(ctx context.Context, uid int64) {
-	tokens, err := s.rdb.SMembers(ctx, refreshUserKey(uid)).Result()
-	if err == nil && len(tokens) > 0 {
-		keys := make([]string, 0, len(tokens))
-		for _, t := range tokens {
-			keys = append(keys, refreshKey(t))
+	if bearer != "" {
+		c, expired, err := s.parseAccess(bearer)
+		if err != nil {
+			return err
 		}
-		s.rdb.Del(ctx, keys...)
+		if refresh != "" && ref != c.ref() {
+			return ErrRefreshInvalid
+		}
+		if !expired {
+			claims = c
+		}
+		if refresh == "" {
+			ref = c.ref()
+		}
 	}
-	s.rdb.Del(ctx, refreshUserKey(uid))
-	s.rdb.Incr(ctx, epochKey(uid))
+	if ref.SID != expectedSID || (refresh == "" && claims == nil) {
+		return ErrRefreshInvalid
+	}
+	ep := ""
+	if claims != nil {
+		ep = strconv.FormatInt(claims.Epoch, 10)
+	}
+	err := s.sessions.mutate(ctx, "logout", ref, ep, refreshDigest(refresh), nil, s.now(), claims != nil)
+	if claims == nil && errors.Is(err, ErrSessionReplaced) {
+		return ErrRefreshInvalid
+	}
+	return err
 }
-
-func parseUIDPrefix(token string) (int64, error) {
-	i := strings.IndexByte(token, '.')
-	if i <= 0 {
-		return 0, errors.New("bad token format")
+func (s *AuthService) RevokeAll(ctx context.Context, uid int64) error {
+	if uid <= 0 {
+		return ErrRefreshInvalid
 	}
-	return strconv.ParseInt(token[:i], 10, 64)
+	return s.sessions.mutate(ctx, "revoke", sessionRef{UID: uid}, "", "", nil, s.now(), false)
 }

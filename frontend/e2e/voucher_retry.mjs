@@ -1,11 +1,14 @@
+import { assertFixture, fixturePageRequest as pageRequest, registerFixturePage } from './support/fixture.mjs';
 import { firefox } from 'playwright-core';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 
-const base = 'http://127.0.0.1:5601';
+const base = process.env.VOUCHER_E2E_BASE ?? 'http://127.0.0.1:5601';
+await assertFixture(base);
 const browser = await firefox.launch({ headless: true, executablePath: process.env.FIREFOX_EXE ?? path.join(process.env.LOCALAPPDATA, 'ms-playwright/firefox-1543/firefox/firefox.exe') });
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
+registerFixturePage(page,base);
 const pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
 try {
@@ -15,9 +18,7 @@ try {
   await page.getByPlaceholder('密码').fill('voucher-test-only');
   await page.getByRole('button', { name: /登\s*录/ }).click();
   await page.waitForURL(base + '/');
-  const auth = await (await ctx.request.post(base + '/api/v1/auth/login', { data: { username: 'voucher-admin', password: 'voucher-test-only' } })).json();
-  const headers = { Authorization: 'Bearer ' + auth.data.access_token };
-  const api = async (method, endpoint) => { const r = await ctx.request.fetch(base + '/api/v1' + endpoint, { method, headers }); assert.equal(r.status(), 200); return (await r.json()).data; };
+  const api = async (method, endpoint) => { const reply = await pageRequest(page, method, endpoint); assert.equal(reply.status, 200, JSON.stringify(reply.body)); return reply.body.data; };
   const before = Number((await api('GET', '/accounts'))[0].balance);
   await page.goto(base + '/vouchers');
   await page.getByRole('button', { name: '登记购券', exact: true }).click();

@@ -58,7 +58,7 @@ function Tile({
 }
 
 /** 我的：身份与主题、按资格显示的记账入口、全角色本人目录管理，
- * 以及管理员设置和退出登录。 */
+ * 以及管理员设置和退出所有设备。 */
 export default function Mine() {
   const navigate = useNavigate();
   const user = useAuth((s) => s.user);
@@ -70,7 +70,7 @@ export default function Mine() {
     try {
       await session.logout();
     } catch {
-      // 即使 refresh 已失效也照常清理本地会话
+      // Login retains the pending marker and offers an explicit retry.
     }
     navigate('/login', { replace: true });
   };
@@ -218,7 +218,7 @@ export default function Mine() {
           icon={<LogoutOutlined />}
           onClick={logout}
         >
-          退出登录
+          退出所有设备
         </Button>
       </Card>
     </div>

@@ -1,26 +1,12 @@
 import assert from 'node:assert/strict';
-import { withFixture, login, until, shot } from './support/fixture.mjs';
+import { withFixture, login, until, shot, fixtureApi } from './support/fixture.mjs';
 
 const base = process.env.PLATFORM_E2E_BASE ?? 'http://127.0.0.1:5601';
 const prefix = `商家管理-${Date.now()}`;
 await withFixture(base, async (browser, cleanup) => {
   const clients = {};
   for (const role of ['admin', 'recorder', 'member', 'viewer']) {
-    const auth = await fetch(base + '/api/v1/auth/login', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ username: `voucher-${role}`, password: 'voucher-test-only' }),
-    });
-    assert.equal(auth.status, 200);
-    const token = (await auth.json()).data.access_token;
-    clients[role] = async (method, endpoint, input, status = 200) => {
-      const response = await fetch(base + '/api/v1' + endpoint, {
-        method, headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
-        ...(input === undefined ? {} : { body: JSON.stringify(input) }),
-      });
-      const body = await response.json();
-      assert.equal(response.status, status, `${method} ${endpoint}: ${JSON.stringify(body)}`);
-      return body.data;
-    };
+    clients[role] = await fixtureApi(base, 'voucher-' + role);
   }
   const directory = {};
   const accountsBefore = await clients.member('GET', '/accounts');
@@ -283,7 +269,7 @@ await withFixture(base, async (browser, cleanup) => {
     await lateEditor.getByRole('button', { name: /取\s*消/ }).click();
     await lateEditor.waitFor({ state: 'hidden' });
     await latePage.locator('.bottom-tabs').getByRole('button', { name: /我的$/ }).click();
-    await latePage.getByRole('button', { name: /退出登录$/ }).click();
+    await latePage.getByRole('button', { name: /退出所有设备$/ }).click();
     await latePage.getByPlaceholder('用户名').fill('voucher-viewer');
     await latePage.getByPlaceholder('密码').fill('voucher-test-only');
     await latePage.getByRole('button', { name: /登\s*录/ }).click();

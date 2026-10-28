@@ -70,9 +70,42 @@ func (f *fakeUserStore) CountActiveAdmins() (int64, error) {
 	return n, nil
 }
 
-type fakeSessions struct{ revoked []int64 }
+type fakeSessions struct {
+	revoked []int64
+	err     error
+}
 
-func (f *fakeSessions) RevokeAll(_ context.Context, uid int64) { f.revoked = append(f.revoked, uid) }
+func (f *fakeSessions) RevokeAll(_ context.Context, uid int64) error {
+	f.revoked = append(f.revoked, uid)
+	return f.err
+}
+
+func TestUserSecurityOperationReportsRevocationFailure(t *testing.T) {
+	for _, op := range []string{"role", "status", "password"} {
+		t.Run(op, func(t *testing.T) {
+			store := newFakeUserStore(admin(1, "boss"), admin(2, "target"))
+			sessions := &fakeSessions{err: ErrAuthUnavailable}
+			svc := NewUserService(store, sessions)
+			for range 2 {
+				var err error
+				switch op {
+				case "role":
+					_, err = svc.SetRole(2, model.RoleMember)
+				case "status":
+					_, err = svc.SetStatus(2, model.StatusDisabled)
+				case "password":
+					err = svc.ResetPassword(2, "changed123")
+				}
+				if !errors.Is(err, ErrAuthUnavailable) {
+					t.Fatal(err)
+				}
+			}
+			if len(sessions.revoked) != 2 {
+				t.Fatal("same-value retry skipped revocation")
+			}
+		})
+	}
+}
 
 func admin(id int64, name string) *model.User {
 	return &model.User{ID: id, Username: name, Role: model.RoleAdmin, Status: model.StatusActive}

@@ -10,11 +10,17 @@ interface AuthState {
   /** 是否已完成一次会话恢复尝试（防止守卫重复刷新） */
   booted: boolean;
   epoch: number;
-  setSession: (token: string, user: User | null) => void;
+  sessionID: string | null;
+  accessExpiresAt: number | null;
+  deviceType: 'phone' | 'tablet' | 'desktop' | null;
+  endReason: string | null;
+  validationPending: boolean;
+  validationError: Error | null;
+  setSession: (token: string, user: User | null, sessionID?: string, deviceType?: 'phone' | 'tablet' | 'desktop', expiresAt?: number) => void;
   setToken: (token: string) => void;
   setUser: (user: User) => void;
   markBooted: () => void;
-  clear: () => void;
+  clear: (reason?: string) => void;
 }
 
 export const useAuth = create<AuthState>((set) => ({
@@ -22,15 +28,27 @@ export const useAuth = create<AuthState>((set) => ({
   user: null,
   booted: false,
   epoch: 0,
-  setSession: (token, user) => set({ token, user, booted: true }),
+  sessionID: null,
+  accessExpiresAt: null,
+  deviceType: null,
+  endReason: null,
+  validationPending: false,
+  validationError: null,
+  setSession: (token, user, sessionID, deviceType, expiresAt) => set((state) => ({ token, user, sessionID: sessionID ?? state.sessionID, accessExpiresAt:expiresAt ?? (token === state.token ? state.accessExpiresAt : null), deviceType: deviceType ?? state.deviceType, booted: true, endReason: null })),
   setToken: (token) => set({ token }),
   setUser: (user) => set({ user }),
   markBooted: () => set({ booted: true }),
-  clear: () =>
+  clear: (reason) =>
     set((state) => ({
       token: null,
       user: null,
       booted: true,
       epoch: state.epoch + 1,
+      sessionID: null,
+      accessExpiresAt: null,
+      deviceType: null,
+      endReason: reason ?? null,
+      validationPending: false,
+      validationError: null,
     })),
 }));

@@ -343,9 +343,9 @@ function handler(url, method, postBody) {
 
   if (p === '/auth/login' && method === 'POST') {
     if (!postBody?.username || !postBody?.password) return { status: 400, body: { code: 400, message: '请输入用户名和密码' } };
-    return { body: ok({ access_token: 'mock-token', token_type: 'Bearer', expires_in: 900, user: USER }) };
+    return { body: ok({ access_token: 'mock-token', session_id: 'preview-session', device_type: 'desktop', token_type: 'Bearer', expires_in: 900, user: USER }) };
   }
-  if (p === '/auth/refresh') return { body: ok({ access_token: 'mock-token', token_type: 'Bearer', expires_in: 900 }) };
+  if (p === '/auth/refresh') return { body: ok({ access_token: 'mock-token', session_id: 'preview-session', device_type: 'desktop', token_type: 'Bearer', expires_in: 900, user: USER }) };
   if (p === '/auth/me') return { body: ok(USER) };
   if (p === '/accounts') return { body: ok(ACCOUNTS) };
   if (p === '/categories')

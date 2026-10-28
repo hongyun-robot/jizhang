@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { assertFixture, withFixture, login, shot, until } from './support/fixture.mjs';
+import { assertFixture, withFixture, login, shot, until, fixtureApi, fixtureToken } from './support/fixture.mjs';
 
 const base = process.env.FUND_E2E_BASE ?? 'http://127.0.0.1:5603';
 await assertFixture(base, ['fund-browser']);
@@ -33,17 +33,11 @@ async function chooseDate(page, input, value) {
 }
 const clients = [];
 for (const username of ['voucher-admin', 'voucher-recorder', 'voucher-member', 'voucher-viewer']) {
-  const auth = await fetch(base + '/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username, password: 'voucher-test-only' }) });
-  assert.equal(auth.status, 200);
-  const token = (await auth.json()).data.access_token;
-  const request = async (method, endpoint, input, expected = 200) => {
-    const response = await fetch(base + '/api/v1' + endpoint, { method, headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, ...(input === undefined ? {} : { body: JSON.stringify(input) }) });
-    const body = await response.json(); assert.equal(response.status, expected, `${method} ${endpoint}: ${JSON.stringify(body)}`); assertions++;
-    return body.data;
-  };
+  const api = await fixtureApi(base, username);
+  const request = async (...args) => { assertions++; return api(...args); };
   await request('GET', '/accounts');
   const bank = await request('POST', '/accounts', { name: prefix + '-' + username + '-现金', type: 'asset', asset_class: 'cash', opening_balance: '1000', request_key: randomUUID() });
-  clients.push({ username, request, bank, token });
+  clients.push({ username, request, bank });
 }
 
 await withFixture(base, async (browser) => {
@@ -132,7 +126,7 @@ await withFixture(base, async (browser) => {
   await admin.request('POST', '/transactions', { kind: 'transfer', amount: '10', account_id: admin.bank.id, transfer_account_id: accountId, entry_date: '2026-10-13' }, 409);
   const csvResponse = await fetch(base + '/api/v1/transactions/export?account_id=' + accountId, { headers: {} });
   check(csvResponse.status === 401, 'unauthenticated export allowed');
-  const ownCSV = await fetch(base + '/api/v1/transactions/export?account_id=' + accountId, { headers: { authorization: 'Bearer ' + admin.token } });
+  const ownCSV = await fetch(base + '/api/v1/transactions/export?account_id=' + accountId, { headers: { authorization: 'Bearer ' + fixtureToken(base, admin.username) } });
   check(ownCSV.status === 200, 'own filtered export failed');
   const csvText = await ownCSV.text();
   check(csvText.includes('023564.OF') && csvText.includes('基金买入付款') && csvText.includes('基金赎回到账'), 'fund CSV lacks code/purpose');

@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"jizhang/internal/middleware"
 
 	"jizhang/internal/model"
 	"jizhang/internal/response"
@@ -20,6 +21,8 @@ func NewUser(svc *service.UserService) *userHandler { return &userHandler{svc: s
 
 func mapUserErr(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, service.ErrAuthUnavailable):
+		middleware.AuthFailure(c, err)
 	case errors.Is(err, service.ErrUserNotFound):
 		response.NotFound(c, err.Error())
 	case errors.Is(err, service.ErrUsernameTaken), errors.Is(err, service.ErrLastAdmin):

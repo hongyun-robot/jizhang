@@ -16,7 +16,7 @@ await withFixture(base, async (browser) => {
     await page.getByRole('menuitem', { name: /流水/ }).click();
     assert.equal(await page.evaluate(() => history.length), history);
     await page.getByRole('menuitem', { name: /我的/ }).click();
-    await page.getByRole('button', { name: /退出登录/ }).click();
+    await page.getByRole('button', { name: /退出所有设备/ }).click();
     await page.waitForURL((url) => url.pathname.endsWith('/login'));
     await login(page, base, 'voucher-viewer');
     await page.getByRole('menuitem', { name: /流水/ }).click();

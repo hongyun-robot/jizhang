@@ -41,7 +41,7 @@ function money(cents) {
 }
 
 try {
-  const login = await request('POST', '/auth/login', { username: process.env.JZ_USER ?? 'admin', password: process.env.JZ_PASS }, null);
+  const login = await request('POST', '/auth/login', { protocol_version: 2, username: process.env.JZ_USER ?? 'admin', password: process.env.JZ_PASS }, null);
   adminToken = login.access_token;
   assert(adminToken, 'administrator login did not return a session');
   const products = await request('GET', '/wealth/products', undefined, adminToken);
@@ -68,7 +68,7 @@ try {
   summary.source = { product_id: product.id, status: product.sync_status, last_success: product.last_success, records: quotes.length, baseline, baseline_nav: left.unit_nav, latest, latest_nav: right.unit_nav };
   user = await request('POST', '/users', { username, password, role: 'member' }, adminToken);
   summary.test_user_id = user.id;
-  token = (await request('POST', '/auth/login', { username, password }, null)).access_token;
+  token = (await request('POST', '/auth/login', { protocol_version: 2, username, password }, null)).access_token;
   const creation = { request_key: randomUUID(), name: `上线理财验证-${started.toISOString().replace(/[:.]/g, '-')}`, type: 'asset', asset_class: 'wealth_cash', opening_balance: money(opening), wealth_cash: { product_id: product.id, start_date: baseline } };
   account = await request('POST', '/accounts', creation);
   assert.equal(account.owner_id, user.id);

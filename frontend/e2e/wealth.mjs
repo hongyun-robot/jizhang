@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { assertFixture, withFixture, login, shot, until } from './support/fixture.mjs';
+import { assertFixture, withFixture, login, shot, until, fixtureApi, fixtureToken } from './support/fixture.mjs';
 
 const base=process.env.WEALTH_E2E_BASE ?? 'http://127.0.0.1:5605';
 await assertFixture(base,['wealth-browser']);
@@ -12,9 +12,9 @@ let assertions=0;
 function check(value,text){assert(value,text);assertions++;}
 async function fixture(path,input){const response=await fetch(base+'/api/v1/__test__/'+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input)});assert.equal(response.status,200);}
 async function client(username){
-  const response=await fetch(base+'/api/v1/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username,password:'voucher-test-only'})});assert.equal(response.status,200);const token=(await response.json()).data.access_token;
-  const request=async(method,path,input,expected=200)=>{const r=await fetch(base+'/api/v1'+path,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json'},...(input===undefined?{}:{body:JSON.stringify(input)})});const body=await r.json();assert.equal(r.status,expected,`${path}: ${JSON.stringify(body)}`);assertions++;return body.data;};
-  await request('GET','/accounts');return {request,token};
+  const api=await fixtureApi(base,username);
+  const request=async(...args)=>{assertions++;return api(...args);};
+  await request('GET','/accounts');return {request,username};
 }
 async function chooseDate(page,input,value){
   if(!(await input.evaluate((element)=>element.readOnly))){await input.fill(value);await input.press('Enter');return;}
@@ -82,7 +82,7 @@ await withFixture(base,async(browser)=>{
     check((await admin.request('GET',`/wealth/positions/${position.id}`)).shares==='200','sale undo failed');
     const flows=await admin.request('GET',`/transactions?account_id=${accountId}&page_size=50`);check(flows.items.length===1 && flows.items[0].wealth_code==='J07241' && flows.items[0].expense_effect==='0','flow scope, code or spending effect incorrect');await admin.request('DELETE',`/transactions/${flows.items[0].id}`,undefined,409);
     await admin.request('POST','/transactions',{kind:'transfer',amount:'1',account_id:cash.id,transfer_account_id:accountId,entry_date:date()},409);await admin.request('POST','/transactions',{kind:'transfer',amount:'1',account_id:cash.id,transfer_account_id:cash.id,entry_date:date(),wealth_event_id:settlement.id},400);
-    const csv=await fetch(base+`/api/v1/transactions/export?account_id=${accountId}`,{headers:{authorization:'Bearer '+admin.token}});const text=await csv.text();check(csv.status===200 && text.includes('J07241') && text.includes('理财申购付款') && text.trim().split('\n').length===flows.items.length+1,'CSV/list mismatch');
+    const csv=await fetch(base+`/api/v1/transactions/export?account_id=${accountId}`,{headers:{authorization:'Bearer '+fixtureToken(base,admin.username)}});const text=await csv.text();check(csv.status===200 && text.includes('J07241') && text.includes('理财申购付款') && text.trim().split('\n').length===flows.items.length+1,'CSV/list mismatch');
     await page.reload();await page.getByRole('button',{name:'现金分红',exact:true}).click();modal=page.getByRole('dialog',{name:'现金分红',exact:true});await modal.getByLabel('实际分红金额',{exact:true}).fill('100');await chooseDate(page,modal.getByLabel('权益生效日期',{exact:true}),rightsDay);await modal.getByRole('button',{name:'保存记录',exact:true}).click();await modal.waitFor({state:'hidden'});value=await admin.request('GET',`/wealth/positions/${position.id}`);check(value.dividends==='100' && value.pending_funds==='100' && value.cost==='230','dividend cost or receivable incorrect');
     await page.getByRole('button',{name:'红利再投资',exact:true}).click();modal=page.getByRole('dialog',{name:'红利再投资',exact:true});await modal.getByLabel('实际分红金额',{exact:true}).fill('100');await modal.getByLabel('实际确认份额',{exact:true}).fill('100');await chooseDate(page,modal.getByLabel('权益生效日期',{exact:true}),paidDay);await chooseDate(page,modal.getByLabel('份额确认日期',{exact:true}),paidDay);await modal.getByRole('button',{name:'保存记录',exact:true}).click();await modal.waitFor({state:'hidden'});value=await admin.request('GET',`/wealth/positions/${position.id}`);check(value.shares==='300' && value.cost==='330' && value.dividends==='200' && await bank()==='4890','reinvestment duplicated cash or dividend');
     await page.goto(base+'/');await page.locator('.recent-row').filter({hasText:'J07241'}).first().click();await page.waitForURL(/\/wealth-positions\/\d+\?event=/);await page.locator('.wealth-event-row.is-located').waitFor();check(true,'recent wealth transfer navigates to related event');await page.locator('.ant-message-notice').first().waitFor({state:'hidden'});await shot(page,mobileMain?'wealth-main-mobile-position':'wealth-desktop-position');
@@ -103,7 +103,7 @@ await withFixture(base,async(browser)=>{
     let ready=false,release;const gate=new Promise((resolve)=>{release=resolve;});
     await page.route('**/api/v1/wealth/products/1/manual-navs',async(route)=>{if(route.request().method()!=='POST')return route.continue();const response=await route.fetch();ready=true;await gate;await route.fulfill({response});});
     await late.getByRole('button',{name:'保存补录',exact:true}).click();await until(async()=>ready,Boolean,'held manual receipt');await late.locator('.ant-modal-close').click();
-    await page.getByRole('menuitem',{name:/我的/}).click();await page.getByRole('button',{name:/退出登录/}).click();await page.waitForURL(/\/login$/);await page.getByPlaceholder('用户名').fill('voucher-viewer');await page.getByPlaceholder('密码').fill('voucher-test-only');await page.getByRole('button',{name:/登\s*录/}).click();await page.waitForURL((url)=>!url.pathname.endsWith('/login'));release();
+    await page.getByRole('menuitem',{name:/我的/}).click();await page.getByRole('button',{name:/退出所有设备/}).click();await page.waitForURL(/\/login$/);await page.getByPlaceholder('用户名').fill('voucher-viewer');await page.getByPlaceholder('密码').fill('voucher-test-only');await page.getByRole('button',{name:/登\s*录/}).click();await page.waitForURL((url)=>!url.pathname.endsWith('/login'));release();
     await page.goto(base+'/wealth');await page.getByRole('button',{name:prefix+'只读',exact:true}).waitFor();check(await page.getByText(prefix,{exact:true}).count()===0,'late owner result populated next login');
     check((await viewer.request('GET',`/wealth/positions/${viewerOpening.position_id}`)).quote.source==='automatic','late manual value leaked to next owner');
     check(errors.length===0,errors.join('\n'));

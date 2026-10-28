@@ -2,6 +2,7 @@ import { firefox } from 'playwright-core';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fixtureToken, registerFixturePage } from './support/fixture.mjs';
 
 const base = process.env.VOUCHER_E2E_BASE ?? 'http://127.0.0.1:5601';
 assert(['127.0.0.1', 'localhost'].includes(new URL(base).hostname));
@@ -11,6 +12,7 @@ const browser = await firefox.launch({
 });
 const context = await browser.newContext({ viewport: { width: 1139, height: 884 } });
 const page = await context.newPage();
+registerFixturePage(page,base,'voucher-member');
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(error.message));
 const prefix = `平台验收-${Date.now()}`;
@@ -24,13 +26,14 @@ const wait = async (fn, label) => {
   throw new Error(`Timed out: ${label}`);
 };
 const auth = async (username) => {
-  const response = await context.request.post(base + '/api/v1/auth/login', { data: { username, password: 'voucher-test-only' } });
-  assert.equal(response.status(), 200);
+  const response = await fetch(base + '/api/v1/auth/login', { method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({ protocol_version: 2, username, password: 'voucher-test-only' }) });
+  assert.equal(response.status, 200);
   return { Authorization: 'Bearer ' + (await response.json()).data.access_token };
 };
 const headers = {};
 const api = async (method, endpoint, data, role = 'member', expected = 200) => {
-  const response = await context.request.fetch(base + '/api/v1' + endpoint, { method, headers: headers[role], data });
+  const token=fixtureToken(base,'voucher-'+role,headers[role]?.Authorization?.slice(7));
+  const response = await context.request.fetch(base + '/api/v1' + endpoint, { method, headers: {Authorization:'Bearer '+token}, data });
   const body = await response.json();
   assert.equal(response.status(), expected, JSON.stringify(body));
   return body.data;

@@ -1,3 +1,4 @@
+import { currentAuthToken, latestBearer, trackPageAuth } from './support/auth-tokens.mjs';
 /* eslint-disable no-console */
 /**
  * add-ledger-system 任务 10.3：specs/notifications 全场景浏览器走查。
@@ -51,17 +52,19 @@ async function shot(page, name) {
 async function api(method, p, token, body) {
   const r = await fetch(API + p, {
     method,
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${latestBearer(BASE, token)}` },
     body: body ? JSON.stringify(body) : undefined,
   });
   const j = await r.json().catch(() => ({}));
   return { status: r.status, body: j };
 }
 async function apiLogin(username, password) {
+  const _uiToken = currentAuthToken(BASE, username);
+  if (_uiToken) { return _uiToken; }
   const r = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ protocol_version: 2, username, password }),
   });
   const j = await r.json();
   if (!j.data?.access_token) throw new Error('login failed');
@@ -88,6 +91,7 @@ function sqlIn(q) {
 const sqlN = (q) => Number(sqlIn(q) || '0');
 
 async function login(page, username, password) {
+  trackPageAuth(page, BASE);
   await page.goto(BASE + '/login');
   await page.locator('input[placeholder="用户名"]').fill(username);
   await page.locator('input[placeholder="密码"]').fill(password);
