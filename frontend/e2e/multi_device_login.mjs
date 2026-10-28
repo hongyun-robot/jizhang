@@ -110,7 +110,11 @@ try {
   await capture(desktop.page, 'desktop-logout.png');
   const all = await Promise.all([replacement, tablet, desktop].map(async (instance) => ({ ...instance, ...(await snapshot(instance.page)) })));
   const viewerToken = (await snapshot(viewer.page)).token;
+  const logoutConfirmed = desktop.page.waitForResponse((response) => response.url().endsWith('/auth/logout') && response.request().method() === 'POST');
   await desktop.page.getByRole('button', { name: '退出所有设备' }).click();
+  const logoutReply = await logoutConfirmed;
+  assert.equal(logoutReply.status(), 200);
+  assert.equal((await logoutReply.json()).code, 0);
   await Promise.all([desktop.page.waitForURL(/\/login$/), tab.waitForURL(/\/login$/)]);
   for (const instance of all) assert.equal(await authorized(instance.context, instance.token), 401);
   assert.equal(await authorized(viewer.context, viewerToken), 200);

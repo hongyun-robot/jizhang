@@ -201,7 +201,7 @@ try {
   // 7. 登出
   await page.goto(BASE + '/mine', { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => {});
-  const logoutBtn = page.getByRole('button', { name: /退?出登录|登\s*出/ }).first();
+  const logoutBtn = page.getByRole('button', { name: /退出所有设备|退?出登录|登\s*出/ }).first();
   if ((await logoutBtn.count()) > 0) {
     await logoutBtn.click();
     const confirm = page.locator('.ant-popconfirm .ant-btn-primary, .ant-modal-confirm-btns .ant-btn-primary').first();

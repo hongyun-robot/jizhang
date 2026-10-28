@@ -55,6 +55,8 @@ go test ./internal/service ./internal/handler ./internal/middleware -run 'Test(A
 
 未配置 DSN 的 MySQL 集成测试及显式环境开关控制的用例保持条件跳过；本次使用本机真实 Redis 和隔离浏览器补充认证验证。未运行生产冒烟、生产部署或全部旧金融浏览器套件。设备验收为浏览器模拟，未进行 iPhone/iPad 实机验证。
 
+以上为实施阶段记录；后续生产发布及线上 22/22 通用冒烟、24/24 多设备专项结果见[部署记录](deployment.md)。
+
 ## 截图
 
 - [桌面退出所有设备](../../../../frontend/e2e/shots/multi-device/desktop-logout.png)
