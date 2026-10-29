@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -251,11 +253,39 @@ func (h *txnHandler) List(c *gin.Context) {
 	})
 }
 
-// Export GET /api/v1/transactions/export 按当前筛选导出 CSV（UTF-8 BOM，任务 11.1）。
+// Export keeps the legacy CSV default; the UI explicitly requests XLSX.
 func (h *txnHandler) Export(c *gin.Context) {
+	format := c.Query("format")
+	if format != "" && format != "csv" && format != "xlsx" {
+		response.Invalid(c, "导出格式无效，请选择 Excel 或 CSV")
+		return
+	}
 	var q txnListQuery
 	if err := c.ShouldBindQuery(&q); err != nil {
 		response.Invalid(c, "查询参数无效")
+		return
+	}
+	if format == "xlsx" {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), service.XLSXTimeout)
+		defer cancel()
+		path, err := h.svc.ExportXLSX(ctx, middleware.CurrentUser(c), buildFilter(q))
+		if err != nil {
+			switch {
+			case errors.Is(err, service.ErrExportTooLarge):
+				response.Fail(c, http.StatusRequestEntityTooLarge, response.CodeInvalidParams, err.Error())
+			case errors.Is(err, context.DeadlineExceeded):
+				response.Fail(c, http.StatusGatewayTimeout, response.CodeInternal, "导出超时，请缩小筛选范围后重试")
+			case errors.Is(err, service.ErrExportAssociation):
+				response.Internal(c, service.ErrExportAssociation.Error())
+			default:
+				mapTxnErr(c, err)
+			}
+			return
+		}
+		defer os.Remove(path)
+		c.Header("Cache-Control", "no-store")
+		c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		c.FileAttachment(path, fmt.Sprintf("transactions-%s.xlsx", time.Now().Format("2006-01-02")))
 		return
 	}
 	data, err := h.svc.ExportCSV(middleware.CurrentUser(c), buildFilter(q))

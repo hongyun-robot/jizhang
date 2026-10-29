@@ -42,6 +42,22 @@ api.interceptors.response.use(
       config._epoch !== useAuth.getState().epoch
     )
       throw new CanceledError('会话已结束');
+    // Downloads still receive JSON business/authentication failures. Decode
+    // before normalization so terminal-session codes and useful messages survive.
+    if (
+      axios.isAxiosError(error) &&
+      config?.responseType === 'blob' &&
+      error.response?.data instanceof Blob &&
+      /application\/(?:[\w.+-]*\+)?json/i.test(String(error.response.headers['content-type'] ?? error.response.data.type))
+    ) {
+      try {
+        error.response.data = JSON.parse(await error.response.data.text());
+      } catch {
+        // Keep the original HTTP error for malformed non-business responses.
+      }
+      if (config._epoch !== useAuth.getState().epoch)
+        throw new CanceledError('会话已结束');
+    }
     if (config && isUnauthorized(error) && !config.url?.startsWith('/auth/')) {
       if (isTerminalAuth(error)) {
         session.end(normalizeError(error).message);

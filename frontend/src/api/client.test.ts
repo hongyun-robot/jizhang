@@ -30,6 +30,71 @@ afterEach(() => {
 });
 
 describe('authenticated request retry', () => {
+  it.each([413, 403, 500])('decodes a Blob JSON failure (%s) before normalization', async (status) => {
+    useAuth.getState().setSession('old', user);
+    api.defaults.adapter = async (config) => {
+      throw new AxiosError('download failed', '', config, undefined, {
+        ...response(config, status), headers: { 'content-type': 'application/json' },
+        data: new Blob([JSON.stringify({ code: 10001, message: '最多 100,000 条，请选择 CSV' })], { type: 'application/json' }),
+      });
+    };
+    await expect(api.get('/transactions/export', { responseType: 'blob' })).rejects.toMatchObject({ status, code: 10001, message: '最多 100,000 条，请选择 CSV' });
+  });
+  it('ends a terminal session received as Blob without refreshing', async () => {
+    useAuth.getState().setSession('old', user);
+    const refresh = vi.spyOn(session, 'refreshAfter401');
+    api.defaults.adapter = async (config) => {
+      throw new AxiosError('ended', '', config, undefined, {
+        ...response(config, 401), headers: { 'content-type': 'application/json' },
+        data: new Blob([JSON.stringify({ code: 10008, message: '会话结束' })]),
+      });
+    };
+    await expect(api.get('/transactions/export', { responseType: 'blob' })).rejects.toMatchObject({ code: 10008 });
+    expect(refresh).not.toHaveBeenCalled();
+    expect(useAuth.getState().user).toBeNull();
+  });
+  it('refreshes an ordinary Blob 401 once', async () => {
+    useAuth.getState().setSession('old', user);
+    const refresh = vi.spyOn(session, 'refreshAfter401').mockImplementation(async () => {
+      useAuth.getState().setToken('new'); return 'new';
+    });
+    api.defaults.adapter = async (config) => {
+      if (config.headers.Authorization === 'Bearer old') throw new AxiosError('expired', '', config, undefined, {
+        ...response(config, 401), headers: { 'content-type': 'application/json' },
+        data: new Blob([JSON.stringify({ code: 10007, message: 'expired' })]),
+      });
+      return response(config, 200);
+    };
+    await api.get('/transactions/export', { responseType: 'blob' });
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+  it('handles malformed Blob errors and isolates account changes during decoding', async () => {
+    useAuth.getState().setSession('old', user);
+    api.defaults.adapter = async (config) => {
+      throw new AxiosError('bad gateway', '', config, undefined, {
+        ...response(config, 502), headers: { 'content-type': 'application/json' }, data: new Blob(['{invalid']),
+      });
+    };
+    await expect(api.get('/transactions/export', { responseType: 'blob' })).rejects.toMatchObject({ status: 502 });
+    let ready!: () => void;
+    let finish!: (value: string) => void;
+    const started = new Promise<void>((resolve) => { ready = resolve; });
+    class DelayedBlob extends Blob {
+      text() { ready(); return new Promise<string>((resolve) => { finish = resolve; }); }
+    }
+    api.defaults.adapter = async (config) => {
+      throw new AxiosError('ended', '', config, undefined, {
+        ...response(config, 401), headers: { 'content-type': 'application/json' }, data: new DelayedBlob(),
+      });
+    };
+    const pending = api.get('/transactions/export', { responseType: 'blob' });
+    const rejected = expect(pending).rejects.toThrow('会话已结束');
+    await started;
+    session.end(); useAuth.getState().setSession('other', { ...user, id: 2 });
+    finish(JSON.stringify({ code: 10008, message: 'old session' }));
+    await rejected;
+    expect(useAuth.getState().user?.id).toBe(2);
+  });
   it('ends a replaced session without refreshing or logging out other devices', async () => {
     useAuth.getState().setSession('old', user);
     const refresh = vi.spyOn(session, 'refreshAfter401');

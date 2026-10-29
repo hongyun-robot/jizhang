@@ -12,13 +12,14 @@ import {
 
 import { summarizeFilters } from '../features/records/filters';
 import { categoryIndex as flattenForest } from '../domain/categories';
-import { useMemo, useState, type HTMLAttributes } from 'react';
+import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState, type HTMLAttributes } from 'react';
 
 import {
   App,
   Badge,
   Button,
   Drawer,
+  Dropdown,
   Empty,
   Grid,
   Pagination,
@@ -26,13 +27,14 @@ import {
   Table,
 } from 'antd';
 import {
-  DownloadOutlined,
+  DownOutlined,
   FilterOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
 
 import { errMsg } from '../api/client';
-import { exportTxns, txnQueryUrl, useDeleteTxn } from '../api/transactions';
+import { exportTxns, txnQueryUrl, useDeleteTxn, type TxnExportFormat } from '../api/transactions';
+import { isCancel } from 'axios';
 import { useTxnReorder } from '../api/ordering';
 import { useCatalogOrder } from '../hooks/useCatalogOrder';
 import { OrderStatus, SortableCollection, SortableTableRow } from '../components/sorting/SortableCollection';
@@ -163,15 +165,24 @@ export default function Records() {
     }
   };
 
-  // 导出当前筛选结果（specs/transactions CSV 导出；四档角色均可读）
+  // Both formats share a synchronous guard; unmount/account changes cancel work.
   const [exporting, setExporting] = useState(false);
-  const doExport = async () => {
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportRequest = useRef<AbortController | null>(null);
+  const epoch = useAuth((s) => s.epoch);
+  useEffect(() => () => { exportRequest.current?.abort(); }, [epoch]);
+  const doExport = async (format: TxnExportFormat = 'xlsx') => {
+    if (exportRequest.current || sorting) return;
+    setExportMenuOpen(false);
+    const controller = new AbortController();
+    exportRequest.current = controller;
     setExporting(true);
     try {
-      await exportTxns(exportParams);
+      await exportTxns(exportParams, format, controller.signal);
     } catch (e) {
-      message.error(errMsg(e));
+      if (!isCancel(e) && !controller.signal.aborted) message.error(errMsg(e));
     } finally {
+      exportRequest.current = null;
       setExporting(false);
     }
   };
@@ -207,14 +218,23 @@ export default function Records() {
           <h2>流水</h2>
         </div>
         <div className="head-actions">
-          <Button
-            icon={<DownloadOutlined />}
+          <Dropdown.Button
+            trigger={['click']}
+            icon={<DownOutlined />}
+            open={exportMenuOpen}
+            onOpenChange={setExportMenuOpen}
             loading={exporting}
-            onClick={doExport}
+            disabled={exporting || sorting}
+            onClick={() => void doExport()}
+            menu={{ items: [{ key: 'csv', label: '导出 CSV' }], onClick: () => void doExport('csv') }}
+            buttonsRender={([main, more]) => [
+              isValidElement<{ 'aria-label'?: string }>(main) ? cloneElement(main, { 'aria-label': '导出 Excel' }) : main,
+              isValidElement<{ 'aria-label'?: string }>(more) ? cloneElement(more, { 'aria-label': '选择导出格式' }) : more,
+            ]}
             aria-label="导出"
           >
-            导出
-          </Button>
+            导出 Excel
+          </Dropdown.Button>
           {canRecord(user?.role) && (
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
               记一笔

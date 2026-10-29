@@ -47,6 +47,7 @@ type TxnStore interface {
 
 // TxnDeps 流水服务的外部依赖。
 type TxnDeps struct {
+	Exports  TxnExportStore
 	Txns     TxnStore
 	Accounts *repository.AccountRepo
 	Cats     *repository.CategoryRepo
@@ -77,6 +78,9 @@ func (s *TransactionService) firePeriods(keys ...string) {
 }
 
 func NewTransactionService(deps TxnDeps) *TransactionService {
+	if deps.Exports == nil && deps.Accounts != nil {
+		deps.Exports = repository.NewTxnExportRepo(deps.Accounts.DB())
+	}
 	return &TransactionService{deps: deps}
 }
 

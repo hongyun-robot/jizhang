@@ -2,6 +2,20 @@
 
 自用家庭记账站点：Web + 移动 H5 一套代码，Go + MySQL + Redis 后端，React + Ant Design 前端。
 
+## 流水导出
+
+流水页点击「导出 Excel」下载 XLSX，旁边的格式菜单可选择「导出 CSV」。两种格式都按当前全部生效筛选导出完整结果，沿用本人保存的列表顺序，不受页码或手机已加载条数限制；只读成员也能导出本人可见流水。
+
+Excel 只有一张「流水明细」表，包含原有 13 列及流水 ID、关联原流水 ID、所属账期、投资类型、产品代码、关联记录类型、关联记录 ID，共 20 列。日期可按日期筛选，金额可直接计算，冻结表头；ID 和产品代码按文字保存。退款、券和投资流水继续使用各自资金/消费口径，不能将金额列直接视为生活支出合计。
+
+XLSX 最多包含 100,000 条数据行；超限返回明确错误，需缩小筛选或自行选择 CSV，不会截断或自动换格式。CSV 保持原 13 列、顺序和 UTF-8 BOM，API 未指定格式时仍返回 CSV，新增 XLSX 上限不限制 CSV。导出不写账、不触发行情查询；空结果仍可下载表头。
+
+无需数据库迁移。发布时先部署支持 `format=xlsx` 的后端，再发布默认请求 XLSX 的前端；回滚先恢复前端 CSV 入口。后端依赖使用固定版本 Excelize，前端不增加工作簿生成依赖。
+
+相关验证：后端执行 `go test ./internal/service ./internal/handler -run 'XLSX|TransactionExportFormats|ExportCSV' -count=1`；设置 `PERSONAL_CATALOG_MYSQL_DSN` 后，`go test ./internal/service -run '^TestXLSXMySQL' -count=1 -v -timeout 5m` 在随机独立库验证一致读取、10 万条生成及超限拒绝。完整检查为后端 `go test ./...`、`go vet ./...`、`go build ./cmd/server`，前端 `npm run typecheck`、`npm run test:unit`、`npm run build`。
+
+浏览器验收仅使用下文的本机临时券 fixture。设置 `BROWSER_FIXTURE_ADDR=127.0.0.1:18189` 后启动 `TestVoucherBrowserServer`，构建前端并运行 `node e2e/support/preview.mjs --dist=dist --port=5619 --api=http://127.0.0.1:18189`，再执行 `node e2e/export.mjs`；可通过 `EXPORT_E2E_BASE` 指定同类本机测试地址，通过 `CHROME_EXE` 指定 Chrome。脚本校验 fixture 身份，写入并清理本次临时记录，覆盖桌面/手机、两种格式、筛选、多页、空表、只读、超限提示、重试和防重；截图位于 `frontend/e2e/shots/refactor-frontend/export-*.png`，下载文件位于已忽略的 `frontend/e2e/downloads/export-*`。
+
 ## 多设备登录
 
 同一个账号可在手机、平板、电脑上同时登录，每类最多保留一个有效会话。同类新登录成功后立即替换旧会话，例如在另一台电脑或换浏览器登录，会让原电脑浏览器失效；错误密码和登录提交前的服务故障不替换原会话。一个浏览器 Cookie 存储空间内的标签页共享登录；不同浏览器配置和无痕窗口按独立登录处理。

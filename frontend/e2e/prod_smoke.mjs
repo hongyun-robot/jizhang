@@ -193,6 +193,34 @@ try {
   ok(toastOk, '记一笔提交成功（UI 提示）');
   await shot(page, 'prod-03b-txn-created');
 
+  // Verify both download formats using only this run's private ledger.
+  for (const format of ['xlsx', 'csv']) {
+    const action = async () => {
+      if (format === 'xlsx') await page.getByRole('button', { name: '导出 Excel', exact: true }).click();
+      else {
+        await page.getByRole('button', { name: '选择导出格式', exact: true }).click();
+        await page.getByRole('menuitem', { name: '导出 CSV', exact: true }).click();
+      }
+    };
+    const [download, response] = await Promise.all([
+      page.waitForEvent('download', { timeout: 60000 }),
+      page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/transactions/export') && new URL(r.url()).searchParams.get('format') === format),
+      action(),
+    ]);
+    const stream = await download.createReadStream();
+    if (!stream) throw new Error('导出下载没有可读取的文件');
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    const bytes = Buffer.concat(chunks);
+    const mime = response.headers()['content-type'] ?? '';
+    const valid = response.status() === 200 && await download.failure() === null && download.suggestedFilename().endsWith('.' + format) && (
+      format === 'xlsx'
+        ? mime.includes('spreadsheetml.sheet') && bytes.subarray(0, 2).toString() === 'PK'
+        : mime.includes('text/csv') && bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf])) && bytes.toString('utf8').includes(SMOKE_NOTE)
+    );
+    ok(valid, `本人流水 ${format.toUpperCase()} 实际下载`, `http=${response.status()} bytes=${bytes.length}`);
+  }
+
   // 6. 刷新恢复会话（refresh cookie 是否生效）
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => {});

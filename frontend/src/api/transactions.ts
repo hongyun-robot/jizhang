@@ -12,6 +12,9 @@ import type { Transaction, TxnListParams, TxnListResp } from './types';
 import { readApi as unwrap, writeApi } from './request';
 import { useFinancialInvalidate as useTxnInvalidate } from './cache';
 import { qs } from './query';
+import { CanceledError } from 'axios';
+import { useAuth } from '../stores/auth';
+import { ApiError, checkBody } from './errors';
 import { queryKeys, useScope } from './keys';
 
 /** 序列化流水查询参数（供 react-query key 稳定）。 */
@@ -19,20 +22,40 @@ export function txnQueryUrl(p: TxnListParams): string {
   return `/transactions${qs({ ...txnQueryParams(p), order: 'custom' })}`;
 }
 
-/** 导出当前筛选流水为 CSV（任务 11.2）：与列表同参但不分页，BOM 由后端产出。 */
-export async function exportTxns(p: TxnListParams): Promise<void> {
-  const url = `/transactions/export${qs({ ...txnQueryParams(p, true), order: 'custom' })}`;
-  const res = await api.get(url, { responseType: 'blob', timeout: 30000 });
-  const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });
+export type TxnExportFormat = 'xlsx' | 'csv';
+/** Export all matching rows; page state never limits the download. */
+export async function exportTxns(p: TxnListParams, format: TxnExportFormat = 'xlsx', signal?: AbortSignal): Promise<void> {
+  const epoch = useAuth.getState().epoch;
+  const url = `/transactions/export${qs({ ...txnQueryParams(p, true), order: 'custom', format })}`;
+  const res = await api.get<Blob>(url, { responseType: 'blob', timeout: format === 'xlsx' ? 55000 : 30000, signal });
+  const current = () => {
+    if (epoch !== useAuth.getState().epoch || signal?.aborted)
+      throw new CanceledError('会话已结束');
+  };
+  current();
+  const mime = String(res.headers['content-type'] ?? res.data.type).split(';')[0].trim().toLowerCase();
+  if (mime.includes('json')) {
+    const body = JSON.parse(await res.data.text());
+    current();
+    checkBody(body);
+    throw new ApiError('服务器未返回导出文件', 'protocol');
+  }
+  const expected = format === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv';
+  if (mime !== expected) throw new ApiError('导出文件格式无效，请重试', 'protocol');
+  const blob = new Blob([res.data], { type: expected });
   const cd = String(res.headers['content-disposition'] ?? '');
-  const name = /filename="?([^";]+)"?/.exec(cd)?.[1] ?? 'transactions.csv';
+  const name = /filename="?([^";]+)"?/.exec(cd)?.[1] ?? `transactions.${format}`;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(a.href);
+  try {
+    current();
+    document.body.appendChild(a);
+    a.click();
+  } finally {
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  }
 }
 
 export function useTxnList(params: TxnListParams) {
