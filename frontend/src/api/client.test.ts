@@ -4,6 +4,7 @@ import { api } from './client';
 import { session } from '../auth/session';
 import { useAuth } from '../stores/auth';
 import { createJsonRequester } from './request';
+import { ApiError } from './errors';
 
 const originalAdapter = api.defaults.adapter;
 const user = {
@@ -30,6 +31,28 @@ afterEach(() => {
 });
 
 describe('authenticated request retry', () => {
+  it('holds financial requests until foreground session validation completes', async () => {
+    useAuth.getState().setSession('old', user);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const validate = vi.spyOn(session, 'beforeRequest').mockReturnValue(gate);
+    const transport = vi.fn(async (config: InternalAxiosRequestConfig) => response(config, 200));
+    api.defaults.adapter = transport;
+    const pending = api.post('/transactions', { amount: '1' });
+    await vi.waitFor(() => expect(validate).toHaveBeenCalledOnce());
+    expect(transport).not.toHaveBeenCalled();
+    release();
+    await pending;
+    expect(transport).toHaveBeenCalledOnce();
+  });
+  it('never sends financial requests when foreground validation fails', async () => {
+    useAuth.getState().setSession('old', user);
+    vi.spyOn(session, 'beforeRequest').mockRejectedValue(new ApiError('认证状态服务暂不可用', 'network', 503));
+    const transport = vi.fn(async (config: InternalAxiosRequestConfig) => response(config, 200));
+    api.defaults.adapter = transport;
+    await expect(api.post('/transactions', { amount: '1' })).rejects.toMatchObject({ status: 503 });
+    expect(transport).not.toHaveBeenCalled();
+  });
   it.each([413, 403, 500])('decodes a Blob JSON failure (%s) before normalization', async (status) => {
     useAuth.getState().setSession('old', user);
     api.defaults.adapter = async (config) => {

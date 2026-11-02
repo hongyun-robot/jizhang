@@ -177,6 +177,7 @@ export interface StatsTotals {
   balance: string;
 }
 export interface CompareResp {
+  period_key?: string;
   start: string;
   end: string;
   previous_start: string;

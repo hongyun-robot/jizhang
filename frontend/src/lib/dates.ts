@@ -7,6 +7,13 @@ export type PresetKey =
   | 'last7'
   | 'last30'
   | 'custom';
+export function validPeriodKey(value: string | null): value is string {
+  return (
+    value !== null &&
+    /^\d{4}-(0[1-9]|1[0-2])$/.test(value) &&
+    Number(value.slice(0, 4)) > 0
+  );
+}
 export function validDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number);

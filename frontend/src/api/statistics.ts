@@ -29,9 +29,9 @@ export function useStatsTrend(range: DateRange, granularity: string) {
   });
 }
 
-export function useStatsCompare(range: DateRange | null) {
+export function useStatsCompare(range: DateRange | null, periodKey?: string) {
   const scope = useScope();
-  const url = `/stats/compare${qs({ start_date: range?.start, end_date: range?.end })}`;
+  const url = `/stats/compare${qs({ start_date: range?.start, end_date: range?.end, period_key: periodKey })}`;
   return useQuery({
     queryKey: queryKeys.key('stats', scope, url),
     queryFn: ({ signal }) => unwrap<CompareResp>(url, signal),

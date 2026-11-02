@@ -47,4 +47,15 @@ describe('transaction filter contract', () => {
     expect(exported.page).toBeUndefined();
     expect(exported.page_size).toBeUndefined();
   });
+  it('preserves a historical billing period without restricting it to recalculated dates', () => {
+    const filters = parseFilters(new URLSearchParams('period_key=2025-12&from=2025-11-26&to=2025-12-25'), fallback);
+    expect(parseFilters(serializeFilters(filters, 1, fallback), fallback)).toEqual(filters);
+    const params = listParams(filters, 1);
+    expect(params.period_key).toBe('2025-12');
+    expect(params.start_date).toBeUndefined();
+    expect(params.end_date).toBeUndefined();
+    expect(txnQueryParams(params, true).period_key).toBe('2025-12');
+    expect(listParams({ ...filters, related_txn_id: 8 }, 1).period_key).toBeUndefined();
+    expect(parseFilters(new URLSearchParams('period_key=2025-13'), fallback).period_key).toBeUndefined();
+  });
 });

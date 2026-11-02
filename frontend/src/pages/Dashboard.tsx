@@ -1,8 +1,8 @@
 import { cents, money, sumMoney } from '../lib/money';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Card, Grid, Skeleton } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { CalendarOutlined, DownOutlined, PlusOutlined, RollbackOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
 import { useAccounts } from '../api/accounts';
@@ -20,9 +20,11 @@ import { canRecord } from '../domain/permissions';
 import Money, { fmtMoney } from '../components/Money';
 import LiabilityFeeTag from '../components/LiabilityFeeTag';
 import BudgetProgress from '../components/BudgetProgress';
+import DatePicker from '../components/DatePicker';
 import QueryState, { QueryBoundary } from '../components/QueryState';
 import TxnFormModal from '../components/TxnFormModal';
 import { lastSearchOf } from '../navigation/memory';
+import { validPeriodKey } from '../lib/dates';
 
 /** 指针柔光：把坐标写进 CSS 变量，只在精确指针设备上出现。 */
 function trackPointer(e: React.PointerEvent<HTMLElement>) {
@@ -49,11 +51,14 @@ function heroFontSize(text: string, vw: number): number | undefined {
 /** 首页概览（specs/home-dashboard）：本期收支结余 hero + 预算进度 + 最近10笔 + 快捷记账。 */
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [search, setSearch] = useSearchParams();
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
   const user = useAuth((s) => s.user);
 
   const [formOpen, setFormOpen] = useState(false);
+  // 点击负责切换，原生控件仅同步关闭；避免首次聚焦的自动打开与点击互相覆盖。
+  const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
   // 视口宽度（hero 金额按位数缩放依赖；监听 resize 保持估算与实际宽度同步）
   const [vw, setVw] = useState(() => window.innerWidth);
   useEffect(() => {
@@ -62,14 +67,37 @@ export default function Dashboard() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // 默认区间 = 当前账期，与统计页同口径（specs/home-dashboard 数值一致）
-  const compare = useStatsCompare(null);
+  // 账期键及日期区间均由服务端解析，不按自然月重算自定义账期。
+  const requestedPeriod = search.get('period_key');
+  const selectedPeriod = validPeriodKey(requestedPeriod) ? requestedPeriod : undefined;
+  const currentBudgets = useBudgets();
+  const currentPeriod = currentBudgets.data?.period_key;
+  const budgets = useBudgets(selectedPeriod);
+  const compare = useStatsCompare(null, selectedPeriod);
+  const periodKey = selectedPeriod ?? compare.data?.period_key ?? currentPeriod;
+  const isHistorical = !!selectedPeriod && selectedPeriod !== currentPeriod;
+  const periodLabel = isHistorical ? '该期' : '本期';
+  const recentPeriod = isHistorical ? selectedPeriod : undefined;
   const accounts = useAccounts();
-  const recent = useTxnList({ page: 1, page_size: 10 });
+  const recent = useTxnList(
+    { period_key: recentPeriod, page: 1, page_size: 10 },
+    { keepPreviousData: false }
+  );
   const reorder = useTxnReorder();
-  const order = useCatalogOrder(recent.data?.items ?? [], 'transactions:recent', reorder.mutateAsync, recent.refetch);
-  const budgets = useBudgets(); // 当前账期预算（后端推 period_key）
+  const order = useCatalogOrder(recent.data?.items ?? [], `transactions:recent:${recentPeriod ?? 'all'}`, reorder.mutateAsync, recent.refetch);
   const vouchers = useVouchers({ page_size: 1 });
+
+  const selectPeriod = (key?: string) => {
+    setSearch((previous) => {
+      const next = new URLSearchParams(previous);
+      if (!key || key === currentPeriod) next.delete('period_key');
+      else next.set('period_key', key);
+      return next;
+    });
+  };
+  const recordsSearch = isHistorical && periodKey
+    ? `?${new URLSearchParams({ period_key: periodKey, ...(compare.data ? { from: compare.data.start, to: compare.data.end } : {}) })}`
+    : lastSearchOf('/records');
 
   const totalAssets = useMemo(
     () =>
@@ -124,21 +152,58 @@ export default function Dashboard() {
 
       {/* 本期结余 hero：一个主数字 + 收支拆解 + 资产/预算侧栏，取代四张同款卡片 */}
       <section className="hero panel" onPointerMove={trackPointer}>
-        <QueryBoundary query={compare}>
-          <div className="hero-main">
-            <div className="hero-label">
-              本期结余
-              {budgets.data && (
-                <span className="hero-range">
-                  账期 {budgets.data.period_key}
-                </span>
+        <div className="hero-main">
+          <div className="hero-heading">
+            <span className="hero-label">{periodLabel}结余</span>
+            <div className={`hero-period-controls${isHistorical ? ' is-history' : ''}`}>
+              <DatePicker
+                className="hero-range"
+                classNames={{ popup: { root: 'hero-period-popup' } }}
+                aria-label="选择账期"
+                picker="month"
+                open={periodPickerOpen}
+                onClick={() => setPeriodPickerOpen((open) => !open)}
+                onOpenChange={(open) => {
+                  if (!open) setPeriodPickerOpen(false);
+                }}
+                onKeyDown={(event) => {
+                  if (!periodPickerOpen && ['Enter', ' ', 'ArrowDown'].includes(event.key)) {
+                    event.preventDefault();
+                    setPeriodPickerOpen(true);
+                  }
+                }}
+                popupAlign={{ overflow: { adjustX: true, adjustY: true, shiftX: true } }}
+                prefix={<CalendarOutlined aria-hidden />}
+                suffixIcon={<DownOutlined />}
+                format="YYYY-MM"
+                value={periodKey ? dayjs(periodKey) : null}
+                maxDate={currentPeriod ? dayjs(currentPeriod).endOf('month') : undefined}
+                disabledDate={!currentPeriod ? () => true : undefined}
+                allowClear={false}
+                inputReadOnly
+                placeholder="选择账期"
+                showNow={false}
+                onChange={(month) => month && selectPeriod(month.format('YYYY-MM'))}
+              />
+              {isHistorical && (
+                <Button
+                  className="hero-period-reset"
+                  type="text"
+                  size="small"
+                  icon={<RollbackOutlined aria-hidden />}
+                  onClick={() => selectPeriod()}
+                >
+                  回到本期
+                </Button>
               )}
             </div>
+          </div>
+          <QueryBoundary query={compare}>
             {/* 窄屏按位数缩放字号 + title 兜底，金额完整可读不被静默裁切 */}
             <div
               className="hero-value"
               style={heroSize ? { fontSize: `${heroSize}px` } : undefined}
-              title={heroSize ? `本期结余 ¥${heroText}` : undefined}
+              title={heroSize ? `${periodLabel}结余 ¥${heroText}` : undefined}
             >
               {!compare.data && !compare.isError ? (
                 <Skeleton.Input active size="large" style={{ width: 220 }} />
@@ -153,22 +218,22 @@ export default function Dashboard() {
             <div className="hero-split">
               <span className="cell">
                 <i className="dot income" />
-                本期收入
+                {periodLabel}收入
                 <Money value={cur?.income ?? '0'} tone="income" animate />
               </span>
               <span className="cell">
                 <i className="dot expense" />
-                本期支出
+                {periodLabel}支出
                 <Money value={cur?.expense ?? '0'} tone="expense" animate />
               </span>
             </div>
-          </div>
-        </QueryBoundary>
+          </QueryBoundary>
+        </div>
 
         <div className="hero-side">
           <QueryBoundary query={vouchers}>
             <div className="hero-stat">
-              <div className="k">未用券金额</div>
+              <div className="k">{isHistorical ? '当前未用券金额' : '未用券金额'}</div>
               <div className="v">
                 <Money value={vouchers.data?.unused_amount ?? '0'} animate />
               </div>
@@ -185,7 +250,7 @@ export default function Dashboard() {
           </QueryBoundary>
           <QueryBoundary query={accounts}>
             <div className="hero-stat">
-              <div className="k">总资产</div>
+              <div className="k">{isHistorical ? '当前总资产' : '总资产'}</div>
               <div className="v">
                 {accounts.data ? (
                   accounts.data.some((a) => (a.asset_class === 'fund' || a.asset_class === 'gold' || a.asset_class === 'wealth') && a.valuation_status === 'no_price') ? <span className="muted"><span>报价不完整</span> · 已知小计 <Money value={totalAssets} /></span> : <Money value={totalAssets} animate />
@@ -215,7 +280,7 @@ export default function Dashboard() {
                   ? '已超支，建议调整'
                   : total?.budget
                     ? `已用 ${total.percent}%`
-                    : '本期尚未配置预算'}
+                    : `${periodLabel}尚未配置预算`}
               </div>
             </div>
           </QueryBoundary>
@@ -230,7 +295,7 @@ export default function Dashboard() {
               view={budgets.data}
               loading={budgets.isLoading}
               showPeriod
-              configLink
+              configLink={!isHistorical}
             />
           </QueryBoundary>
         </Card>
@@ -239,12 +304,12 @@ export default function Dashboard() {
         <Card
           size="small"
           className="panel"
-          title="最近流水"
+          title={isHistorical ? '该期流水' : '最近流水'}
           extra={
             <Button
               type="link"
               size="small"
-              onClick={() => navigate('/records')}
+              onClick={() => navigate(`/records${recordsSearch}`)}
             >
               查看全部
             </Button>
@@ -257,7 +322,7 @@ export default function Dashboard() {
               hasData={recent.data !== undefined}
               isEmpty={!!recent.data && recent.data.items.length === 0}
               onRetry={() => void recent.refetch()}
-              emptyDescription="还没有流水，记一笔吧"
+              emptyDescription={isHistorical ? '该期暂无流水' : '还没有流水，记一笔吧'}
               skeleton={
                 <Skeleton active paragraph={{ rows: 5 }} title={false} />
               }
@@ -275,7 +340,7 @@ export default function Dashboard() {
                       type="button"
                       className="recent-content"
                       onClick={() =>
-                        t.wealth_position_id ? navigate(`/wealth-positions/${t.wealth_position_id}?event=${t.wealth_event_id}`) : navigate(`/records${lastSearchOf('/records')}`, {
+                        t.wealth_position_id ? navigate(`/wealth-positions/${t.wealth_position_id}?event=${t.wealth_event_id}`) : navigate(`/records${isHistorical ? recordsSearch : `?${new URLSearchParams({ period_key: t.period_key })}`}`, {
                           state: { locateId: t.id },
                         })
                       }
@@ -319,7 +384,7 @@ export default function Dashboard() {
         <div className="greeting">
           你好，<b>{user.username}</b> · {ROLE_LABEL[user.role] ?? user.role}
           {recent.data
-            ? ` · 累计 ${recent.data.total.toLocaleString('zh-CN')} 笔`
+            ? ` · ${isHistorical ? '该期共' : '累计'} ${recent.data.total.toLocaleString('zh-CN')} 笔`
             : ''}
         </div>
       )}

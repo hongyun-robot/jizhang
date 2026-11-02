@@ -34,7 +34,9 @@ export default function RequireAuth({
   }, [booted, epoch, retry]);
   if (user) return <>
     {validationError && <QueryState error={validationError} onRetry={() => { void session.validate().catch(() => {}); }} />}
-    <div style={{ display: 'contents' }} inert={validationPending || !!validationError}>{children}</div>
+    {/* Pending validation gates network requests in api/client. Making the
+        whole page inert during focus validation drops the activating click. */}
+    <div style={{ display: 'contents' }} aria-busy={validationPending} inert={!!validationError}>{children}</div>
   </>;
   if (error && !booted)
     return (

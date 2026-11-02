@@ -69,22 +69,128 @@
   background: color-mix(in srgb, var(--panel) 72%, transparent);
 }
 
-.hero-label {
+.hero-heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 6px;
+}
+.hero-label {
+  flex-shrink: 0;
   font-size: 12px;
-  letter-spacing: 0.1em;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   color: var(--muted);
 }
-.hero-range {
-  font-size: 11px;
+.hero-period-controls {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+}
+.hero-range.ant-picker {
+  width: 8.625rem;
+  min-height: 34px;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  padding: 1px 7px;
+  padding: 4px 9px;
   border: 1px solid var(--line);
-  border-radius: 99px;
-  background: var(--panel);
+  border-radius: var(--radius-ctl) !important;
+  background: var(--panel-sunken) !important;
+  cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+.hero-range.ant-picker .ant-picker-input > input {
+  font-family: var(--font-num);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.hero-range .ant-picker-prefix {
+  margin-inline-end: 8px;
+  color: var(--primary);
+  font-size: 14px;
+}
+.hero-range .ant-picker-suffix {
+  margin-inline-start: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.hero-period-controls.is-history .hero-range.ant-picker {
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--line));
+  background: color-mix(in srgb, var(--primary) 5%, var(--panel)) !important;
+}
+.hero-range.ant-picker-focused {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--hover-tint) !important;
+}
+.hero-period-reset.ant-btn {
+  min-height: 34px;
+  padding-inline: 6px;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: color 180ms ease, background-color 180ms ease;
+}
+.hero-period-reset.ant-btn .anticon {
+  font-size: 12px;
+}
+.hero-period-reset.ant-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.hero-period-reset.ant-btn:active {
+  background: var(--hover-tint) !important;
+}
+@media (hover: hover) {
+  .hero-range.ant-picker:hover {
+    border-color: color-mix(in srgb, var(--primary) 36%, var(--line)) !important;
+    background: var(--hover-soft) !important;
+  }
+  .hero-period-reset.ant-btn:hover {
+    color: var(--primary) !important;
+    background: var(--hover-soft) !important;
+  }
+}
+.hero-period-popup .ant-picker-panel-container {
+  border: 1px solid var(--line);
+}
+.hero-period-popup .ant-picker-header button {
+  min-width: 36px;
+  min-height: 40px;
+}
+.hero-period-popup .ant-picker-header-view {
+  font-family: var(--font-num);
+  font-weight: 600;
+}
+.hero-period-popup .ant-picker-cell-inner {
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 767px) {
+  .hero-period-controls {
+    gap: 4px;
+  }
+  .hero-range.ant-picker,
+  .hero-period-reset.ant-btn {
+    min-height: 40px;
+  }
+  .hero-range.ant-picker .ant-picker-input > input {
+    font-size: 16px;
+  }
+  .hero-period-reset.ant-btn.ant-btn-sm {
+    padding-inline: 6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-range.ant-picker,
+  .hero-period-reset.ant-btn {
+    transition: none;
+  }
 }
 
 .hero-value {
@@ -93,7 +199,7 @@
   line-height: 1.02;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
-  margin-top: 6px;
+  margin-top: 0;
 }
 .hero-value .money {
   font-variant-numeric: tabular-nums;

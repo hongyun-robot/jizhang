@@ -363,6 +363,7 @@ type compareChange struct {
 }
 
 type compareResponse struct {
+	PeriodKey     string        `json:"period_key,omitempty"`
 	Start         string        `json:"start"`
 	End           string        `json:"end"`
 	PreviousStart string        `json:"previous_start"`
@@ -375,6 +376,9 @@ type compareResponse struct {
 // Compare 当前区间与上一同比窗口（前移一月）的收支结余及增减幅度。
 // 上期为 0 时对应幅度为 null（前端显示“—”）。
 func (s *StatsService) Compare(start, end string) (json.RawMessage, bool, error) {
+	if start == "" && end == "" {
+		return s.ComparePeriod(s.periods.CurrentKey(time.Now()))
+	}
 	st, en, err := s.resolveRange(start, end)
 	if err != nil {
 		return nil, false, err
@@ -397,6 +401,40 @@ func (s *StatsService) Compare(start, end string) (json.RawMessage, bool, error)
 			PreviousEnd:   pen.Format("2006-01-02"),
 			Current:       cur,
 			Previous:      prev,
+			Change: compareChange{
+				IncomePercent:  percentOf(cur.Income, prev.Income),
+				ExpensePercent: percentOf(cur.Expense, prev.Expense),
+				BalancePercent: percentOf(cur.Balance, prev.Balance),
+			},
+		}, nil
+	})
+}
+
+// ComparePeriod 按物化账期汇总；修改结算日后也不将历史流水重新归期。
+func (s *StatsService) ComparePeriod(periodKey string) (json.RawMessage, bool, error) {
+	st, en, ok := s.periods.Range(periodKey)
+	if !ok {
+		return nil, false, ErrInvalidStatsRange
+	}
+	previousKey, _ := s.periods.PrevKey(periodKey)
+	pst, pen, _ := s.periods.Range(previousKey)
+	key := fmt.Sprintf("stats:compare:period:%s:%s:%s", periodKey, st.Format("2006-01-02"), en.Format("2006-01-02"))
+	return s.cached(key, func() (any, error) {
+		current, err := s.repo.SumByPeriod(periodKey)
+		if err != nil {
+			return nil, err
+		}
+		previous, err := s.repo.SumByPeriod(previousKey)
+		if err != nil {
+			return nil, err
+		}
+		cur := statsTotals{Income: current.Income, Expense: current.Expense, Balance: current.Income.Sub(current.Expense)}
+		prev := statsTotals{Income: previous.Income, Expense: previous.Expense, Balance: previous.Income.Sub(previous.Expense)}
+		return compareResponse{
+			PeriodKey: periodKey,
+			Start:     st.Format("2006-01-02"), End: en.AddDate(0, 0, -1).Format("2006-01-02"),
+			PreviousStart: pst.Format("2006-01-02"), PreviousEnd: pen.AddDate(0, 0, -1).Format("2006-01-02"),
+			Current: cur, Previous: prev,
 			Change: compareChange{
 				IncomePercent:  percentOf(cur.Income, prev.Income),
 				ExpensePercent: percentOf(cur.Expense, prev.Expense),

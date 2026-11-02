@@ -59,9 +59,14 @@ func (h *statsHandler) Trend(c *gin.Context) {
 	emit(c, raw, hit, err)
 }
 
-// Compare GET /api/v1/stats/compare?start_date&end_date
+// Compare GET /api/v1/stats/compare?start_date&end_date 或 ?period_key=YYYY-MM。
 func (h *statsHandler) Compare(c *gin.Context) {
 	q := c.Request.URL.Query()
+	if q.Has("period_key") {
+		raw, hit, err := h.svc.ForUser(middleware.CurrentUser(c)).ComparePeriod(q.Get("period_key"))
+		emit(c, raw, hit, err)
+		return
+	}
 	raw, hit, err := h.svc.ForUser(middleware.CurrentUser(c)).Compare(q.Get("start_date"), q.Get("end_date"))
 	emit(c, raw, hit, err)
 }

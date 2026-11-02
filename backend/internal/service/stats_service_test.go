@@ -1,13 +1,75 @@
 package service
 
 import (
+	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/shopspring/decimal"
 
+	"jizhang/internal/model"
 	"jizhang/internal/repository"
 )
+
+func TestCompareHistoricalPeriod(t *testing.T) {
+	e := newBudgetEnv(t)
+	owner, otherOwner := int64(1), int64(2)
+	account := model.Account{OwnerID: &owner, Name: "本人", Type: model.AccountAsset, Status: model.StatusActive}
+	otherAccount := model.Account{OwnerID: &otherOwner, Name: "他人", Type: model.AccountAsset, Status: model.StatusActive}
+	mustOK(t, e.accRepo.Create(&account))
+	mustOK(t, e.accRepo.Create(&otherAccount))
+	for _, row := range []struct {
+		kind                 model.TxnKind
+		amount, date, period string
+		account              int64
+	}{
+		{model.TxnIncome, "200", "2026-01-30", "2026-01", account.ID},
+		{model.TxnExpense, "50", "2026-01-31", "2026-01", account.ID},
+		{model.TxnRefund, "10", "2026-01-31", "2026-01", account.ID},
+		{model.TxnTransfer, "999", "2026-01-31", "2026-01", account.ID},
+		{model.TxnExpense, "20", "2025-12-30", "2025-12", account.ID},
+		{model.TxnIncome, "9000", "2026-01-05", "2026-01", otherAccount.ID},
+		{model.TxnExpense, "700", "2026-01-10", "2026-02", account.ID},
+	} {
+		txn := model.Transaction{Kind: row.kind, Amount: dec(row.amount), AccountID: row.account, EntryDate: d(t, row.date), PeriodKey: row.period, Purpose: "regular", CreatedBy: owner, Source: model.SourceManual}
+		mustOK(t, e.txn.deps.Txns.Create(&txn))
+	}
+	stats := NewStatsService(e.budget.deps.Stats, e.accRepo, e.catRepo, e.periods, nil)
+	personal := stats.ForUser(&model.User{ID: owner, Role: model.RoleMember})
+	// 改结算日后，1 月末旧流水仍归入原账期，不受新的日期边界限制。
+	mustOK(t, e.periods.SetSettlementDay(26))
+	raw, _, err := personal.ComparePeriod("2026-01")
+	mustOK(t, err)
+	var view compareResponse
+	mustOK(t, json.Unmarshal(raw, &view))
+	if view.PeriodKey != "2026-01" || view.Start != "2025-12-26" || view.End != "2026-01-25" || view.PreviousStart != "2025-11-26" || view.PreviousEnd != "2025-12-25" {
+		t.Fatalf("wrong custom period across year boundary: %+v", view)
+	}
+	if !view.Current.Income.Equal(dec("200")) || !view.Current.Expense.Equal(dec("40")) || !view.Current.Balance.Equal(dec("160")) || !view.Previous.Expense.Equal(dec("20")) {
+		t.Fatalf("period, refund or owner scope changed: %+v", view)
+	}
+	for _, key := range []string{"", "2026-13", "2026-1", "invalid"} {
+		if _, _, err := personal.ComparePeriod(key); !errors.Is(err, ErrInvalidStatsRange) {
+			t.Fatalf("accepted invalid period %q: %v", key, err)
+		}
+	}
+	raw, _, err = personal.ComparePeriod("2024-02")
+	mustOK(t, err)
+	mustOK(t, json.Unmarshal(raw, &view))
+	if !view.Current.Income.IsZero() || !view.Current.Expense.IsZero() {
+		t.Fatal("empty period reused another period", view)
+	}
+	if _, _, err := stats.ForUser(nil).ComparePeriod("2026-01"); !errors.Is(err, ErrTxnForbidden) {
+		t.Fatal("anonymous period query accepted", err)
+	}
+	raw, _, err = personal.Compare("", "")
+	mustOK(t, err)
+	mustOK(t, json.Unmarshal(raw, &view))
+	if view.PeriodKey != e.periods.CurrentKey(time.Now()) {
+		t.Fatal("default comparison did not resolve current billing period", view.PeriodKey)
+	}
+}
 
 func d(t *testing.T, s string) time.Time {
 	t.Helper()

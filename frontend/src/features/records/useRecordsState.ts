@@ -48,7 +48,7 @@ export function useRecordsState() {
   const patch = (value: Partial<FilterState>) => {
     generation.current++;
     setStartPage(1);
-    setSearch(serializeFilters({ ...filters, ...value }, 1, defaultRange));
+    setSearch(serializeFilters({ ...filters, ...(value.range ? { period_key: undefined } : {}), ...value }, 1, defaultRange));
   };
   const gotoPage = async (next: number) => {
     const current = ++generation.current;

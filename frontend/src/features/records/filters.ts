@@ -1,9 +1,10 @@
 import type { DateRange, TxnKind, TxnListParams } from '../../api/types';
-import { validRange } from '../../lib/dates';
+import { validPeriodKey, validRange } from '../../lib/dates';
 import { parseCents } from '../../lib/money';
 
 export interface FilterState {
   range: DateRange;
+  period_key?: string;
   kind: TxnKind | '';
   account_id?: number;
   category_id?: number;
@@ -13,6 +14,7 @@ export interface FilterState {
   related_txn_id?: number;
 }
 export const EMPTY_FILTERS = {
+  period_key: undefined,
   kind: '' as const,
   account_id: undefined,
   category_id: undefined,
@@ -41,6 +43,7 @@ export function parseFilters(
     end: search.get('to') ?? '',
   };
   const kind = search.get('kind');
+  const period = search.get('period_key');
   let min = amount(search.get('amount_min')),
     max = amount(search.get('amount_max'));
   if (min && max && parseCents(min)! > parseCents(max)!) {
@@ -49,6 +52,7 @@ export function parseFilters(
   }
   return {
     range: validRange(range) ? range : fallback,
+    period_key: validPeriodKey(period) ? period : undefined,
     kind: kinds.find((value) => value === kind) ?? '',
     account_id: positiveId(search.get('account_id')),
     category_id: positiveId(search.get('category_id')),
@@ -87,8 +91,9 @@ export function listParams(
   size = 20
 ): TxnListParams {
   return {
-    start_date: filters.related_txn_id ? undefined : filters.range.start,
-    end_date: filters.related_txn_id ? undefined : filters.range.end,
+    start_date: filters.related_txn_id || filters.period_key ? undefined : filters.range.start,
+    end_date: filters.related_txn_id || filters.period_key ? undefined : filters.range.end,
+    period_key: filters.related_txn_id ? undefined : filters.period_key,
     kind: filters.kind || undefined,
     account_id: filters.account_id,
     category_id: filters.category_id,
@@ -130,10 +135,10 @@ export function summarizeFilters(
   categories: ReadonlyMap<number, { full: string }>
 ) {
   const parts: string[] = [
-    `${filters.range.start.replace(/-/g, '.')} – ${filters.range.end.replace(/-/g, '.')}`,
+    filters.period_key ? `账期 ${filters.period_key}` : `${filters.range.start.replace(/-/g, '.')} – ${filters.range.end.replace(/-/g, '.')}`,
   ];
   let count =
-    filters.range.start !== fallback.start || filters.range.end !== fallback.end
+    filters.period_key || filters.range.start !== fallback.start || filters.range.end !== fallback.end
       ? 1
       : 0;
   if (filters.kind) {

@@ -58,13 +58,17 @@ export async function exportTxns(p: TxnListParams, format: TxnExportFormat = 'xl
   }
 }
 
-export function useTxnList(params: TxnListParams) {
+export function useTxnList(
+  params: TxnListParams,
+  { enabled = true, keepPreviousData = true } = {}
+) {
   const scope = useScope();
   const url = txnQueryUrl(params);
   return useQuery({
     queryKey: queryKeys.key('txns', scope, url),
     queryFn: ({ signal }) => unwrap<TxnListResp>(url, signal),
-    placeholderData: (prev) => prev,
+    enabled,
+    placeholderData: keepPreviousData ? (prev) => prev : undefined,
   });
 }
 
