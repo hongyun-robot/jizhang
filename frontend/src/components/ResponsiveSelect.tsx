@@ -85,6 +85,12 @@ export default function ResponsiveSelect<Value extends string | number>({
       <Select
         {...props}
         options={options}
+        optionRender={props.optionRender ?? (options.some((option) => option.description != null) ? (option) => (
+          <span className="selection-option-row">
+            <span className="selection-option-label">{option.label}</span>
+            {option.data.description != null && <span className="selection-option-description">{option.data.description}</span>}
+          </span>
+        ) : undefined)}
         open={open && active && !suspended}
         onOpenChange={setOpen}
         onSearch={(search) => { setQuery(search); props.onSearch?.(search); }}

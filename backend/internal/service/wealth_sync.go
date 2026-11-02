@@ -85,11 +85,11 @@ func (s *WealthService) Refresh(ctx context.Context, actor *model.User, account 
 	return s.Account(actor, account)
 }
 func (s *WealthService) Ensure(ctx context.Context) error {
+	first := s.backfillCashYieldCategories(ctx)
 	products, err := s.repo.TrackedProducts()
 	if err != nil {
 		return err
 	}
-	var first error
 	for _, product := range products {
 		if ctx.Err() != nil {
 			return ctx.Err()

@@ -14,6 +14,8 @@ export function useCategoryForest() {
   return useQuery({
     queryKey: queryKeys.key('categories', scope),
     queryFn: ({ signal }) => unwrap<CategoryForest>('/categories', signal),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 }
 

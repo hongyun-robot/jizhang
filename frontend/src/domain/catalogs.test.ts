@@ -1,9 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { categoryIndex, categoryPath } from './categories';
-import { accountOptions } from './accounts';
+import { accountBalanceSummary, accountOptions } from './accounts';
 import type { Account } from '../api/types';
 
 describe('catalog presentation', () => {
+  it.each([
+    ['asset', '1234.56', '余额', '1234.56'],
+    ['asset', '-20.01', '余额', '-20.01'],
+    ['asset', '0', '余额', '0.00'],
+    ['liability', '-8765.43', '总欠款', '8765.43'],
+    ['liability', '0', '总欠款', '0.00'],
+    ['liability', '35.20', '总欠款', '0.00'],
+    ['asset', null, '余额', null],
+    ['liability', undefined, '总欠款', null],
+    ['asset', '90071992547409.91', '余额', '90071992547409.91'],
+  ] as const)('shows %s balance %s with the account debt convention', (type, balance, label, amount) => {
+    expect(accountBalanceSummary({ type, balance })).toEqual({ label, amount });
+  });
   it('indexes grouped and ungrouped selectable categories consistently', () => {
     const index = categoryIndex([
       {

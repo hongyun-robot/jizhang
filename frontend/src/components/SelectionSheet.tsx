@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type ReactNode,
@@ -18,6 +19,7 @@ import { useVisualViewportKeyboard } from '../hooks/useVisualViewportKeyboard';
 export interface SheetOption<Value> {
   value: Value;
   label: ReactNode;
+  description?: ReactNode;
   disabled?: boolean;
   searchText?: string;
 }
@@ -125,6 +127,7 @@ export default function SelectionSheet<Value extends string | number>({
   emptyText?: ReactNode;
 }) {
   useVisualViewportKeyboard(open);
+  const optionId = useId();
   const heading = useRef<HTMLSpanElement>(null);
   const wasOpen = useRef(false);
   const [inputFocused, setInputFocused] = useState(false);
@@ -267,16 +270,23 @@ export default function SelectionSheet<Value extends string | number>({
             <LoadingOutlined /> 正在加载选项…
           </div>
         )}
-        {options.map((option) => (
+        {options.map((option, index) => (
           <button
             type="button"
             key={`${typeof option.value}:${option.value}`}
             disabled={busy || option.disabled}
             className={`selection-sheet-item${option.value === value ? ' is-selected' : ''}`}
             aria-pressed={option.value === value}
+            aria-labelledby={option.description != null ? `${optionId}-${index}-label` : undefined}
+            aria-describedby={option.description != null ? `${optionId}-${index}-description` : undefined}
             onClick={() => onSelect(option.value)}
           >
-            <span>{option.label}</span>
+            <span id={`${optionId}-${index}-label`}>{option.label}</span>
+            {option.description != null && (
+              <span id={`${optionId}-${index}-description`} className="selection-option-description">
+                {option.description}
+              </span>
+            )}
             {option.value === value && <CheckOutlined aria-hidden />}
           </button>
         ))}

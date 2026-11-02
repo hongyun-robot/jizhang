@@ -99,6 +99,12 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+.txn-category-path {
+  margin-top: 2px;
+  color: var(--text-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
 
 .txn-actions {
   flex-shrink: 0;

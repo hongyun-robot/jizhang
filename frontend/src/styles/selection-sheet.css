@@ -96,7 +96,40 @@
 }
 .selection-sheet-item > span:first-child {
   flex: 1;
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+.selection-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+.selection-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.selection-option-description {
+  flex-shrink: 0;
+  max-width: 65%;
+}
+.account-option-balance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0 6px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+.account-option-balance .money {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 .selection-sheet-item:active,
 .selection-sheet-item.is-selected {

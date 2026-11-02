@@ -13,6 +13,52 @@ import (
 	"jizhang/internal/repository"
 )
 
+func TestWealthCashMySQLCategoryBackfillConcurrency(t *testing.T) {
+	e := newWealthMySQLEnv(t)
+	mustOK(t, cashMigration(t, e, "000020_cmbcwm_wealth_product.up.sql"))
+	mustOK(t, cashMigration(t, e, "000021_wealth_cash_accounts.up.sql"))
+	enableCash(t, e, "2026-10-12", "unit_nav")
+	e.quote(t, "2026-10-12", "1")
+	e.quote(t, "2026-10-13", "1.01")
+	mustOK(t, e.svc.ensureCashYields(context.Background()))
+	row := cashYieldTransaction(t, e, e.banks[0])
+	root, leaf := cashYieldCategoryPath(t, e, row, model.KindIncome)
+	// Preserve a deliberately old timestamp to catch MySQL's automatic update.
+	mustOK(t, e.db.Model(&row).UpdateColumns(map[string]any{"category_id": nil, "updated_at": fday("2026-10-13")}).Error)
+	var before model.Transaction
+	mustOK(t, e.db.First(&before, row.ID).Error)
+	mustOK(t, e.db.Create(&model.PeriodClosing{PeriodKey: row.PeriodKey, Status: model.ClosingClosed, ClosedBy: e.users[0].ID, ClosedAt: e.now}).Error)
+	var wg sync.WaitGroup
+	failures := make(chan error, 8)
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := e.svc.backfillCashYieldCategories(context.Background()); err != nil {
+				failures <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(failures)
+	for err := range failures {
+		t.Fatal(err)
+	}
+	after := cashYieldTransaction(t, e, e.banks[0])
+	if after.CategoryID == nil || *after.CategoryID != leaf.ID || !after.UpdatedAt.Equal(before.UpdatedAt) || !after.Amount.Equal(before.Amount) || after.PeriodKey != before.PeriodKey || e.bank(t, 0) != "5050.00" {
+		t.Fatal("metadata backfill changed financial facts", before, after)
+	}
+	var count int64
+	mustOK(t, e.db.Model(&model.WealthCashAudit{}).Where("action = ? AND yield_id = ?", "category_assignment", row.WealthCashYieldID).Count(&count).Error)
+	if count != 1 {
+		t.Fatal("concurrent backfill duplicated audit", count)
+	}
+	mustOK(t, e.db.Model(&model.Category{}).Where("owner_id = ? AND kind = ? AND parent_id = ? AND name = ?", row.CreatedBy, model.KindIncome, root.ID, leaf.Name).Count(&count).Error)
+	if count != 1 {
+		t.Fatal("concurrent category creation duplicated a leaf", count)
+	}
+}
+
 func cashMigration(t *testing.T, e *wealthEnv, file string) error {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "migrations", file))

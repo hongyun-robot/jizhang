@@ -15,10 +15,11 @@ const views = {
     'funds',
     'gold',
     'wealth',
+    'categories',
   ],
   account: ['accounts', 'liabilities', 'stats', 'notifications', 'gold', 'wealth'],
   gold: ['gold', 'accounts', 'stats', 'txns', 'notifications'],
-  wealth: ['wealth', 'accounts', 'stats', 'txns', 'notifications'],
+  wealth: ['wealth', 'accounts', 'stats', 'txns', 'notifications', 'categories'],
   fund: ['funds', 'accounts', 'stats', 'txns', 'notifications'],
   category: [
     'categories',

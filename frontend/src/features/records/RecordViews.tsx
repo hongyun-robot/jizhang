@@ -172,6 +172,9 @@ export function RecordRows({
               </span>
               <Money value={amountOf(t)} tone={tone(t.kind)} />
             </div>
+            {t.purpose === 'wealth_cash_yield' && t.category_id != null && catInfo.get(t.category_id)?.full && (
+              <div className="txn-category-path">{catInfo.get(t.category_id)?.full}</div>
+            )}
             <div className="txn-sub">
               {dayjs(t.entry_date).format('MM-DD')} ·{' '}
               {t.kind === 'transfer'

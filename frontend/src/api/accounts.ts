@@ -10,12 +10,12 @@ export const useReorderAccounts = () => useCatalogReorder('accounts');
 
 // ---------- 查询 ----------
 
-export function useAccounts() {
+export function useAccounts({ poll = true } = {}) {
   const scope = useScope();
   return useQuery({
     queryKey: queryKeys.key('accounts', scope),
     queryFn: ({ signal }) => unwrap<Account[]>('/accounts', signal),
-    refetchInterval: 60_000,
+    refetchInterval: poll ? 60_000 : false,
     refetchOnWindowFocus: true,
   });
 }

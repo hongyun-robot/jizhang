@@ -58,6 +58,14 @@ await withFixture(base, async (browser) => {
     check(direct.find((a) => a.id === wallet.id).balance === view.account.balance, 'account ledger and wealth view agree');
     const pure = await api('GET', '/wealth/accounts');
     check(!pure.some((a) => a.account.id === wallet.id), 'no duplicate investment account');
+    const automatic = (await api('GET', `/transactions?account_id=${wallet.id}`)).items.find((row) => row.purpose === 'wealth_cash_yield');
+    check(!!automatic?.category_id, 'automatic yield has a real category');
+    const flatten = (nodes) => nodes.flatMap((node) => [node, ...flatten(node.children ?? [])]);
+    const categories = flatten(await api('GET', '/categories'));
+    const yieldCategory = categories.find((row) => row.id === automatic.category_id);
+    const finance = categories.find((row) => row.id === yieldCategory?.parent_id);
+    check(yieldCategory?.name === `收益-${wallet.name}` && finance?.name === '理财' && yieldCategory.kind === 'income' && yieldCategory.owner_id === view.account.owner_id, 'personal finance/yield category path');
+    check((await api('GET', `/transactions?category_id=${yieldCategory.id}`)).items.some((row) => row.id === automatic.id), 'yield category filter includes the automatic transaction');
 
     // Ordinary expense UI must offer the same wallet and default to quick.
     await page.goto(base + '/');
@@ -87,6 +95,7 @@ await withFixture(base, async (browser) => {
 
     await page.goto(`${base}/records?account_id=${wallet.id}`);
     const yieldRow = page.locator(mobile ? '.txn-row' : 'tr.ant-table-row').filter({ hasText: '理财零钱收益' });
+    await until(() => yieldRow.innerText(), (text) => text.includes(`理财/收益-${wallet.name}`), 'ledger displays the automatic yield category');
     await yieldRow.getByRole('button', { name: '修改收益', exact: true }).click();
     modal = page.getByRole('dialog', { name: '修改理财收益', exact: true });
     await modal.getByLabel('实际理财收益', { exact: true }).fill('0.45');

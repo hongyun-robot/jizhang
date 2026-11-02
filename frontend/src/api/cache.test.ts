@@ -1,9 +1,19 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
-import { invalidateFinancialViews } from './cache';
+import { invalidateFinancialViews, invalidateViews } from './cache';
 import { queryKeys } from './keys';
 
 describe('financial views', () => {
+  it('refreshes wallet yield categories only in the current session', async () => {
+    const client = new QueryClient();
+    const current = queryKeys.key('categories', 1);
+    const previous = queryKeys.key('categories', 0);
+    client.setQueryData(current, {});
+    client.setQueryData(previous, {});
+    await invalidateViews(client, 1, 'wealth');
+    expect(client.getQueryState(current)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(previous)?.isInvalidated).toBe(false);
+  });
   it('refreshes both list shapes and related views without touching another session', async () => {
     const client = new QueryClient();
     const current = [
@@ -13,6 +23,7 @@ describe('financial views', () => {
       queryKeys.key('budgets', 1),
       queryKeys.key('closings', 1, 'preview'),
       queryKeys.key('wealth', 1, 'position', 10),
+      queryKeys.key('categories', 1),
     ];
     for (const key of current) client.setQueryData(key, {});
     const previous = queryKeys.key('txns', 0, 'page=1');

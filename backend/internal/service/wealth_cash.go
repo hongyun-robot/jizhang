@@ -339,7 +339,10 @@ func (s *WealthService) CashAccount(actor *model.User, accountID int64) (WealthC
 
 // postCashYield changes one owned, open-period cash fact. The metadata remains
 // available even when the adopted amount is zero and no zero-value txn exists.
-func (s *WealthService) postCashYield(tx *gorm.DB, row *model.WealthCashYield) error {
+func (s *WealthService) postCashYield(tx *gorm.DB, row *model.WealthCashYield, account model.Account) error {
+	if account.ID != row.AccountID || account.OwnerID == nil || *account.OwnerID != row.OwnerID {
+		return ErrTxnForbidden
+	}
 	if row.Amount.IsZero() {
 		if row.TxnID != nil {
 			id := *row.TxnID
@@ -357,7 +360,16 @@ func (s *WealthService) postCashYield(tx *gorm.DB, row *model.WealthCashYield) e
 	if row.Amount.IsNegative() {
 		kind = model.TxnExpense
 	}
+	categoryKind := model.KindIncome
+	if kind == model.TxnExpense {
+		categoryKind = model.KindExpense
+	}
+	category, err := s.cashYieldCategory(tx, account, categoryKind, row.TxnID)
+	if err != nil {
+		return err
+	}
 	values := map[string]any{"kind": kind, "amount": row.Amount.Abs(), "account_id": row.AccountID, "entry_date": row.NAVDate, "period_key": s.txns.bound(tx).deps.Periods.KeyForDate(wealthDay(row.NAVDate)), "note": row.Note, "updated_at": s.Now()}
+	values["category_id"] = category.ID
 	if row.TxnID == nil {
 		values["source"] = model.SourceWealthAuto
 		values["purpose"] = model.PurposeWealthCashYield
@@ -523,7 +535,7 @@ func (s *WealthService) reconcileCashAt(tx *gorm.DB, account model.Account, link
 			}
 		}
 		if !closed[s.txns.bound(tx).deps.Periods.KeyForDate(plan.Date)] {
-			if err = s.postCashYield(tx, &row); err != nil {
+			if err = s.postCashYield(tx, &row, account); err != nil {
 				return false, err
 			}
 		}
@@ -700,7 +712,7 @@ func (s *WealthService) EditCashYield(ctx context.Context, actor *model.User, id
 			row.ManualStartDate = &start
 		}
 		row.Amount, row.Note, row.ManualOverride, row.Revision, row.Status, row.UpdatedAt = amount, in.Note, true, row.Revision+1, "applied", s.Now()
-		if e = s.postCashYield(tx, &row); e != nil {
+		if e = s.postCashYield(tx, &row, *account); e != nil {
 			return e
 		}
 		if e = tx.Save(&row).Error; e != nil {

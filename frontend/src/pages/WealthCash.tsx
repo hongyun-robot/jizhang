@@ -82,7 +82,7 @@ export default function WealthCash() {
           {writable && <Button onClick={() => setEditing({ id: row.id })}>修改收益</Button>}
         </div>)}</div>}
       </Card>
-      {!!value.audits.length && <Collapse items={[{ key: 'history', label: `调整记录（${value.audits.length}）`, children: <div className="wealth-cash-yields">{value.audits.slice(0, 30).map((audit) => <div className="wealth-cash-yield" key={audit.id}><span>{audit.action === 'manual' ? '手动修改收益或校准余额' : audit.action === 'creation' ? '新建理财零钱' : audit.action === 'configuration' ? '调整账户关联' : '按净值核对收益'}</span><span className="muted small">{dayjs(audit.created_at).format('YYYY-MM-DD HH:mm')}</span></div>)}</div> }]} />}
+      {!!value.audits.length && <Collapse items={[{ key: 'history', label: `调整记录（${value.audits.length}）`, children: <div className="wealth-cash-yields">{value.audits.slice(0, 30).map((audit) => <div className="wealth-cash-yield" key={audit.id}><span>{audit.action === 'manual' ? '手动修改收益或校准余额' : audit.action === 'creation' ? '新建理财零钱' : audit.action === 'configuration' ? '调整账户关联' : audit.action === 'category_assignment' ? '补齐收益分类' : '按净值核对收益'}</span><span className="muted small">{dayjs(audit.created_at).format('YYYY-MM-DD HH:mm')}</span></div>)}</div> }]} />}
     </>}</QueryBoundary>
     {setup && value && <Configure value={value} onClose={() => setSetup(false)} />}
     {editing && <WealthCashYieldDialog key={editing.id + ':' + (editing.balance ?? 'yield')} {...editing} onClose={() => setEditing(null)} />}

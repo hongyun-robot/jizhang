@@ -45,6 +45,21 @@ func (r *CategoryRepo) GetByID(id int64) (*model.Category, error) {
 // Create 新建分类。
 func (r *CategoryRepo) Create(c *model.Category) error { return r.db.Create(c).Error }
 
+func (r *CategoryRepo) FindNamed(kind model.CategoryKind, name string, parent *int64) (*model.Category, error) {
+	query := r.visible().Where("kind = ? AND name = ?", kind, name)
+	if parent == nil {
+		query = query.Where("parent_id IS NULL")
+	} else {
+		query = query.Where("parent_id = ?", *parent)
+	}
+	var category model.Category
+	err := query.Order("sort, id").First(&category).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return &category, err
+}
+
 // Update 保存修改。
 func (r *CategoryRepo) Update(c *model.Category) error { return r.db.Save(c).Error }
 
