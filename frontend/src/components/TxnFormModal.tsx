@@ -7,7 +7,7 @@ import { useRef as submissionRef } from 'react';
 import CategoryPicker from './CategoryPicker';
 import { accountOptions as buildAccountOptions } from '../domain/accounts';
 import { amountError } from '../lib/money';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
   Alert,
@@ -140,6 +140,24 @@ function OrdinaryTxnFormModal({
   const [refundedBase, setRefundedBase] = useState('0');
   const [overAck, setOverAck] = useState(false);
   const [voucherOpen, setVoucherOpen] = useState(false);
+  const scrollLocked = open || voucherOpen;
+  useLayoutEffect(() => {
+    if (!scrollLocked) return;
+    // iOS Safari can still pan the page with only AntD's overflow lock.
+    const { scrollX, scrollY } = window;
+    const { style } = document.body;
+    const { position, top, left, right } = style;
+    Object.assign(style, {
+      position: 'fixed',
+      top: `${-scrollY}px`,
+      left: `${-scrollX}px`,
+      right: '0',
+    });
+    return () => {
+      Object.assign(style, { position, top, left, right });
+      window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' });
+    };
+  }, [scrollLocked]);
   // 内联校验：提交失败后才提示（specs/ui-shell 记账表单内联校验），Alert 与字段错误态同步展示
   const [showErrors, setShowErrors] = useState(false);
   const creditAccount = (accounts.data ?? []).find(

@@ -165,7 +165,7 @@ await withFixture(base, async (browser) => {
         assert(await list.evaluate((element) => element.scrollTop > 0), 'virtual list remains scrollable');
         assert.deepEqual(await ancestors(list), before);
         const option = page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').first();
-        const selected = await option.innerText();
+        const selected = await option.locator('.selection-option-label').innerText();
         await option.click();
         assert.equal(await form.locator('.ant-select-content-has-value').last().innerText(), selected);
       });
@@ -207,6 +207,7 @@ await withFixture(base, async (browser) => {
     }
     await check(label + ' page scrolling resumes after closing', async () => {
       await page.goto(base + '/');
+      await page.locator('.page h2').first().waitFor();
       await settle();
       assert(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight));
       await page.mouse.move(viewport.width - 20, 150);

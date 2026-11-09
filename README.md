@@ -256,6 +256,8 @@ foreach ($script in $scripts) {
 
 日期与输入框回归运行 `node e2e/mobile_dates.mjs`，覆盖中文月份 / 星期、手机单日 / 月份 / 范围选择、日期只读且可点选、390px 手机及 820px 触屏平板的输入字号，以及桌面日期键入。它检查登录、记账、筛选、购券、账户、负债、周期模板、分类、用户密码、设置、预算和统计页面，不提交业务表单；手机日历截图保存在同一截图目录。基金表单改用同一日期组件，并由 `node e2e/funds.mjs` 验证 YYYY-MM-DD 日期值及保存行为。自动验收使用浏览器触屏模拟，iOS 实机的系统键盘和聚焦缩放仍需实机复核。
 
+`node e2e/txn_modal_scroll.mjs` 额外验证记一笔的背景锁定：使用长页面并模拟 Safari 根页面仍可移动的情况，覆盖手机、平板和桌面尺寸、嵌套账户选择、切换购券、关闭恢复原位置及再次打开。默认使用 Chrome，设置 `$env:SCROLL_BROWSER='webkit'` 可用 Playwright WebKit 验证（先执行 `node node_modules/playwright-core/cli.js install webkit`）；这不替代实体 iOS 设备的触控验收。
+
 负债 fixture 使用 18085/5602，在 `liabilities.mjs` 后运行 `refactor_settlement.mjs`，验证改字段后的预览失效、失败草稿、防重和重试标识。后者在 finally 关闭整个 18085 临时账本，不与其他负债脚本并行；重新运行会改变时钟的负债原始验收时应重新启动 fixture。`refactor_plan_retry.mjs` 使用新启动的负债 fixture，覆盖调整与退款核对的已提交响应丢失、后台更新后的完整请求重放，以及改值 409；也会在 finally 销毁账本，可用 `LIABILITY_FIXTURE_API` 指定对应本机 fixture 地址。`refactor_repairs.mjs` 验证记账/周期新草稿不被旧成功或旧失败关闭，以及侧栏首次/后台错误与重试。`refactor_keyboard` 模拟 visualViewport 收缩，实体手机键盘可另作人工复核。
 
 还款日期回归使用新启动的负债 fixture，执行 `node e2e/liability_repayment_dates.mjs`，覆盖桌面修改还款日以及手机重新保存旧版本的待生效设置：已有未出账消费从次月 1 日同步到 8 日，账单标识、流水和金额不变。脚本使用当前日期并在结束时销毁临时账本，不与其他负债脚本并行。
