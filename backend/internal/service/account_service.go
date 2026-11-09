@@ -266,7 +266,7 @@ func (s *AccountService) createAt(tx *gorm.DB, in CreateAccountInput) (*model.Ac
 				return nil, e
 			}
 		}
-		if _, e := liability.Configure(tx, a.ID, kind, *in.StatementDay, *in.RepaymentDay, *in.RepaymentMonthOffset, in.ActorID, time.Now()); e != nil {
+		if _, e := liability.Configure(tx, a.ID, kind, *in.StatementDay, *in.RepaymentDay, *in.RepaymentMonthOffset, in.ActorID, s.Now()); e != nil {
 			return nil, e
 		}
 		if e := tx.First(a, a.ID).Error; e != nil {

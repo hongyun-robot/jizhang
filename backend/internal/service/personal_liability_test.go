@@ -12,6 +12,7 @@ import (
 func TestPersonalLiabilityAccountsAndIndependentRules(t *testing.T) {
 	e := newLiabilityEnv(t)
 	svc := NewAccountService(repository.NewAccountRepo(e.db))
+	svc.Now = e.svcL.Now
 	admin := adminUser()
 	member := &model.User{ID: 3, Role: model.RoleMember}
 	viewer := &model.User{ID: 2, Role: model.RoleViewer}
@@ -68,6 +69,7 @@ func TestPrivateLiabilityCannotBeAccessedThroughMoneyOrNotifications(t *testing.
 	e := newLiabilityEnv(t)
 	member := &model.User{ID: 3, Role: model.RoleMember}
 	svc := NewAccountService(repository.NewAccountRepo(e.db))
+	svc.Now = e.svcL.Now
 	day, due, offset := 31, 10, 1
 	own, err := svc.CreateFor(member, CreateAccountInput{Name: "私人负债", Type: model.AccountLiability, LiabilityType: "huabei", StatementDay: &day, RepaymentDay: &due, RepaymentMonthOffset: &offset})
 	mustOK(t, err)

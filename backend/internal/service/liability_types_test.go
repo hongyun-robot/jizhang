@@ -14,6 +14,7 @@ func TestLiabilityTypesComeFromDatabase(t *testing.T) {
 	catalog := model.LiabilityAccountType{Code: "database_pay_later", Name: "数据库添加的月付", Sort: -1}
 	mustOK(t, e.db.Create(&catalog).Error)
 	svc := NewAccountService(repository.NewAccountRepo(e.db))
+	svc.Now = e.svcL.Now
 	rows, err := svc.LiabilityTypes()
 	mustOK(t, err)
 	if rows[0].Code != catalog.Code || rows[0].Name != catalog.Name {
