@@ -516,7 +516,7 @@ func (s *LiabilityService) Reconcile(actor *model.User, id int64, in LiabilityRe
 			}
 			for _, b := range detail.Statements {
 				if b.ID == id && in.ReferenceAmount != nil && !in.ReferenceAmount.Equal(b.Amount) {
-					return LiabilityResult{}, liability.ErrConflict
+					return LiabilityResult{}, requestConflict(fmt.Sprintf("调整后本账单金额为 ¥%s，与平台参考金额 ¥%s 不一致；请核对参考金额，或取消“标记核对完成”后仅保存归属调整", b.Amount.StringFixed(2), in.ReferenceAmount.StringFixed(2)))
 				}
 			}
 			if e := tx.Model(&model.LiabilityStatement{}).Where("id = ?", id).Update("reconciled_at", s.Now()).Error; e != nil {

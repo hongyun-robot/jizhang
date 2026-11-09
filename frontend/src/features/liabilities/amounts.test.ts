@@ -1,12 +1,48 @@
 import { describe, expect, it } from 'vitest';
 import type { DebtItem } from '../../api/liability';
-import { liabilityAmounts } from './amounts';
+import { liabilityAmounts, reconciledBillAmount } from './amounts';
 import { sumMoney } from '../../lib/money';
 
 const debt = (overrides: Partial<DebtItem> = {}): DebtItem => ({
   id: 1, source_id: 100, source_txn_id: 100, kind: 'principal',
   statement_id: 1, plan_id: 1, term_id: 11,
   amount: '332.79', remaining: '132.79', ...overrides,
+});
+
+describe('reconciliation amount preview', () => {
+  const detail = {
+    items: [debt({ amount: '3', remaining: '3', plan_id: null, term_id: null })],
+    credits: [], transactions: [], allocations: [],
+  };
+
+  it('compares the reference with the original bill after moving its entire expense to next month', () => {
+    const moves = [{ item_id: 1, statement_id: 2 }];
+    expect(reconciledBillAmount(detail, 1)).toBe('3.00');
+    expect(reconciledBillAmount(detail, 1, moves)).toBe('0.00');
+    expect(reconciledBillAmount(detail, 2, moves)).toBe('3.00');
+    expect(detail.items[0].statement_id).toBe(1);
+  });
+
+  it('carries actual refunds with their expense and keeps repayment out of the reference amount', () => {
+    const refunded = {
+      ...detail,
+      credits: [{ id: 1, source_id: 200 }, { id: 2, source_id: 201 }],
+      transactions: [{ id: 200, kind: 'refund' as const }, { id: 201, kind: 'transfer' as const }],
+      allocations: [
+        { id: 1, credit_event_id: 1, debt_item_id: 1, amount: '0.5' },
+        { id: 2, credit_event_id: 2, debt_item_id: 1, amount: '1' },
+      ],
+    };
+    expect(reconciledBillAmount(refunded, 1)).toBe('2.50');
+    expect(reconciledBillAmount(refunded, 2, [{ item_id: 1, statement_id: 2 }])).toBe('2.50');
+  });
+
+  it('uses the last selected destination once and ignores incomplete draft rows', () => {
+    const moves = [{ item_id: 1, statement_id: 2 }, { item_id: 1, statement_id: 3 }];
+    expect(reconciledBillAmount(detail, 1, [undefined, { item_id: 1 }])).toBe('3.00');
+    expect(reconciledBillAmount(detail, 2, moves)).toBe('0.00');
+    expect(reconciledBillAmount(detail, 3, moves)).toBe('3.00');
+  });
 });
 
 describe('liability table amounts', () => {

@@ -262,6 +262,8 @@ foreach ($script in $scripts) {
 
 还款日期回归使用新启动的负债 fixture，执行 `node e2e/liability_repayment_dates.mjs`，覆盖桌面修改还款日以及手机重新保存旧版本的待生效设置：已有未出账消费从次月 1 日同步到 8 日，账单标识、流水和金额不变。脚本使用当前日期并在结束时销毁临时账本，不与其他负债脚本并行。
 
+账单归属核对回归在同一负债 fixture 上执行 `node e2e/liability_reconcile_moves.mjs`，覆盖桌面和手机调整后金额预览、参考金额不匹配时保存前拦截、参考金额改为零后完成核对，以及取消完成标记后仅保存归属。验证总欠款、原消费日期与收支账期、出账快照保持不变；该脚本会修改测试时钟，需单独运行。
+
 旧 SQL/开发脚本依赖历史种子账号，部分硬编码客户端路径和 `jizhang` 开发库并直接删除数据。应先按其文档建立临时 MySQL 账本，不能仅修改 BASE 就对真实库运行。本次结果、明确跳过的旧检查、截图和回滚说明见 `openspec/changes/archive/2026-10-12-refactor-frontend-foundations/acceptance.md`。
 
 ## 目录结构

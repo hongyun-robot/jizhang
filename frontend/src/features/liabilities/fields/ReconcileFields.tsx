@@ -4,7 +4,8 @@ import { amountRules } from './amountRules';
 import { Button, Checkbox, Form, Input, Space } from 'antd';
 
 import Money from '../../../components/Money';
-import { previewCents as cents, money } from '../../../lib/money';
+import { previewCents as cents, money, parseCents } from '../../../lib/money';
+import { reconciledBillAmount } from '../amounts';
 import type { FieldContext } from './context';
 export default function ReconcileFields({
   context,
@@ -12,24 +13,43 @@ export default function ReconcileFields({
   context: FieldContext;
 }) {
   const { d, bill, values, bills, reason, onAddExpense, editable } = context;
+  const adjustedAmount = reconciledBillAmount(d, bill?.id ?? 0, values?.moves);
   return (
     <>
       <p>
         系统账单 <Money value={bill?.amount} /> · 原出账快照{' '}
         <Money value={bill?.snapshot_amount} />
       </p>
+      {!!values?.moves?.length && (
+        <p aria-live="polite">
+          调整后系统账单 <Money value={adjustedAmount} />
+        </p>
+      )}
       <Form.Item
         name="reference_amount"
         label="平台账单参考金额（仅用于核对）"
-        rules={amountRules}
+        extra="参考金额用于核对调整后的本账单；仅调整归属可取消勾选“标记核对完成”。"
+        dependencies={['moves', 'complete']}
+        rules={[
+          ...amountRules,
+          ({ getFieldValue }) => ({
+            validator: (_rule, value: unknown) => {
+              const reference = parseCents(String(value ?? ''));
+              const amount = reconciledBillAmount(d, bill?.id ?? 0, getFieldValue('moves'));
+              return !getFieldValue('complete') || reference === null || reference === cents(amount)
+                ? Promise.resolve()
+                : Promise.reject(new Error(`调整后本账单金额为 ¥${amount}，请核对参考金额，或取消勾选“标记核对完成”`));
+            },
+          }),
+        ]}
       >
         <Input inputMode="decimal" />
       </Form.Item>
       {values?.reference_amount && (
         <p>
-          与系统差异{' '}
+          {values?.moves?.length ? '与调整后系统差异' : '与系统差异'}{' '}
           <Money
-            value={money(cents(values.reference_amount) - cents(bill?.amount))}
+            value={money(cents(values.reference_amount) - cents(adjustedAmount))}
           />
         </p>
       )}
@@ -106,7 +126,7 @@ export default function ReconcileFields({
                 <Button onClick={() => remove(f.name)}>移除</Button>
               </Space>
             ))}
-            <Button className="liability-toolbar" onClick={() => add()}>
+            <Button className="liability-toolbar" onClick={() => add({})}>
               调整消费归属
             </Button>
           </>

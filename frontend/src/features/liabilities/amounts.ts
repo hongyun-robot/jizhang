@@ -69,3 +69,19 @@ export function liabilityAmounts(detail: {
     termRemainingFee: (termId: number, feeTxnId: number | null) => sumMoney(detail.items.filter((item) => item.kind === 'fee' && (item.term_id === termId || (!!feeTxnId && item.source_id === feeTxnId))).map((item) => item.remaining)),
   };
 }
+
+export function reconciledBillAmount(
+  detail: Parameters<typeof liabilityAmounts>[0],
+  billId: number,
+  moves: readonly ({ item_id?: number; statement_id?: number } | undefined)[] = []
+): string {
+  const assignments = new Map<number, number>();
+  for (const move of moves) {
+    if (move?.item_id && move.statement_id) assignments.set(move.item_id, move.statement_id);
+  }
+  const preview = liabilityAmounts({
+    ...detail,
+    items: detail.items.map((item) => ({ ...item, statement_id: assignments.get(item.id) ?? item.statement_id })),
+  });
+  return sumMoney(preview.billItems(billId).map((row) => row.amount));
+}
