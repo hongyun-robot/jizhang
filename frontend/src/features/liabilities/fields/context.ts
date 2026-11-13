@@ -13,7 +13,7 @@ import type {
   TxnListResp,
 } from '../../../api/types';
 import type { FeeMode } from '../../../api/liability-inputs';
-import type { LiabilityDialog } from '../dialog';
+import type { LiabilityDialog, LiabilityIntent } from '../dialog';
 import type { LiabilityValues } from '../input';
 
 export interface ScheduleRow {
@@ -26,8 +26,9 @@ export interface ScheduleRow {
   feeDate: string;
 }
 type Option = { value: number; label: string };
-/** Private presentation context; callers use the four-input dialog interface. */
+/** Private presentation context; callers use LiabilityDialogs. */
 export interface FieldContext {
+  open: (intent: LiabilityIntent) => void;
   ordinaryPreview: OrdinaryRepaymentPreview | null;
   ordinaryAvailable: string;
   ordinaryPreviewing: boolean;

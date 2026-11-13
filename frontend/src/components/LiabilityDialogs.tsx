@@ -19,7 +19,7 @@ import {
   settlementInput as makeSettlementInput,
   type LiabilityValues as Values,
 } from '../features/liabilities/input';
-import type { LiabilityDialog } from '../features/liabilities/dialog';
+import type { LiabilityDialog, LiabilityIntent } from '../features/liabilities/dialog';
 export type { LiabilityDialog } from '../features/liabilities/dialog';
 import { canModifyOwnedRecord } from '../domain/permissions';
 import { useEffect, useRef, useState } from 'react';
@@ -74,11 +74,13 @@ export default function LiabilityDialogs({
   detail: d,
   dialog,
   onClose,
+  onOpen,
   onAddExpense,
 }: {
   detail: LiabilityDetail;
   dialog: LiabilityDialog | null;
   onClose: () => void;
+  onOpen: (intent: LiabilityIntent) => void;
   onAddExpense: () => void;
 }) {
   useVisualViewportKeyboard(true);
@@ -244,6 +246,10 @@ export default function LiabilityDialogs({
       initial.fee_category_id = plan.fee_category_id;
       if (dialog.mode === 'settle' || dialog.mode === 'repay_plan') {
         initial.repayment_end = dialog.mode === 'settle' ? 0 : plan.terms.find((t) => cents(t.remaining) > 0n)?.number;
+      }
+      if (dialog.mode === 'repay_plan') {
+        initial.from_account_id = dialog.fromAccountId ?? firstAsset;
+        initial.entry_date = dialog.entryDate ? dayjs(dialog.entryDate) : dayjs();
       }
       if (dialog.mode === 'edit_plan')
         initial.terms = plan.terms.map((t) => ({
@@ -499,13 +505,14 @@ export default function LiabilityDialogs({
             ]}
           />
           <p>
-            {advance ? '只偿还已发生的未出账普通消费，分期请从分期计划操作。' : previewLeft > 0n ? '金额超过当前账单可偿付范围；未出账普通消费可切换还款范围，未来分期请从分期计划操作。' : '提交时核对最新账单及完整分期期次金额。'}
+            {advance ? '此分配预览仅包含未出账普通消费。' : previewLeft > 0n ? '金额超过当前账单可偿付范围；未出账普通消费和分期可切换到「提前还未出账」。' : '提交时核对最新账单及完整分期期次金额。'}
           </p>
         </>
       )}
     </>
   );
   const context: FieldContext = {
+    open: onOpen,
     ordinaryPreview,
     ordinaryAvailable: ordinaryPreview?.available_amount ?? ordinary.total,
     ordinaryPreviewing,

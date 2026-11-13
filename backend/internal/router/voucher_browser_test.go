@@ -136,6 +136,7 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	budgets := service.NewBudgetService(service.BudgetDeps{Budgets: repository.NewBudgetRepo(db), Stats: statsRepo, Cats: cats, Notifs: notifs, Periods: periods})
 	txn.OnWrite = stats.InvalidateAll
 	liab := service.NewLiabilityService(db, txn)
+	accountSvc := service.NewAccountService(accounts)
 	var browserTime atomic.Int64
 	initialDate, _ := liability.Parse("2026-11-01")
 	browserTime.Store(initialDate.Unix())
@@ -169,6 +170,7 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 	}
 	if liabilityFixture {
 		liab.Now = func() time.Time { return time.Unix(browserTime.Load(), 0).In(liability.Location) }
+		accountSvc.Now = liab.Now
 	}
 	txn.OnWritePeriod = func(keys ...string) {
 		for _, key := range keys {
@@ -177,7 +179,7 @@ func runBrowserServer(t *testing.T, liabilityFixture bool) {
 			}
 		}
 	}
-	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601", "http://127.0.0.1:5602", "http://127.0.0.1:5603", "http://127.0.0.1:5612"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: service.NewAccountService(accounts), CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn), LiabilitySvc: liab, FundSvc: funds, GoldSvc: gold, WealthSvc: wealth})
+	r := router.New([]string{"http://127.0.0.1:5601", "http://localhost:5601", "http://127.0.0.1:5602", "http://127.0.0.1:5603", "http://127.0.0.1:5612"}, router.Deps{AuthSvc: auth, UserSvc: service.NewUserService(users, auth), AccountSvc: accountSvc, CategorySvc: service.NewCategoryService(cats), TxnSvc: txn, StatsSvc: stats, PeriodSvc: periods, ClosingSvc: service.NewClosingService(service.ClosingDeps{Closings: closings, Audits: repository.NewAuditRepo(db), Periods: periods, Stats: statsRepo}), BudgetSvc: budgets, RecurringSvc: service.NewRecurringService(service.RuleDeps{Rules: repository.NewRecurringRepo(db), Dates: repository.NewTransactionRepo(db), Txns: txn, Accounts: accounts, Cats: cats, Notifs: notifs, Users: users}), NotifSvc: service.NewNotificationService(service.NotifDeps{Notifs: notifs, Accounts: accounts}), VoucherSvc: service.NewVoucherService(db, txn), LiabilitySvc: liab, FundSvc: funds, GoldSvc: gold, WealthSvc: wealth})
 	if wealthFixture {
 		wealthBrowserRoutes(r, db, wealthMarket, &browserTime, wealth)
 	}
