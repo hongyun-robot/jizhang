@@ -101,7 +101,7 @@ export function liabilityCommand(
           ),
           mode: mode(),
           targets: mode() === 'manual' ? (value.targets ?? []) : [],
-          ...(value.scope === 'unbilled_ordinary' ? { scope: value.scope, quote_signature: value.quote_signature } : {}),
+          ...(value.scope === 'unbilled_ordinary' || value.scope === 'all' ? { scope: value.scope, quote_signature: value.quote_signature } : {}),
         },
       };
     case 'allocation':

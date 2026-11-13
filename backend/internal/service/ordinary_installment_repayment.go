@@ -18,13 +18,15 @@ type ordinaryPlanPayment struct {
 }
 
 type preparedRepayment struct {
-	Service *LiabilityService
-	Op      *model.LiabilityOperation
-	Before  *liability.Detail
-	Parts   []ordinaryPlanPayment
-	Targets []liability.Target
-	Result  LiabilityResult
-	OwnOp   bool
+	Service    *LiabilityService
+	Op         *model.LiabilityOperation
+	Before     *liability.Detail
+	Parts      []ordinaryPlanPayment
+	Targets    []liability.Target
+	Result     LiabilityResult
+	OwnOp      bool
+	CreditMode string
+	EntryDate  string
 }
 
 func (s *TransactionService) liabilityClock() time.Time {
@@ -115,7 +117,7 @@ func (s *LiabilityService) prepareOrdinaryRepayment(tx *gorm.DB, actor *model.Us
 	if len(selected) == 0 {
 		return nil, nil
 	}
-	prepared := &preparedRepayment{Service: s, Op: op, Before: d, Targets: targets, Result: LiabilityResult{TransactionIDs: []int64{}, TermIDs: []int64{}, CreditSignatures: map[int64]string{}}}
+	prepared := &preparedRepayment{Service: s, Op: op, Before: d, EntryDate: date, Targets: targets, Result: LiabilityResult{TransactionIDs: []int64{}, TermIDs: []int64{}, CreditSignatures: map[int64]string{}}}
 	planIDs := []int64{}
 	for id := range selected {
 		planIDs = append(planIDs, id)
@@ -136,21 +138,31 @@ func (s *LiabilityService) prepareOrdinaryRepayment(tx *gorm.DB, actor *model.Us
 		prepared.Result.PlanIDs = append(prepared.Result.PlanIDs, id)
 		prepared.Result.TermIDs = append(prepared.Result.TermIDs, ids...)
 	}
+	if err := prepared.begin(tx, actor); err != nil {
+		return nil, err
+	}
+	return prepared, nil
+}
+
+func (prepared *preparedRepayment) begin(tx *gorm.DB, actor *model.User) error {
+	s, d := prepared.Service, prepared.Before
+	account := d.Account.ID
+	planIDs := prepared.Result.PlanIDs
 	if len(planIDs) == 1 {
 		prepared.Result.PlanID = planIDs[0]
 	}
-	if op == nil {
+	if prepared.Op == nil {
 		prepared.OwnOp = true
 		prepared.Op = &model.LiabilityOperation{ActorID: actor.ID, RequestKey: "ordinary:" + uuid.NewString(), Kind: "installment_repayment", AccountID: account, BeforeJSON: jsonText(operationSnapshot(d)), ResultJSON: "{}", Reason: "普通转账整期还款"}
 		if err := tx.Create(prepared.Op).Error; err != nil {
-			return nil, err
+			return err
 		}
 	}
 	if prepared.Result.PlanID > 0 {
 		id := prepared.Result.PlanID
 		prepared.Op.PlanID = &id
 		if err := tx.Model(prepared.Op).Update("plan_id", id).Error; err != nil {
-			return nil, err
+			return err
 		}
 	}
 	selectedIDs := map[int64]bool{}
@@ -158,7 +170,7 @@ func (s *LiabilityService) prepareOrdinaryRepayment(tx *gorm.DB, actor *model.Us
 		selectedIDs[id] = true
 	}
 	if err := s.fixRepaymentSources(tx, actor, d, selectedIDs, &prepared.Result); err != nil {
-		return nil, err
+		return err
 	}
 	for _, item := range d.Items {
 		if item.TermID != nil && selectedIDs[*item.TermID] && item.Remaining.IsPositive() {
@@ -171,19 +183,19 @@ func (s *LiabilityService) prepareOrdinaryRepayment(tx *gorm.DB, actor *model.Us
 			if !selectedIDs[term.ID] || term.FeeTxnID != nil || term.FeeStatus == "cancelled" || !term.FeeAmount.IsPositive() {
 				continue
 			}
-			id, err := s.postFeeAt(tx, &p, &term, prepared.Op.ID, date, p.AccountID)
+			id, err := s.postFeeAt(tx, &p, &term, prepared.Op.ID, prepared.EntryDate, p.AccountID)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			prepared.Result.TransactionIDs = append(prepared.Result.TransactionIDs, id)
 			var fee model.LiabilityDebtItem
 			if err := tx.Where("source_id = ? AND account_id = ?", id, account).First(&fee).Error; err != nil {
-				return nil, err
+				return err
 			}
 			prepared.Targets = append(prepared.Targets, liability.Target{DebtItemID: fee.ID, Amount: term.FeeAmount})
 		}
 	}
-	return prepared, nil
+	return nil
 }
 
 func (p *preparedRepayment) finish(tx *gorm.DB, actor *model.User, source *model.Transaction, newSource bool) (LiabilityResult, error) {
@@ -202,10 +214,14 @@ func (p *preparedRepayment) finish(tx *gorm.DB, actor *model.User, source *model
 		return result, err
 	}
 	targets := jsonText(p.Targets)
-	if err := tx.Model(&credit).Updates(map[string]any{"mode": "settlement", "targets": targets}).Error; err != nil {
+	mode := p.CreditMode
+	if mode == "" {
+		mode = "settlement"
+	}
+	if err := tx.Model(&credit).Updates(map[string]any{"mode": mode, "targets": targets}).Error; err != nil {
 		return result, err
 	}
-	result.CreditSignatures[credit.ID] = "settlement:" + targets
+	result.CreditSignatures[credit.ID] = mode + ":" + targets
 	selected := map[int64]bool{}
 	for _, id := range result.TermIDs {
 		selected[id] = true

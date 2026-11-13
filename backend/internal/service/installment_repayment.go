@@ -457,7 +457,7 @@ func (s *LiabilityService) fixRepaymentSources(tx *gorm.DB, actor *model.User, d
 		items[item.ID] = item
 	}
 	for _, credit := range d.Credits {
-		if credit.Mode == "settlement" {
+		if credit.Mode == "settlement" || credit.Mode == liability.CombinedRepayment {
 			continue
 		}
 		targets := []liability.Target{}

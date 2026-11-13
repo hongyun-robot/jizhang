@@ -31,6 +31,9 @@ type OrdinaryRepaymentPreview struct {
 	Bills           []OrdinaryRepaymentBill       `json:"bills"`
 	Allocations     []liability.AdvanceAllocation `json:"allocations"`
 	QuoteSignature  string                        `json:"quote_signature"`
+	OrdinaryAmount  decimal.Decimal               `json:"ordinary_amount"`
+	FeeAmount       decimal.Decimal               `json:"fee_amount"`
+	Installments    []CombinedRepaymentTerm       `json:"installments,omitempty"`
 }
 
 func (s *LiabilityService) ordinaryPreviewAt(tx *gorm.DB, actor *model.User, in LiabilityRepaymentInput) (OrdinaryRepaymentPreview, error) {
@@ -159,6 +162,10 @@ func (s *LiabilityService) OrdinaryRepaymentPreview(actor *model.User, in Liabil
 	var out OrdinaryRepaymentPreview
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var err error
+		if in.Scope == combinedRepayment {
+			out, _, err = s.combinedPreviewAt(tx, actor, in)
+			return err
+		}
 		out, err = s.ordinaryPreviewAt(tx, actor, in)
 		return err
 	})

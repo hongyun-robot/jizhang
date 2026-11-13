@@ -302,10 +302,13 @@ func (s *LiabilityService) Repay(actor *model.User, in LiabilityRepaymentInput) 
 	if in.Scope == "issued" {
 		in.Scope = ""
 	}
-	if in.Scope != "" && in.Scope != unbilledOrdinary {
+	if in.Scope != "" && in.Scope != unbilledOrdinary && in.Scope != combinedRepayment {
 		return LiabilityResult{}, liability.ErrInvalid
 	}
 	return s.operation(actor, in.AccountID, "repayment", in.RequestKey, in.Reason, in, func(tx *gorm.DB, op *model.LiabilityOperation) (LiabilityResult, error) {
+		if in.Scope == combinedRepayment {
+			return s.repayCombined(tx, actor, in, op)
+		}
 		if in.Scope == unbilledOrdinary {
 			return s.repayOrdinaryAdvance(tx, actor, in, op)
 		}
@@ -406,7 +409,7 @@ func (s *LiabilityService) Allocate(actor *model.User, txnID int64, in Liability
 		if e := tx.Where("source_id = ? AND account_id = ? AND active = ?", txnID, *t.TransferAccountID, true).First(&c).Error; e != nil {
 			return LiabilityResult{}, e
 		}
-		if c.Mode == "settlement" {
+		if c.Mode == "settlement" || c.Mode == liability.CombinedRepayment {
 			return LiabilityResult{}, liability.ErrManaged
 		}
 		if e := tx.Model(&model.LiabilityAllocation{}).Where("credit_event_id = ? AND active = ?", c.ID, true).Updates(map[string]any{"active": false, "voided_at": s.Now()}).Error; e != nil {

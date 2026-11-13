@@ -12,7 +12,7 @@ export interface AllocationInput extends OperationInput {
   mode: AllocationMode;
   targets: AllocationTarget[];
 }
-export type RepaymentScope = 'issued' | 'unbilled_ordinary';
+export type RepaymentScope = 'issued' | 'unbilled_ordinary' | 'all';
 export interface RepaymentInput extends AllocationInput {
   scope?: RepaymentScope;
   quote_signature?: string;

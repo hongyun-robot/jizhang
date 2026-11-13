@@ -19,7 +19,7 @@ import {
   settlementInput as makeSettlementInput,
   type LiabilityValues as Values,
 } from '../features/liabilities/input';
-import type { LiabilityDialog, LiabilityIntent } from '../features/liabilities/dialog';
+import type { LiabilityDialog } from '../features/liabilities/dialog';
 export type { LiabilityDialog } from '../features/liabilities/dialog';
 import { canModifyOwnedRecord } from '../domain/permissions';
 import { useEffect, useRef, useState } from 'react';
@@ -74,13 +74,11 @@ export default function LiabilityDialogs({
   detail: d,
   dialog,
   onClose,
-  onOpen,
   onAddExpense,
 }: {
   detail: LiabilityDetail;
   dialog: LiabilityDialog | null;
   onClose: () => void;
-  onOpen: (intent: LiabilityIntent) => void;
   onAddExpense: () => void;
 }) {
   useVisualViewportKeyboard(true);
@@ -104,6 +102,8 @@ export default function LiabilityDialogs({
   const [ordinaryPreview, setOrdinaryPreview] = useState<OrdinaryRepaymentPreview | null>(null);
   const [ordinaryPreviewing, setOrdinaryPreviewing] = useState(false);
   const advance = dialog?.mode === 'repay' && values?.scope === 'unbilled_ordinary';
+  const combined = dialog?.mode === 'repay' && values?.scope === 'all';
+  const needsRepaymentQuote = advance || combined;
   const ordinary = ordinaryCapacity(d, values?.entry_date?.format('YYYY-MM-DD') ?? dayjs().format('YYYY-MM-DD'));
   const [preview, setPreview] = useState<SettlementPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -217,11 +217,13 @@ export default function LiabilityDialogs({
         first_statement_date: dayjs(dialog.draft.entry_date),
       });
     }
-    if (dialog.mode === 'repay')
+    if (dialog.mode === 'repay') {
+      initial.scope = 'all';
       initial.amount =
         cents(d.summary.overdue) > 0n
           ? d.summary.overdue
           : d.summary.current_due;
+    }
     if (dialog.mode === 'edit_plan' && plan) {
       initial.fee_account_id = plan.fee_account_id;
       initial.fee_category_id = plan.fee_category_id;
@@ -246,10 +248,6 @@ export default function LiabilityDialogs({
       initial.fee_category_id = plan.fee_category_id;
       if (dialog.mode === 'settle' || dialog.mode === 'repay_plan') {
         initial.repayment_end = dialog.mode === 'settle' ? 0 : plan.terms.find((t) => cents(t.remaining) > 0n)?.number;
-      }
-      if (dialog.mode === 'repay_plan') {
-        initial.from_account_id = dialog.fromAccountId ?? firstAsset;
-        initial.entry_date = dialog.entryDate ? dayjs(dialog.entryDate) : dayjs();
       }
       if (dialog.mode === 'edit_plan')
         initial.terms = plan.terms.map((t) => ({
@@ -329,13 +327,13 @@ export default function LiabilityDialogs({
           message.info('请先核对本次还款金额');
           return;
         }
-        if (advance && !ordinaryPreview) { message.info('请先核对本次还款金额'); return; }
+        if (needsRepaymentQuote && !ordinaryPreview) { message.info('请先核对本次还款金额'); return; }
         const feeDatesInput =
           Object.keys(feeDates).length && v.fee_mode !== 'upfront'
             ? schedule.map((row) => row.feeDate)
             : undefined;
         const command = liabilityCommand(operationDetail, dialog, v, feeDatesInput);
-        if (command.mode === 'settle' || command.mode === 'repay_plan' || (command.mode === 'repay' && advance)) {
+        if (command.mode === 'settle' || command.mode === 'repay_plan' || (command.mode === 'repay' && needsRepaymentQuote)) {
           const fingerprint = JSON.stringify(command.input);
           if (attempt.current.fingerprint !== fingerprint) {
             attempt.current = {
@@ -351,7 +349,7 @@ export default function LiabilityDialogs({
       } catch (e) {
         if (e && typeof e === 'object' && 'errorFields' in e) return;
         message.error(errMsg(e));
-        if ((dialog.mode === 'settle' || dialog.mode === 'repay_plan' || advance) && isAxiosError(e) && e.response?.status === 409) {
+        if ((dialog.mode === 'settle' || dialog.mode === 'repay_plan' || needsRepaymentQuote) && isAxiosError(e) && e.response?.status === 409) {
           previewGeneration.current++;
           setPreview(null);
           setOrdinaryPreview(null);
@@ -512,7 +510,11 @@ export default function LiabilityDialogs({
     </>
   );
   const context: FieldContext = {
-    open: onOpen,
+    fillRepaymentAmount: (amount) => {
+      previewGeneration.current++;
+      setOrdinaryPreview(null);
+      form.setFieldsValue({ amount, quote_signature: undefined });
+    },
     ordinaryPreview,
     ordinaryAvailable: ordinaryPreview?.available_amount ?? ordinary.total,
     ordinaryPreviewing,
@@ -553,7 +555,7 @@ export default function LiabilityDialogs({
       onCancel={onClose}
       onOk={submit}
       confirmLoading={write.isPending}
-      okButtonProps={{ disabled: creatingAccount || creatingPlatform || (advance && (!ordinaryPreview || ordinaryPreviewing)) || ((dialog.mode === 'settle' || dialog.mode === 'repay_plan') && (!preview || previewing)) }}
+      okButtonProps={{ disabled: creatingAccount || creatingPlatform || (needsRepaymentQuote && (!ordinaryPreview || ordinaryPreviewing)) || ((dialog.mode === 'settle' || dialog.mode === 'repay_plan') && (!preview || previewing)) }}
       width={
         dialog.mode === 'create_plan' || dialog.mode === 'edit_plan' ? 820 : 620
       }
@@ -569,7 +571,7 @@ export default function LiabilityDialogs({
           previewGeneration.current++;
           setOrdinaryPreview(null);
           form.setFieldValue('quote_signature', undefined);
-          if (changed.scope !== undefined) form.setFieldsValue({ targets: [], amount: undefined });
+          if (changed.scope !== undefined) form.setFieldsValue({ targets: [], amount: undefined, mode: 'auto' });
           if (dialog.mode === 'settle' || dialog.mode === 'repay_plan') {
             setPreview(null);
           }

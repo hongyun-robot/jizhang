@@ -42,6 +42,7 @@ describe('ordinary advance drafts', () => {
     expect(old.input).not.toHaveProperty('quote_signature');
     const command = liabilityCommand(detail, dialog, { ...draft, scope: 'unbilled_ordinary' });
     expect(command.input).toMatchObject({ amount: '300.01', scope: 'unbilled_ordinary', quote_signature: 'confirmed', targets: [] });
+    expect(liabilityCommand(detail, dialog, { ...draft, scope: 'all' }).input).toMatchObject({ amount: '300.01', scope: 'all', quote_signature: 'confirmed', targets: [] });
     const calls: { url: string; data: unknown }[] = [];
     const requester = createJsonRequester(axios.create({ adapter: async (config) => {
       calls.push({ url: config.url ?? '', data: JSON.parse(config.data) });

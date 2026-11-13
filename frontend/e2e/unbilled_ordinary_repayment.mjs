@@ -55,7 +55,7 @@ try {
       await page.goto(base + `/liabilities/${card.id}`);
       await page.getByRole('button', { name: label('还款'), exact: true }).click();
       let dialog = page.getByRole('dialog', { name: '记录还款', exact: true });
-      check((await dialog.textContent()).includes('还已出账'), `${viewport.width}: defaults to issued scope`);
+      check((await dialog.textContent()).includes('一起还（含未出账和分期）'), `${viewport.width}: defaults to combined scope`);
       await choose(dialog, '还款范围', '提前还未出账');
       await choose(dialog, '还款资金账户', bank.name);
       await dialog.getByLabel('还款金额', { exact: true }).fill('300');

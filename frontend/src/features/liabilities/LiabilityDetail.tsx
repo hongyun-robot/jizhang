@@ -450,7 +450,6 @@ export default function LiabilityDetail() {
           detail={d}
           dialog={dialog}
           onClose={() => setDialog(null)}
-          onOpen={open}
           onAddExpense={() => {
             setRefill({ kind: 'expense', account_id: d.account.id });
             setTxnOpen(true);

@@ -15,8 +15,6 @@ interface Unused {
   operationId?: never;
   version?: never;
   draft?: never;
-  fromAccountId?: never;
-  entryDate?: never;
 }
 type State<Mode extends string, Fields = object> = {
   mode: Mode;
@@ -30,12 +28,7 @@ export type LiabilityDialog =
   | State<'create_plan', { draft?: PlanDraft }>
   | State<'edit_plan', { planId: number; version: number }>
   | State<'settle', { planId: number; version: number }>
-  | State<'repay_plan', {
-      planId: number;
-      version: number;
-      fromAccountId?: number;
-      entryDate?: string;
-    }>
+  | State<'repay_plan', { planId: number; version: number }>
   | State<'reverse', { operationId: number }>;
 type Intent<T> = T extends { version: number }
   ? Omit<T, 'requestKey' | 'version'> & { version?: number }

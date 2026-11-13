@@ -274,6 +274,7 @@ func TestLiabilityMySQL(t *testing.T) {
 	_, err = e.svcL.Settings(adminUser(), card.ID, LiabilitySettingsInput{LiabilityType: "huabei", StatementDay: 31, RepaymentDay: 10, RepaymentMonthOffset: 1})
 	mustOK(t, err)
 	t.Run("ordinary-advance-concurrency", func(t *testing.T) { checkOrdinaryAdvanceMySQL(t, db) })
+	t.Run("combined-repayment-concurrency", func(t *testing.T) { checkCombinedRepaymentMySQL(t, db) })
 	e.spend(t, "500", "2026-10-15")
 	e.now = vdate(t, "2026-11-01")
 	_, err = e.svcL.EnsureDue(e.now)

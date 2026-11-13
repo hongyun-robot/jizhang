@@ -244,7 +244,9 @@ func Reallocate(db *gorm.DB, account int64) error {
 	// This also repairs older allocations clipped after a bill move, using
 	// the same recorded funds and targets without changing any transaction.
 	sort.SliceStable(credits, func(i, j int) bool {
-		fixed := func(mode string) bool { return mode == "settlement" || mode == OrdinaryAdvance }
+		fixed := func(mode string) bool {
+			return mode == "settlement" || mode == OrdinaryAdvance || mode == CombinedRepayment
+		}
 		return fixed(credits[i].Mode) && !fixed(credits[j].Mode)
 	})
 	if e := db.Where("account_id = ?", account).Find(&bills).Error; e != nil {
@@ -280,7 +282,7 @@ func Reallocate(db *gorm.DB, account int64) error {
 			remaining[d.ID] = remaining[d.ID].Sub(n)
 			left = left.Sub(n)
 		}
-		if c.Mode == OrdinaryAdvance {
+		if c.Mode == OrdinaryAdvance || c.Mode == CombinedRepayment {
 			var targets []Target
 			if err := json.Unmarshal([]byte(c.Targets), &targets); err != nil {
 				return AdvanceConflict()
@@ -296,7 +298,7 @@ func Reallocate(db *gorm.DB, account int64) error {
 					if err := db.First(&source, item.SourceID).Error; err != nil {
 						return AdvanceConflict()
 					}
-					if target.StatementID != 0 || !ValidAmount(target.Amount, false) || !OrdinaryPrincipal(item, source) || Date(source.EntryDate) > c.EntryDate || target.Amount.GreaterThan(left) || target.Amount.GreaterThan(remaining[item.ID]) {
+					if target.StatementID != 0 || !ValidAmount(target.Amount, false) || !validAdvanceTarget(c.Mode, item, source) || Date(source.EntryDate) > c.EntryDate || target.Amount.GreaterThan(left) || target.Amount.GreaterThan(remaining[item.ID]) {
 						return AdvanceConflict()
 					}
 					allocate(item, target.Amount)

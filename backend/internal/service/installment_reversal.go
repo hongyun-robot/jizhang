@@ -135,8 +135,9 @@ func (s *LiabilityService) reverseTermPayment(tx *gorm.DB, actor *model.User, pr
 			return result, err
 		}
 	}
-	for _, id := range original.TransactionIDs {
-		if err := repository.NewTransactionRepo(tx).WithActor(actor.ID).Delete(id); err != nil {
+	// Remove the funding before the fees it paid, so fixed targets stay valid.
+	for i := len(original.TransactionIDs) - 1; i >= 0; i-- {
+		if err := repository.NewTransactionRepo(tx).WithActor(actor.ID).Delete(original.TransactionIDs[i]); err != nil {
 			return result, err
 		}
 	}

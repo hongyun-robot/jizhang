@@ -11,6 +11,14 @@ import (
 )
 
 const OrdinaryAdvance = "ordinary_advance"
+const CombinedRepayment = "combined"
+
+func validAdvanceTarget(mode string, item model.LiabilityDebtItem, source model.Transaction) bool {
+	if mode == OrdinaryAdvance {
+		return OrdinaryPrincipal(item, source)
+	}
+	return mode == CombinedRepayment && item.Active && source.ID > 0 && item.SourceID == source.ID && item.SourceTxnID != nil && *item.SourceTxnID == source.ID
+}
 
 // OrdinaryPrincipal excludes non-consumption funding and every managed fee/term.
 // It is also used after issuance: issuance does not invalidate an earlier payment.
@@ -87,7 +95,7 @@ func ValidateAdvanceAllocations(d *Detail) error {
 		sources[t.ID] = t
 	}
 	for _, c := range d.Credits {
-		if c.Mode != OrdinaryAdvance {
+		if c.Mode != OrdinaryAdvance && c.Mode != CombinedRepayment {
 			continue
 		}
 		var targets []Target
@@ -99,7 +107,7 @@ func ValidateAdvanceAllocations(d *Detail) error {
 		for _, target := range targets {
 			item := items[target.DebtItemID]
 			if target.StatementID != 0 || !ValidAmount(target.Amount, false) ||
-				!OrdinaryPrincipal(item, sources[item.SourceID]) || Date(sources[item.SourceID].EntryDate) > c.EntryDate {
+				!validAdvanceTarget(c.Mode, item, sources[item.SourceID]) || Date(sources[item.SourceID].EntryDate) > c.EntryDate {
 				return AdvanceConflict()
 			}
 			expected[item.ID] = expected[item.ID].Add(target.Amount)
