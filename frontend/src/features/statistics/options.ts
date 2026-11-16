@@ -189,7 +189,14 @@ export function assetOptions(
     });
   });
   return {
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+      trigger: 'axis',
+      confine: true,
+      enterable: true,
+      // 账户较多时在浮层内滚动，避免超出图表后被卡片裁切。
+      extraCssText:
+        'max-width:100%;max-height:100%;box-sizing:border-box;overflow:auto;overscroll-behavior:contain;',
+    },
     legend: { type: 'scroll', top: 0, textStyle: { fontSize: 11 } },
     grid: { left: 48, right: 12, top: 32, bottom: 24 },
     xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 10 } },
