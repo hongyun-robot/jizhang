@@ -76,4 +76,43 @@ describe('statistics projections', () => {
     });
     expect(describeOption({})).toBe('图表');
   });
+  it('pins the asset total and sorts account balances descending with unknown values last', () => {
+    const tooltip = assetOptions(undefined, style).tooltip;
+    if (!tooltip || Array.isArray(tooltip) || typeof tooltip.formatter !== 'function') {
+      throw new Error('Asset tooltip must provide its formatter');
+    }
+    const params = [
+      { seriesName: '总资产', value: -50 },
+      { seriesName: '负债账户', value: -100 },
+      { seriesName: '零余额', value: 0 },
+      { seriesName: '大额<&账户>', value: 1200.5 },
+      { seriesName: '同额账户', value: 1200.5 },
+      { seriesName: '缺失估值', value: NaN },
+      { seriesName: '空值账户', value: null },
+    ].map((item, seriesIndex) => ({
+      componentType: 'series',
+      componentSubType: 'line',
+      componentIndex: seriesIndex,
+      seriesIndex,
+      name: '11-01 <script>',
+      dataIndex: 0,
+      data: item.value,
+      $vars: [],
+      ...item,
+    }));
+    const original = [...params];
+    const html = tooltip.formatter(params, 'test');
+    if (typeof html !== 'string') throw new Error('Expected HTML asset tooltip');
+    const positions = [
+      '总资产', '大额&lt;&amp;账户&gt;', '同额账户', '零余额', '负债账户', '缺失估值', '空值账户',
+    ].map((name) => html.indexOf(name));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(html).toContain('1,200.5');
+    expect(html).toContain('11-01 &lt;script&gt;');
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('大额<&账户>');
+    expect(html).not.toContain('NaN');
+    expect(params).toEqual(original);
+  });
 });

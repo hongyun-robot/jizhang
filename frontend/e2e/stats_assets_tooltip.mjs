@@ -21,10 +21,13 @@ import { assetOptions } from '/src/features/statistics/options.ts';
 import '/src/styles.css';
 const accounts = Array.from({ length: 24 }, (_, i) => ({
   account_id: i + 1, name: '测试账户' + String(i + 1).padStart(2, '0'),
-  type: 'cash', balance: String((i + 1) * 100),
+  type: 'cash', balance: i === 23 ? '-50000' : String(i === 0 ? 0 : (i + 1) * 100),
 }));
-const data = { start: '2026-11-01', end: '2026-11-02', ending_total: '30000',
-  points: ['2026-11-01', '2026-11-02'].map(date => ({ date, total: '30000', accounts })) };
+const data = { start: '2026-11-01', end: '2026-11-02', ending_total: '-17500',
+  points: ['2026-11-01', '2026-11-02'].map((date, day) => ({ date,
+    total: day ? '-17500' : '-22500',
+    accounts: accounts.map((account, i) => day && i === 0 ? { ...account, balance: '5000' } : account),
+  })) };
 const option = assetOptions(data, { dark: false, isMobile: innerWidth < 768,
   TEAL: '#0a7568', GREEN: '#0f7a52', RED: '#c0392b',
   PALETTE: ['#0a7568', '#40aaa2', '#8a929c'], pieBorder: '#fff', prevBar: '#ddd' });
@@ -65,9 +68,20 @@ try {
     await chart.locator('canvas').waitFor();
     await chart.scrollIntoViewIfNeeded();
     const box = await chart.boundingBox();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.move(box.x + 48 + (box.width - 60) / 4, box.y + box.height / 2);
     const tooltip = chart.locator(':scope > div').last();
     await tooltip.getByText('测试账户24', { exact: true }).waitFor();
+    const accountNames = async () => (await tooltip.locator('span').allTextContents())
+      .filter((text) => text === '总资产' || /^测试账户\d+$/.test(text));
+    const descending = Array.from({ length: 22 }, (_, i) => '测试账户' + String(23 - i).padStart(2, '0'));
+    assert.deepEqual(await accountNames(), ['总资产', ...descending, '测试账户01', '测试账户24'],
+      name + ': total stays first even when negative; accounts sort by signed balance');
+    await page.mouse.move(4, 4);
+    await tooltip.waitFor({ state: 'hidden' });
+    await page.mouse.move(box.x + 48 + (box.width - 60) * 3 / 4, box.y + box.height / 2);
+    await tooltip.getByText('11-02', { exact: true }).waitFor();
+    assert.deepEqual(await accountNames(), ['总资产', '测试账户01', ...descending, '测试账户24'],
+      name + ': account ordering follows the hovered date');
     await page.screenshot({ path: path.join(shots, name + '.png'), fullPage: true });
     const bounds = await tooltip.evaluate((element) => {
       const rect = element.getBoundingClientRect();

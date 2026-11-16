@@ -1,4 +1,5 @@
 import type { EChartsOption, SeriesOption } from 'echarts';
+import { format } from 'echarts/core';
 import type {
   CategoryShareResp,
   TrendResp,
@@ -191,6 +192,22 @@ export function assetOptions(
   return {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'html',
+      formatter: (params) => {
+        const balance = (value: unknown) =>
+          typeof value === 'number' && Number.isFinite(value) ? value : -Infinity;
+        const items = [...(Array.isArray(params) ? params : [params])].sort((a, b) => {
+          if (a.seriesIndex === 0) return -1;
+          if (b.seriesIndex === 0) return 1;
+          return balance(b.value) - balance(a.value);
+        });
+        const rows = items.map((item) => {
+          const value = balance(item.value);
+          const amount = Number.isFinite(value) ? format.addCommas(value) : '-';
+          return `<div style="display:flex;align-items:center;line-height:24px">${item.marker ?? ''}<span>${format.encodeHTML(item.seriesName ?? '')}</span><span style="margin-left:auto;padding-left:20px;font-weight:600">${amount}</span></div>`;
+        });
+        return `<div>${format.encodeHTML(items[0]?.name ?? '')}</div>${rows.join('')}`;
+      },
       confine: true,
       enterable: true,
       // 账户较多时在浮层内滚动，避免超出图表后被卡片裁切。
