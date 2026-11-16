@@ -199,6 +199,8 @@ export function assetOptions(
         const items = [...(Array.isArray(params) ? params : [params])].sort((a, b) => {
           if (a.seriesIndex === 0) return -1;
           if (b.seriesIndex === 0) return 1;
+          if (a.value === 0 && b.value !== 0) return 1;
+          if (b.value === 0 && a.value !== 0) return -1;
           return balance(b.value) - balance(a.value);
         });
         const rows = items.map((item) => {

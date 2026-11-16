@@ -21,11 +21,11 @@ import { assetOptions } from '/src/features/statistics/options.ts';
 import '/src/styles.css';
 const accounts = Array.from({ length: 24 }, (_, i) => ({
   account_id: i + 1, name: '测试账户' + String(i + 1).padStart(2, '0'),
-  type: 'cash', balance: i === 23 ? '-50000' : String(i === 0 ? 0 : (i + 1) * 100),
+  type: 'cash', balance: i === 23 ? '-50000' : String(i < 2 ? 0 : (i + 1) * 100),
 }));
-const data = { start: '2026-11-01', end: '2026-11-02', ending_total: '-17500',
+const data = { start: '2026-11-01', end: '2026-11-02', ending_total: '-17700',
   points: ['2026-11-01', '2026-11-02'].map((date, day) => ({ date,
-    total: day ? '-17500' : '-22500',
+    total: day ? '-17700' : '-22700',
     accounts: accounts.map((account, i) => day && i === 0 ? { ...account, balance: '5000' } : account),
   })) };
 const option = assetOptions(data, { dark: false, isMobile: innerWidth < 768,
@@ -73,14 +73,14 @@ try {
     await tooltip.getByText('测试账户24', { exact: true }).waitFor();
     const accountNames = async () => (await tooltip.locator('span').allTextContents())
       .filter((text) => text === '总资产' || /^测试账户\d+$/.test(text));
-    const descending = Array.from({ length: 22 }, (_, i) => '测试账户' + String(23 - i).padStart(2, '0'));
-    assert.deepEqual(await accountNames(), ['总资产', ...descending, '测试账户01', '测试账户24'],
-      name + ': total stays first even when negative; accounts sort by signed balance');
+    const descending = Array.from({ length: 21 }, (_, i) => '测试账户' + String(23 - i).padStart(2, '0'));
+    assert.deepEqual(await accountNames(), ['总资产', ...descending, '测试账户24', '测试账户01', '测试账户02'],
+      name + ': total stays first; nonzero balances descend and zero balances come last');
     await page.mouse.move(4, 4);
     await tooltip.waitFor({ state: 'hidden' });
     await page.mouse.move(box.x + 48 + (box.width - 60) * 3 / 4, box.y + box.height / 2);
     await tooltip.getByText('11-02', { exact: true }).waitFor();
-    assert.deepEqual(await accountNames(), ['总资产', '测试账户01', ...descending, '测试账户24'],
+    assert.deepEqual(await accountNames(), ['总资产', '测试账户01', ...descending, '测试账户24', '测试账户02'],
       name + ': account ordering follows the hovered date');
     await page.screenshot({ path: path.join(shots, name + '.png'), fullPage: true });
     const bounds = await tooltip.evaluate((element) => {
@@ -113,7 +113,7 @@ try {
     const pageY = await page.evaluate(() => scrollY);
     await page.mouse.wheel(0, 900);
     await page.waitForFunction((element) => element.scrollTop > 0, await tooltip.elementHandle());
-    const lastRow = await tooltip.getByText('测试账户24', { exact: true }).boundingBox();
+    const lastRow = await tooltip.getByText('测试账户02', { exact: true }).boundingBox();
     assert(lastRow.y >= tooltipBox.y && lastRow.y + lastRow.height <= tooltipBox.y + tooltipBox.height,
       name + ': final account is readable after scrolling');
     assert.equal(await page.evaluate(() => scrollY), pageY, name + ': tooltip scroll keeps the page still');
